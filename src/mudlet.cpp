@@ -416,6 +416,17 @@ mudlet::mudlet()
     timerAutologin->start( 1000 );
 
     connect(mpMainStatusBar, SIGNAL(messageChanged(QString)), this, SLOT(slot_statusBarMessageChanged(QString)));
+    // Do something with the QStatusBar just so we "use" it (for 15 seconds)...
+    // This MUST be done otherwise the status bar is never shown - even if it IS
+    // wanted...!
+    if(  mStatusBarState & statusBarAlwaysShown
+      || mStatusBarState & statusBarAutoShown ) {
+
+        mpMainStatusBar->showMessage( tr( "This status bar can be disabled via options once a profile is loaded!" ), 15000 );
+    }
+    else {
+        mpMainStatusBar->showMessage( tr( "This status bar is disabled via options, will not show again this session unless enabled!" ), 5000 );
+    }
 }
 
 bool mudlet::moduleTableVisible()
