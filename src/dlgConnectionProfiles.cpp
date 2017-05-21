@@ -755,8 +755,7 @@ void dlgConnectionProfiles::slot_item_clicked(QListWidgetItem *pItem)
     }
 
     quint16 host_port = val.toUInt();
-    mud_description_textedit->clear();
-    mud_description_textedit->insertPlainText(getDescription(host_url, host_port, profile_name));
+    mud_description_textedit->setPlainText(getDescription(host_url, host_port, profile_name));
 
     port_entry->setText(val);
 
