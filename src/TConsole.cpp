@@ -1,6 +1,8 @@
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Heiko Koehn (KoehnHeiko@googlemail.com)    *
- *                                                                         *
+ *   Copyright (C) 2008-2013 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014-2016 by Stephen Lyons - slysven@virginmedia.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
+ *   Copyright (C) 2016 by Ian Adkins - ieadkins@gmail.com                 *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -19,38 +21,35 @@
  ***************************************************************************/
 
 
-#include <QMessageBox>
-#include <QDebug>
 #include "TConsole.h"
-#include "mudlet.h"
-#include <QScrollBar>
+
+
+#include "Host.h"
 #include "TCommandLine.h"
-#include <QVBoxLayout>
-//#include <sys/time.h>
-#include <stdio.h>
-#include <iostream>
-#include <string>
-#include <time.h>
-//#include <unistd.h>
-#include <QTextCodec>
-#include <QHostAddress>
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <sys/types.h>
-#include <stdio.h>
 #include "TDebug.h"
-#include "TTextEdit.h"
-#include <QGraphicsSimpleTextItem>
-#include "XMLexport.h"
-#include <QShortcut>
+#include "TEvent.h"
 #include "TLabel.h"
+#include "TMap.h"
+#include "TRoomDB.h"
 #include "TSplitter.h"
-#include "TSplitterHandle.h"
-#include <QDir>
-#include "dlgNotepad.h"
-#include <assert.h>
+#include "TTextEdit.h"
+#include "XMLexport.h"
 #include "dlgMapper.h"
+#include "mudlet.h"
+
+#include "pre_guard.h"
+#include <QDateTime>
+#include <QDir>
+#include <QLineEdit>
+#include <QMessageBox>
+#include <QScrollBar>
+#include <QShortcut>
+#include <QToolButton>
+#include <QVBoxLayout>
+#include "post_guard.h"
+
+#include <assert.h>
+
 
 using namespace std;
 
@@ -62,13 +61,13 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
 , buffer( pH )
 , emergencyStop( new QToolButton )
 , layerCommandLine( 0 )
-, mBgColor( QColor( 255, 255, 255 ) )
+, mBgColor( QColor(Qt::black) )
 , mClipboard( mpHost )
-, mCommandBgColor( QColor( 0, 0, 0 ) )
+, mCommandBgColor( QColor(Qt::white) )
 , mCommandFgColor( QColor( 213, 195, 0 ) )
 , mConsoleName( "main" )
-, mDisplayFont( QFont("Bitstream Vera Sans Mono", 10, QFont::Courier ) )//mDisplayFont( QFont("Monospace", 10, QFont::Courier ) )
-, mFgColor( QColor( 0, 0, 0 ) )
+, mDisplayFont( QFont("Bitstream Vera Sans Mono", 10, QFont::Normal ) )//mDisplayFont( QFont("Monospace", 10, QFont::Courier ) )
+, mFgColor( QColor(Qt::white) )
 , mIndentCount( 0 )
 , mIsDebugConsole( isDebugConsole )
 , mLogFileName(QString(""))
@@ -91,13 +90,12 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
 
 , mRecordReplay( false )
 , mSystemMessageBgColor( mBgColor )
-, mSystemMessageFgColor( QColor( 255,0,0 ) )
+, mSystemMessageFgColor( QColor(Qt::red) )
 , mTriggerEngineMode( false )
 , mUserConsole( false )
 , mWindowIsHidden( false )
 , mWrapAt( 100 )
 , networkLatency( new QLineEdit )
-, mLastBufferLogLine( 0 )
 , mUserAgreedToCloseConsole( false )
 , mpBufferSearchBox( new QLineEdit )
 , mpBufferSearchUp( new QToolButton )
@@ -105,15 +103,15 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
 , mCurrentSearchResult( 0 )
 , mSearchQuery("")
 {
-    //mDisplayFont.setWordSpacing( 0 );
-//    mDisplayFont.setLetterSpacing( QFont::AbsoluteSpacing, 0 );
-    QShortcut * ps = new QShortcut(this);
+    auto ps = new QShortcut(this);
     ps->setKey(Qt::CTRL + Qt::Key_W);
     ps->setContext(Qt::WidgetShortcut);
 
     if( mIsDebugConsole )
     {
-        setWindowTitle("Debug Console");
+        setWindowTitle( tr( "Debug Console" ) );
+        // Probably will not show up as this is used inside a QMainWindow widget
+        // which has it's own title and icon set.
         mWrapAt = 50;
         mIsSubConsole = false;
         mStandardFormat.bgR = mBgColor.red();
@@ -122,13 +120,14 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
         mStandardFormat.fgR = mFgColor.red();
         mStandardFormat.fgG = mFgColor.green();
         mStandardFormat.fgB = mFgColor.blue();
-        mStandardFormat.bold = false;
-        mStandardFormat.italics = false;
-        mStandardFormat.underline = false;
+        mStandardFormat.flags &= ~(TCHAR_BOLD);
+        mStandardFormat.flags &= ~(TCHAR_ITALICS);
+        mStandardFormat.flags &= ~(TCHAR_UNDERLINE);
+        mStandardFormat.flags &= ~(TCHAR_STRIKEOUT);
     }
     else
     {
-        setWindowTitle("keine Debug Console");
+        setWindowTitle( tr( "Non Debug Console" ) );
         if( parent )
         {
             mIsSubConsole = true;
@@ -154,9 +153,10 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
         mStandardFormat.fgR = mpHost->mFgColor.red();
         mStandardFormat.fgG = mpHost->mFgColor.green();
         mStandardFormat.fgB = mpHost->mFgColor.blue();
-        mStandardFormat.bold = false;
-        mStandardFormat.italics = false;
-        mStandardFormat.underline = false;
+        mStandardFormat.flags &= ~(TCHAR_BOLD);
+        mStandardFormat.flags &= ~(TCHAR_ITALICS);
+        mStandardFormat.flags &= ~(TCHAR_UNDERLINE);
+        mStandardFormat.flags &= ~(TCHAR_STRIKEOUT);
     }
     setContentsMargins(0,0,0,0);
     if( mpHost )
@@ -182,33 +182,33 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     QSizePolicy sizePolicy4( QSizePolicy::Fixed, QSizePolicy::Expanding);
     QSizePolicy sizePolicy5( QSizePolicy::Fixed, QSizePolicy::Fixed);
     QPalette mainPalette;
-    mainPalette.setColor( QPalette::Text, QColor(0,0,0) );
+    mainPalette.setColor( QPalette::Text, QColor(Qt::black) );
     mainPalette.setColor( QPalette::Highlight, QColor(55,55,255) );
     mainPalette.setColor( QPalette::Window, QColor(0,0,0,255) );
     QPalette splitterPalette;
     splitterPalette = mainPalette;
     splitterPalette.setColor( QPalette::Button, QColor(0,0,255,255) );
-    splitterPalette.setColor( QPalette::Window, QColor(0,255,0));//,255) );
+    splitterPalette.setColor( QPalette::Window, QColor(Qt::green));//,255) );
     splitterPalette.setColor( QPalette::Base, QColor(255,0,0,255) );
-    splitterPalette.setColor( QPalette::Window, QColor(255,255,255) );
+    splitterPalette.setColor( QPalette::Window, QColor(Qt::white) );
     //setPalette( mainPalette );
 
     //QVBoxLayout * layoutFrame = new QVBoxLayout( mainFrame );
     QPalette framePalette;
-    framePalette.setColor( QPalette::Text, QColor(0,0,0) );
+    framePalette.setColor( QPalette::Text, QColor(Qt::black) );
     framePalette.setColor( QPalette::Highlight, QColor(55,55,255) );
     framePalette.setColor( QPalette::Window, QColor(0,0,0,255) );
     mpMainFrame->setPalette( framePalette );
     mpMainFrame->setAutoFillBackground(true);
     mpMainFrame->setContentsMargins(0,0,0,0);
-    QVBoxLayout * centralLayout = new QVBoxLayout;
+    auto centralLayout = new QVBoxLayout;
     setLayout( centralLayout );
-    QVBoxLayout * baseVFrameLayout = new QVBoxLayout;
+    auto baseVFrameLayout = new QVBoxLayout;
     mpBaseVFrame->setLayout( baseVFrameLayout );
     baseVFrameLayout->setMargin( 0 );
     baseVFrameLayout->setSpacing( 0 );
     centralLayout->addWidget( mpBaseVFrame );
-    QHBoxLayout * baseHFrameLayout = new QHBoxLayout;
+    auto baseHFrameLayout = new QHBoxLayout;
     mpBaseHFrame->setLayout( baseHFrameLayout );
     baseHFrameLayout->setMargin( 0 );
     baseHFrameLayout->setSpacing( 0 );
@@ -216,13 +216,13 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     layout()->setMargin( 0 );
     setContentsMargins( 0, 0, 0, 0 );
 
-    QHBoxLayout * topBarLayout = new QHBoxLayout;
+    auto topBarLayout = new QHBoxLayout;
     mpTopToolBar->setLayout( topBarLayout );
     mpTopToolBar->setSizePolicy(QSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed));
     mpTopToolBar->setContentsMargins(0,0,0,0);
     mpTopToolBar->setAutoFillBackground(true);
     QPalette topbarPalette;
-    topbarPalette.setColor( QPalette::Text, QColor(255,255,255) );
+    topbarPalette.setColor( QPalette::Text, QColor(Qt::white) );
     topbarPalette.setColor( QPalette::Highlight, QColor(55,55,255) );
     topbarPalette.setColor( QPalette::Window, QColor(0,255,0,255) );
     topbarPalette.setColor( QPalette::Base, QColor(0,255,0,255) );
@@ -231,14 +231,14 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
 
     topBarLayout->setMargin( 0 );
     topBarLayout->setSpacing(0);
-    QVBoxLayout * leftBarLayout = new QVBoxLayout;
+    auto leftBarLayout = new QVBoxLayout;
     mpLeftToolBar->setLayout( leftBarLayout );
     mpLeftToolBar->setSizePolicy(QSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding));
     mpLeftToolBar->setAutoFillBackground(true);
     leftBarLayout->setMargin( 0 );
     leftBarLayout->setSpacing(0);
     mpLeftToolBar->setContentsMargins(0,0,0,0);
-    QVBoxLayout * rightBarLayout = new QVBoxLayout;
+    auto rightBarLayout = new QVBoxLayout;
     mpRightToolBar->setLayout( rightBarLayout );
     mpRightToolBar->setSizePolicy(QSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding));
     mpRightToolBar->setAutoFillBackground(true);
@@ -252,8 +252,8 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     baseVFrameLayout->addWidget( mpTopToolBar );
     baseVFrameLayout->addWidget( mpBaseHFrame );
     baseHFrameLayout->addWidget( mpLeftToolBar );
-    QWidget * mpCorePane = new QWidget( mpBaseHFrame );
-    QVBoxLayout * coreSpreadLayout = new QVBoxLayout;
+    auto mpCorePane = new QWidget( mpBaseHFrame );
+    auto coreSpreadLayout = new QVBoxLayout;
     mpCorePane->setLayout( coreSpreadLayout );
     mpCorePane->setContentsMargins(0,0,0,0);
     coreSpreadLayout->setMargin(0);
@@ -276,7 +276,7 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     mpMainDisplay->show();
     mpMainFrame->setContentsMargins(0,0,0,0);
     mpMainDisplay->setContentsMargins(0,0,0,0);
-    QVBoxLayout * layout = new QVBoxLayout;
+    auto layout = new QVBoxLayout;
     mpMainDisplay->setLayout(layout);
     layout->setContentsMargins(0,0,0,0);
     layout->setSpacing(0);
@@ -301,12 +301,11 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     layer->setSizePolicy( sizePolicy );
     layer->setFocusPolicy( Qt::NoFocus );
 
-    QHBoxLayout * layoutLayer = new QHBoxLayout;
+    auto layoutLayer = new QHBoxLayout;
     layer->setLayout( layoutLayer );
     layoutLayer->setMargin( 0 );//neu rc1
     layoutLayer->setSpacing( 0 );//neu rc1
     layoutLayer->setMargin( 0 );//neu rc1
-    QSizePolicy sizePolicyLayer(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     mpScrollBar->setFixedWidth( 15 );
 
@@ -348,50 +347,48 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     layerCommandLine->setMaximumHeight(31);
     layerCommandLine->setMinimumHeight(31);
 
-    QHBoxLayout * layoutLayer2 = new QHBoxLayout( layerCommandLine );
+    auto layoutLayer2 = new QHBoxLayout( layerCommandLine );
     layoutLayer2->setMargin(0);
     layoutLayer2->setSpacing(0);
 
-    QWidget * buttonMainLayer = new QWidget;//( layerCommandLine );
+    auto buttonMainLayer = new QWidget;//( layerCommandLine );
     buttonMainLayer->setSizePolicy(sizePolicy);
     buttonMainLayer->setContentsMargins(0,0,0,0);
-    QVBoxLayout * layoutButtonMainLayer = new QVBoxLayout( buttonMainLayer );
+    auto layoutButtonMainLayer = new QVBoxLayout( buttonMainLayer );
     layoutButtonMainLayer->setMargin(0);
     layoutButtonMainLayer->setContentsMargins(0,0,0,0);
 
     layoutButtonMainLayer->setSpacing(0);
     /*buttonMainLayer->setMinimumHeight(31);
     buttonMainLayer->setMaximumHeight(31);*/
-    QWidget * buttonLayer = new QWidget;
-    QGridLayout * layoutButtonLayer = new QGridLayout( buttonLayer );
+    auto buttonLayer = new QWidget;
+    auto layoutButtonLayer = new QGridLayout( buttonLayer );
     layoutButtonLayer->setMargin(0);
     layoutButtonLayer->setSpacing(0);
 
-    QWidget * buttonLayerSpacer = new QWidget(buttonLayer);
+    auto buttonLayerSpacer = new QWidget(buttonLayer);
     buttonLayerSpacer->setSizePolicy( sizePolicy4 );
     layoutButtonMainLayer->addWidget( buttonLayerSpacer );
     layoutButtonMainLayer->addWidget( buttonLayer );
 
-    QToolButton * timeStampButton = new QToolButton;
+    auto timeStampButton = new QToolButton;
     timeStampButton->setCheckable( true );
     timeStampButton->setMinimumSize(QSize(30,30));
     timeStampButton->setMaximumSize(QSize(30,30));
     timeStampButton->setSizePolicy( sizePolicy5 );
     timeStampButton->setFocusPolicy( Qt::NoFocus );
-    timeStampButton->setToolTip("Show Time Stamps");
-    QIcon icon(":/icons/dialog-information.png");
-    timeStampButton->setIcon( icon );
+    timeStampButton->setToolTip(tr("<html><head/><body><p>Show Time Stamps.</p></body></html>"));
+    timeStampButton->setIcon( QIcon( QStringLiteral( ":/icons/dialog-information.png" ) ) );
     connect( timeStampButton, SIGNAL(pressed()), console, SLOT(slot_toggleTimeStamps()));
 
-    QToolButton * replayButton = new QToolButton;
+    auto replayButton = new QToolButton;
     replayButton->setCheckable( true );
     replayButton->setMinimumSize(QSize(30,30));
     replayButton->setMaximumSize(QSize(30,30));
     replayButton->setSizePolicy( sizePolicy5 );
     replayButton->setFocusPolicy( Qt::NoFocus );
-    replayButton->setToolTip("record a replay");
-    QIcon icon4(":/icons/media-tape.png");
-    replayButton->setIcon( icon4 );
+    replayButton->setToolTip(tr("<html><head/><body><p>Record a replay.</p></body></html>"));
+    replayButton->setIcon( QIcon( QStringLiteral( ":/icons/media-tape.png" ) ) );
     connect( replayButton, SIGNAL(pressed()), this, SLOT(slot_toggleReplayRecording()));
 
     logButton = new QToolButton;
@@ -400,28 +397,30 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     logButton->setCheckable( true );
     logButton->setSizePolicy( sizePolicy5 );
     logButton->setFocusPolicy( Qt::NoFocus );
-    logButton->setToolTip("start logging MUD output to log file");
-    QIcon icon3(":/icons/folder-downloads.png");
-    logButton->setIcon( icon3 );
+    logButton->setToolTip(tr("<html><head/><body><p>Start logging MUD output to log file.</p></body></html>"));
+    QIcon logIcon;
+    logIcon.addPixmap( QPixmap( QStringLiteral( ":/icons/folder-downloads.png" ) ), QIcon::Normal, QIcon::Off );
+    logIcon.addPixmap( QPixmap( QStringLiteral( ":/icons/folder-downloads-red-cross.png" ) ), QIcon::Normal, QIcon::On );
+    logButton->setIcon( logIcon );
     connect( logButton, SIGNAL(pressed()), this, SLOT(slot_toggleLogging()));
 
     networkLatency->setReadOnly( true );
     networkLatency->setSizePolicy( sizePolicy4 );
     networkLatency->setFocusPolicy( Qt::NoFocus );
-    networkLatency->setToolTip("<i>N:</i> is the latency of the MUD server and network (aka ping, in seconds), <br><i>S:</i> is the system processing time - how long your triggers took to process the last line(s)");
+    networkLatency->setToolTip(tr("<html><head/><body><p><i>N:</i> is the latency of the MUD server and network (aka ping, in seconds), <br><i>S:</i> is the system processing time - how long your triggers took to process the last line(s).</p></body></html>"));
     networkLatency->setMaximumSize( 120, 30 );
     networkLatency->setMinimumSize( 120, 30 );
     networkLatency->setAutoFillBackground( true );
     networkLatency->setContentsMargins(0,0,0,0);
     QPalette basePalette;
-    basePalette.setColor( QPalette::Text, QColor(0,0,0) );
-    basePalette.setColor( QPalette::Base, QColor(255, 255, 255) );
+    basePalette.setColor( QPalette::Text, QColor(Qt::black) );
+    basePalette.setColor( QPalette::Base, QColor(Qt::white) );
     networkLatency->setPalette( basePalette );
     networkLatency->setAlignment( Qt::AlignHCenter | Qt::AlignVCenter );
 
 
 
-    QFont latencyFont = QFont("Bitstream Vera Sans Mono", 10, QFont::Courier);
+    QFont latencyFont = QFont("Bitstream Vera Sans Mono", 10, QFont::Normal);
     int width;
     int maxWidth = 120;
     width = QFontMetrics( latencyFont ).boundingRect(QString("N:0.000 S:0.000")).width();
@@ -431,7 +430,7 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     }
     else
     {
-         QFont latencyFont2 = QFont("Bitstream Vera Sans Mono", 9, QFont::Courier);
+         QFont latencyFont2 = QFont("Bitstream Vera Sans Mono", 9, QFont::Normal);
          width = QFontMetrics( latencyFont2 ).boundingRect(QString("N:0.000 S:0.000")).width();
          if( width < maxWidth )
          {
@@ -439,20 +438,19 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
          }
          else
          {
-             QFont latencyFont3 = QFont("Bitstream Vera Sans Mono", 8, QFont::Courier);
+             QFont latencyFont3 = QFont("Bitstream Vera Sans Mono", 8, QFont::Normal);
              width = QFontMetrics( latencyFont3 ).boundingRect(QString("N:0.000 S:0.000")).width();
              networkLatency->setFont( latencyFont3 );
          }
     }
 
-    QIcon icon2(":/icons/edit-bomb.png");
     emergencyStop->setMinimumSize(QSize(30,30));
     emergencyStop->setMaximumSize(QSize(30,30));
-    emergencyStop->setIcon( icon2 );
+    emergencyStop->setIcon( QIcon( QStringLiteral( ":/icons/edit-bomb.png" ) ) );
     emergencyStop->setSizePolicy( sizePolicy4 );
     emergencyStop->setFocusPolicy( Qt::NoFocus );
     emergencyStop->setCheckable( true );
-    emergencyStop->setToolTip("Emergency Stop. Stop All Timers and Triggers");
+    emergencyStop->setToolTip(tr("<html><head/><body><p>Emergency Stop. Stops all timers and triggers.</p></body></html>"));
     connect( emergencyStop, SIGNAL(clicked(bool)), this, SLOT(slot_stop_all_triggers( bool )));
 
     mpBufferSearchBox->setMinimumSize(QSize(100,30));
@@ -460,17 +458,15 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     mpBufferSearchBox->setSizePolicy( sizePolicy5 );
     mpBufferSearchBox->setFont(mpHost->mCommandLineFont);
     mpBufferSearchBox->setFocusPolicy( Qt::ClickFocus );
-#if QT_VERSION >= 0x040700
     mpBufferSearchBox->setPlaceholderText("Search ...");
-#endif
     QPalette __pal;
     __pal.setColor(QPalette::Text, mpHost->mCommandLineFgColor );//QColor(0,0,192));
     __pal.setColor(QPalette::Highlight,QColor(0,0,192));
-    __pal.setColor(QPalette::HighlightedText, QColor(255,255,255));
+    __pal.setColor(QPalette::HighlightedText, QColor(Qt::white));
     __pal.setColor(QPalette::Base,mpHost->mCommandLineBgColor);//QColor(255,255,225));
     __pal.setColor(QPalette::Window, mpHost->mCommandLineBgColor);
     mpBufferSearchBox->setPalette( __pal );
-    mpBufferSearchBox->setToolTip("Search buffer");
+    mpBufferSearchBox->setToolTip(tr("<html><head/><body><p>Search buffer.</p></body></html>"));
     connect( mpBufferSearchBox, SIGNAL(returnPressed()), this, SLOT(slot_searchBufferUp()));
 
 
@@ -479,11 +475,9 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     mpBufferSearchUp->setMinimumSize(QSize(30,30));
     mpBufferSearchUp->setMaximumSize(QSize(30,30));
     mpBufferSearchUp->setSizePolicy( sizePolicy5 );
+    mpBufferSearchUp->setToolTip(tr("<html><head/><body><p>Earlier search result.</p></body></html>"));
     mpBufferSearchUp->setFocusPolicy( Qt::NoFocus );
-    mpBufferSearchUp->setToolTip("next result");
-    mpBufferSearchUp->setFocusPolicy( Qt::NoFocus );
-    QIcon icon34(":/icons/export.png");
-    mpBufferSearchUp->setIcon( icon34 );
+    mpBufferSearchUp->setIcon( QIcon( QStringLiteral( ":/icons/export.png" ) ) );
     connect( mpBufferSearchUp, SIGNAL(clicked()), this, SLOT(slot_searchBufferUp()));
 
 
@@ -491,10 +485,8 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     mpBufferSearchDown->setMaximumSize(QSize(30,30));
     mpBufferSearchDown->setSizePolicy( sizePolicy5 );
     mpBufferSearchDown->setFocusPolicy( Qt::NoFocus );
-    mpBufferSearchDown->setToolTip("next result");
-    mpBufferSearchDown->setFocusPolicy( Qt::NoFocus );
-    QIcon icon35(":/icons/import.png");
-    mpBufferSearchDown->setIcon( icon35 );
+    mpBufferSearchDown->setToolTip(tr("<html><head/><body><p>Later search result.</p></body></html>"));
+    mpBufferSearchDown->setIcon( QIcon( QStringLiteral( ":/icons/import.png" ) ) );
     connect( mpBufferSearchDown, SIGNAL(clicked()), this, SLOT(slot_searchBufferDown()));
 
     layoutLayer2->addWidget( mpCommandLine );
@@ -552,8 +544,6 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     mpBaseHFrame->layout()->setSpacing(0);
 
 
-    setAttribute( Qt::WA_OpaquePaintEvent );//was disabled
-
     buttonLayerSpacer->setMinimumHeight(0);
     buttonLayerSpacer->setMinimumWidth(100);
     buttonLayer->setMaximumHeight(31);
@@ -580,8 +570,25 @@ TConsole::TConsole( Host * pH, bool isDebugConsole, QWidget * parent )
     layerCommandLine->setPalette( __pal );
 
     changeColors();
-
+    if( ! mIsSubConsole && ! mIsDebugConsole )
+    {
+        // During first use where mIsDebugConsole IS true mudlet::self() is null
+        // then - but we rely on that flag to avoid having to also test for a
+        // non-null mudlet::self() - the connect(...) will produce a debug
+        // message and not make THAT connection should it indeed be null but it
+        // is not fatal...
+        // So, this SHOULD be the main profile console - Slysven
+        connect( mudlet::self(),
+                 SIGNAL( signal_profileMapReloadRequested( QList<QString> ) ),
+                 this,
+                 SLOT( slot_reloadMap( QList<QString> ) ),
+                 Qt::UniqueConnection );
+        // For some odd reason the first seems to get connected twice - the
+        // last flag prevents multiple ones being made
+    }
 }
+
+Host * TConsole::getHost() { return mpHost; }
 
 void TConsole::setLabelStyleSheet( std::string & buf, std::string & sh )
 {
@@ -648,16 +655,16 @@ void TConsole::resizeEvent( QResizeEvent * event )
         QString n = "WindowResizeEvent";
         pLua->call( func, n );
 
-        TEvent me;
-        me.mArgumentList.append( "sysWindowResizeEvent" );
-        me.mArgumentList.append( QString::number(x - mMainFrameLeftWidth - mMainFrameRightWidth) );
-        me.mArgumentList.append( QString::number(y - mMainFrameTopHeight - mMainFrameBottomHeight - mpCommandLine->height()) );
-        me.mArgumentList.append( mConsoleName );
-        me.mArgumentTypeList.append( ARGUMENT_TYPE_STRING );
-        me.mArgumentTypeList.append( ARGUMENT_TYPE_NUMBER );
-        me.mArgumentTypeList.append( ARGUMENT_TYPE_NUMBER );
-        me.mArgumentTypeList.append( ARGUMENT_TYPE_STRING );
-        mpHost->raiseEvent( &me );
+        TEvent mudletEvent;
+        mudletEvent.mArgumentList.append(QLatin1String("sysWindowResizeEvent"));
+        mudletEvent.mArgumentList.append(QString::number(x - mMainFrameLeftWidth - mMainFrameRightWidth));
+        mudletEvent.mArgumentList.append(QString::number(y - mMainFrameTopHeight - mMainFrameBottomHeight - mpCommandLine->height()));
+        mudletEvent.mArgumentList.append(mConsoleName);
+        mudletEvent.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
+        mudletEvent.mArgumentTypeList.append(ARGUMENT_TYPE_NUMBER);
+        mudletEvent.mArgumentTypeList.append(ARGUMENT_TYPE_NUMBER);
+        mudletEvent.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
+        mpHost->raiseEvent(mudletEvent);
     }
 }
 
@@ -732,29 +739,15 @@ void TConsole::closeEvent( QCloseEvent *event )
     if( profile_name != "default_host" )
     {
         TEvent conCloseEvent;
-        conCloseEvent.mArgumentList.append( "sysExitEvent" );
+        conCloseEvent.mArgumentList.append(QLatin1String("sysExitEvent"));
         conCloseEvent.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
-        mpHost->raiseEvent( & conCloseEvent );
+        mpHost->raiseEvent( conCloseEvent );
 
         if( mpHost->mFORCE_SAVE_ON_EXIT )
         {
-            QString directory_xml = QDir::homePath()+"/.config/mudlet/profiles/"+profile_name+"/current";
-            QString filename_xml = directory_xml + "/"+QDateTime::currentDateTime().toString("dd-MM-yyyy#hh-mm-ss")+".xml";
-            QDir dir_xml;
-            if( ! dir_xml.exists( directory_xml ) )
-            {
-                dir_xml.mkpath( directory_xml );
-            }
-            QFile file_xml( filename_xml );
-            if( file_xml.open( QIODevice::WriteOnly ) )
-            {
-                mpHost->modulesToWrite.clear();
-                XMLexport writer( mpHost );
-                writer.exportHost( & file_xml );
-                file_xml.close();
-                mpHost->saveModules(0);
+            mpHost->modulesToWrite.clear();
+            mpHost->saveProfile();
 
-            }
             if( mpHost->mpMap->mpRoomDB->size() > 0 )
             {
                 QDir dir_map;
@@ -786,55 +779,31 @@ void TConsole::closeEvent( QCloseEvent *event )
             event->ignore();
             return;
         }
-        if( choice == QMessageBox::Yes )
-        {
-            QString directory_xml = QDir::homePath()+"/.config/mudlet/profiles/"+profile_name+"/current";
-            QString filename_xml = directory_xml + "/"+QDateTime::currentDateTime().toString("dd-MM-yyyy#hh-mm-ss")+".xml";
-            QDir dir_xml;
-            if( ! dir_xml.exists( directory_xml ) )
-            {
-                dir_xml.mkpath( directory_xml );
-            }
-            QFile file_xml( filename_xml );
-            if( file_xml.open( QIODevice::WriteOnly ) )
-            {
-                /*XMLexport writer( mpHost );
-                writer.exportHost( & file_xml );
-                file_xml.close();*/
-                mpHost->modulesToWrite.clear();
-                XMLexport writer( mpHost );
-                writer.exportHost( & file_xml );
-                file_xml.close();
-                mpHost->saveModules(0);
-                if( mpHost->mpMap && mpHost->mpMap->mpRoomDB->size() > 0 )
-                {
-                    QDir dir_map;
-                    QString directory_map = QDir::homePath()+"/.config/mudlet/profiles/"+profile_name+"/map";
-                    QString filename_map = directory_map + "/"+QDateTime::currentDateTime().toString("dd-MM-yyyy#hh-mm-ss")+"map.dat";
-                    if( ! dir_map.exists( directory_map ) )
-                    {
-                        dir_map.mkpath( directory_map );
-                    }
-                    QFile file_map( filename_map );
-                    if ( file_map.open( QIODevice::WriteOnly ) )
-                    {
-                        QDataStream out( & file_map );
-                        mpHost->mpMap->serialize( out );
-                        file_map.close();
-                    }
-                }
-                event->accept();
-                return;
-            }
-            else
-            {
-                QMessageBox::critical( this, "ERROR: Not closing profile.", "Failed to save "+profile_name+" to location "+filename_xml+" because of the following error: "+file_xml.errorString() );
-                goto ASK;
-            }
+        if (choice == QMessageBox::Yes) {
+            mpHost->modulesToWrite.clear();
+            std::tuple<bool, QString, QString> result = mpHost->saveProfile();
 
-        }
-        else if( choice == QMessageBox::No )
-        {
+            if (std::get<0>(result) == false) {
+                QMessageBox::critical(this, tr("Couldn't save profile"), tr("Sorry, couldn't save your profile - got the following error: %1").arg(std::get<2>(result)));
+                goto ASK;
+            } else if (mpHost->mpMap && mpHost->mpMap->mpRoomDB->size() > 0) {
+                QDir dir_map;
+                QString directory_map = QDir::homePath() + "/.config/mudlet/profiles/" + profile_name + "/map";
+                QString filename_map = directory_map + "/" + QDateTime::currentDateTime().toString("dd-MM-yyyy#hh-mm-ss") + "map.dat";
+                if (!dir_map.exists(directory_map)) {
+                    dir_map.mkpath(directory_map);
+                }
+                QFile file_map(filename_map);
+                if (file_map.open(QIODevice::WriteOnly)) {
+                    QDataStream out(&file_map);
+                    mpHost->mpMap->serialize(out);
+                    file_map.close();
+                }
+            }
+            event->accept();
+            return;
+
+        } else if (choice == QMessageBox::No) {
             event->accept();
             return;
         }
@@ -862,54 +831,119 @@ int TConsole::getButtonState()
     return mButtonState;
 }
 
-void TConsole::slot_toggleLogging()
+void TConsole::toggleLogging( bool isMessageEnabled )
 {
-    if( mIsDebugConsole ) return;
-    mLogToLogFile = ! mLogToLogFile;
-    //mpHost->mLogStatus = mLogToLogFile;
-    if( mLogToLogFile )
-    {
-        QFile file( QDir::homePath()+"/.config/mudlet/autolog" );
+    if( mIsDebugConsole || mIsSubConsole ) {
+        return;
+        // We don't support logging anything other than main console (at present?)
+    }
+
+    QFile file( QStringLiteral( "%1/.config/mudlet/autolog" ).arg( QDir::homePath() ) );
+    if( ! mLogToLogFile ) {
         file.open( QIODevice::WriteOnly | QIODevice::Text );
         QTextStream out(&file);
         file.close();
-    }
-    else
-    {
-       QFile file( QDir::homePath()+"/.config/mudlet/autolog" );
-       file.remove();
-    }
-    if( mLogToLogFile )
-    {
-        mLastBufferLogLine = buffer.size();
-        QString directoryLogFile = QDir::homePath()+"/.config/mudlet/profiles/"+profile_name+"/log";
-        QString mLogFileName = directoryLogFile + "/"+QDateTime::currentDateTime().toString("dd-MM-yyyy#hh-mm-ss");
-        if( mpHost->mRawStreamDump )
-        {
-            mLogFileName.append(".html");
-        }
-        else
-            mLogFileName.append(".txt");
 
+        QString directoryLogFile = QStringLiteral( "%1/.config/mudlet/profiles/%2/log" ).arg( QDir::homePath() ).arg( profile_name );
+        mLogFileName = QStringLiteral( "%1/%2" ).arg( directoryLogFile ).arg( QDateTime::currentDateTime().toString( QStringLiteral( "yyyy-MM-dd#hh-mm-ss" ) ) );
+        // Revised file name derived from time so that alphabetical filename and
+        // date sort order are the same...
         QDir dirLogFile;
-        if( ! dirLogFile.exists( directoryLogFile ) )
-        {
+        if( ! dirLogFile.exists( directoryLogFile ) ) {
             dirLogFile.mkpath( directoryLogFile );
+        }
+
+        mpHost->mIsCurrentLogFileInHtmlFormat = mpHost->mIsNextLogFileInHtmlFormat;
+        if( mpHost->mIsCurrentLogFileInHtmlFormat ) {
+            mLogFileName.append( QStringLiteral( ".html" ) );
+        }
+        else {
+            mLogFileName.append( QStringLiteral( ".txt" ) );
         }
         mLogFile.setFileName( mLogFileName );
         mLogFile.open( QIODevice::WriteOnly );
         mLogStream.setDevice( &mLogFile );
-        if( mpHost->mRawStreamDump ) mLogStream << "<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01//EN' 'http://www.w3.org/TR/html4/strict.dtd'><html><head><style><!-- *{ font-family: 'Courier New', 'Monospace', 'Courier';} *{ white-space: pre-wrap; } *{color:rgb(255,255,255);} *{background-color:rgb("<<mpHost->mBgColor.red()<<","<<mpHost->mBgColor.green()<<","<<mpHost->mBgColor.blue()<<");} --></style><meta http-equiv='content-type' content='text/html; charset=utf-8'></head><body>";
-        QString message = QString("Logging has started. Log file is ") + mLogFile.fileName() + "\n";
-        printSystemMessage( message );
+        if( isMessageEnabled ) {
+            QString message = tr("Logging has started. Log file is %1\n").arg( mLogFile.fileName() );
+            printSystemMessage( message );
+            // This puts text onto console that is IMMEDIATELY POSTED into log file so
+            // must be done BEFORE logging starts - or actually mLogToLogFile gets set!
+        }
+        mLogToLogFile = true;
     }
-    else
-    {
-        if( mpHost->mRawStreamDump ) mLogStream << "</pre></body></html>";
+    else {
+        file.remove();
+        mLogToLogFile = false;
+        if( isMessageEnabled ) {
+            QString message = tr("Logging has been stopped. Log file is %1\n").arg( mLogFile.fileName() );
+            printSystemMessage( message );
+            // This puts text onto console that is IMMEDIATELY POSTED into log file so
+            // must be done AFTER logging ends - or actually mLogToLogFile gets reset!
+        }
+    }
+
+    if( mLogToLogFile ) {
+        if( mpHost->mIsCurrentLogFileInHtmlFormat ) {
+            QStringList fontsList; // List of fonts to become the font-family entry for
+                                   // the master css in the header
+            fontsList << this->fontInfo().family(); // Seems to be the best way to get the
+                                                // font in use, as different TConsole
+                                                // instances within the same profile
+                                                // might have different fonts in future,
+                                                // and although the font is settable for
+                                                // the main profile window, it is not yet
+                                                // for user miniConsoles, or the Debug one
+            fontsList << QStringLiteral( "Courier New" );
+            fontsList << QStringLiteral( "Monospace" );
+            fontsList << QStringLiteral( "Courier" );
+            fontsList.removeDuplicates(); // In case the actual one is one of the defaults here
+
+            mLogStream << "<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01//EN' 'http://www.w3.org/TR/html4/strict.dtd'>\n";
+            mLogStream << "<html>\n";
+            mLogStream << " <head>\n";
+            mLogStream << "  <meta http-equiv='content-type' content='text/html; charset=utf-8'>";
+            // put the charset as early as possible as the parser MUST restart when it
+            // switches away from the ASCII default
+            mLogStream << "  <meta name='generator' content='Mudlet MUD Client version: " << APP_VERSION << APP_BUILD << "'>\n";
+            // Nice to identify what made the file!
+            mLogStream << "  <title>" << tr( "Mudlet, log from %1 profile" ).arg(profile_name) << "</title>\n" ;
+             // Web-page title
+            mLogStream << "  <style type='text/css'>\n";
+            mLogStream << "   <!-- body { font-family: '" << fontsList.join("', '") << "'; font-size: 100%; line-height: 1.125em; white-space: nowrap; color:rgb(255,255,255); background-color:rgb("<<mpHost->mBgColor.red()<<","<<mpHost->mBgColor.green()<<","<<mpHost->mBgColor.blue()<<");}\n";
+            mLogStream << "        span { white-space: pre; } -->\n";
+            mLogStream << "  </style>\n";
+            mLogStream << "  </head>\n";
+            mLogStream << "  <body><div>";
+            // <div></div> tags required around outside of the body <span></spans> for
+            // strict HTML 4 as we do not use <p></p>s or anything else
+            mLogFile.flush();
+        }
+        logButton->setToolTip( tr("<html><head/><body><p>Stop logging MUD output to log file.</p></body></html>") );
+    }
+    else {
+        if( mpHost->mIsCurrentLogFileInHtmlFormat ) {
+            mLogStream << "</div></body>\n";
+            mLogStream << "</html>\n";
+        }
+        mLogFile.flush();
         mLogFile.close();
-        QString message = QString("Logging has been stopped. Log file is ") + mLogFile.fileName() + "\n";
-        printSystemMessage( message );
+        logButton->setToolTip( tr("<html><head/><body><p>Start logging MUD output to log file.</p></body></html>") );
     }
+}
+
+// Converted into a wrapper around a separate toggleLogging() method so that
+// calls to turn logging on/off via the toolbar button - which go via this
+// wrapper - generate messages on the console.  Requests to control logging from
+// the Lua interpreter call the wrapped method directly and messages are
+// generated for Lua user control by the Lua subsystem.
+void TConsole::slot_toggleLogging()
+{
+    if( mIsDebugConsole || mIsSubConsole ) {
+        return;
+        // We don't support logging anything other than main console (at present?)
+    }
+
+    toggleLogging( true );
 }
 
 void TConsole::slot_toggleReplayRecording()
@@ -936,7 +970,7 @@ void TConsole::slot_toggleReplayRecording()
     else
     {
         mReplayFile.close();
-        QString message = QString("Replay recording has been stopped. File: ") + mLogFile.fileName() + "\n";
+        QString message = QString("Replay recording has been stopped. File: ") + mReplayFile.fileName() + "\n";
         printSystemMessage( message );
     }
 }
@@ -953,14 +987,14 @@ void TConsole::changeColors()
         QPalette palette;
         palette.setColor( QPalette::Text, mFgColor );
         palette.setColor( QPalette::Highlight, QColor(55,55,255) );
-        palette.setColor( QPalette::Base, QColor(0,0,0) );
+        palette.setColor( QPalette::Base, QColor(Qt::black) );
         console->setPalette( palette );
         console2->setPalette( palette );
     }
     else if( mIsSubConsole )
     {
+#if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
         mDisplayFont.setStyleStrategy( (QFont::StyleStrategy)(QFont::NoAntialias | QFont::PreferQuality ) );
-#if defined(Q_OS_MAC) || (defined(Q_OS_LINUX) && QT_VERSION >= 0x040800)
         QPixmap pixmap = QPixmap( 2000, 600 );
         QPainter p(&pixmap);
         mDisplayFont.setLetterSpacing( QFont::AbsoluteSpacing, 0 );
@@ -994,7 +1028,7 @@ void TConsole::changeColors()
         QPalette pal;
         pal.setColor(QPalette::Text, mpHost->mCommandLineFgColor );//QColor(0,0,192));
         pal.setColor(QPalette::Highlight,QColor(0,0,192));
-        pal.setColor(QPalette::HighlightedText, QColor(255,255,255));
+        pal.setColor(QPalette::HighlightedText, QColor(Qt::white));
         pal.setColor(QPalette::Base,mpHost->mCommandLineBgColor);//QColor(255,255,225));
         mpCommandLine->setPalette( pal );
         mpCommandLine->mRegularPalette = pal;
@@ -1004,7 +1038,7 @@ void TConsole::changeColors()
             mpHost->mDisplayFont.setStyleStrategy( (QFont::StyleStrategy)( QFont::PreferAntialias | QFont::PreferQuality ) );
         mpHost->mDisplayFont.setFixedPitch(true);
         mDisplayFont.setFixedPitch(true);
-#if defined(Q_OS_MAC) || (defined(Q_OS_LINUX) && QT_VERSION >= 0x040800)
+#if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
         QPixmap pixmap = QPixmap( 2000, 600 );
         QPainter p(&pixmap);
         QFont _font = mpHost->mDisplayFont;
@@ -1035,11 +1069,18 @@ void TConsole::changeColors()
         mCommandFgColor = mpHost->mCommandFgColor;
         mCommandBgColor = mpHost->mCommandBgColor;
         mpCommandLine->setFont(mpHost->mDisplayFont);
+        mFormatCurrent.bgR = mpHost->mBgColor.red();
+        mFormatCurrent.bgG = mpHost->mBgColor.green();
+        mFormatCurrent.bgB = mpHost->mBgColor.blue();
+        mFormatCurrent.fgR = mpHost->mFgColor.red();
+        mFormatCurrent.fgG = mpHost->mFgColor.green();
+        mFormatCurrent.fgB = mpHost->mFgColor.blue();
+
     }
     QPalette palette;
-    palette.setColor( QPalette::Button, QColor(0,0,255) );
-    palette.setColor( QPalette::Window, QColor(0,255,0) );
-    palette.setColor( QPalette::Base, QColor(255,0,0) );
+    palette.setColor( QPalette::Button, QColor(Qt::blue) );
+    palette.setColor( QPalette::Window, QColor(Qt::green) );
+    palette.setColor( QPalette::Base, QColor(Qt::red) );
 
     if( ! mIsSubConsole )
     {
@@ -1106,44 +1147,7 @@ void TConsole::printOnDisplay( std::string & incomingSocketData )
     mTriggerEngineMode = true;
     buffer.translateToPlainText( incomingSocketData );
     mTriggerEngineMode = false;
-//    if( mLogToLogFile )
-//    {
-//        if( ! mIsDebugConsole )
-//        {
-//            if( buffer.size() < mLastBufferLogLine )
-//            {
-//                mLastBufferLogLine -= buffer.mBatchDeleteSize;
-//                qDebug()<<"---> RESETTING mLastBufferLogLine";
-//                if( mLastBufferLogLine < 0 )
-//                {
-//                    mLastBufferLogLine = 0;
-//                }
-//            }
-//            if( buffer.size() > mLastBufferLogLine + 1 )
-//            {
-//                for( int i=mLastBufferLogLine+1; i<buffer.size(); i++ )
-//                {
-//                    QString toLog;
-//                    if( mpHost->mRawStreamDump )
-//                    {
-//                        QPoint P1 = QPoint(0,i);
-//                        QPoint P2 = QPoint( buffer.buffer[i].size(), i);
-//                        toLog = buffer.bufferToHtml(P1, P2);
-//                    }
-//                    else
-//                    {
-//                        toLog = buffer.lineBuffer[i];
-//                        toLog.append("\n");
-//                    }
-//                    mLogStream << toLog;
-//                    qDebug()<<"LOG:"<<i<<" lastLogLine="<<mLastBufferLogLine<<" size="<<buffer.size()<<" toLog<"<<toLog<<">";
-//                    mLastBufferLogLine++;
-//                }
-//                mLastBufferLogLine--;
-//            }
-//            mLogStream.flush();
-//        }
-//    }
+
     double processT = mProcessingTime.elapsed();
     if( mpHost->mTelnet.mGA_Driver )
     {
@@ -1184,152 +1188,6 @@ void TConsole::finalize()
     console2->showNewLines();
 }
 
-QString TConsole::assemble_html_font_specs()
-{
-    QString s;
-    s = "</span><span style=\"";
-    if( m_LoggerfontSpecs.m_fgColorHasChanged )
-    {
-        s+="color: rgb("+
-            QString::number(m_LoggerfontSpecs.fgColor.red())+","+
-            QString::number(m_LoggerfontSpecs.fgColor.green())+","+
-            QString::number(m_LoggerfontSpecs.fgColor.blue()) + ");";
-    }
-    if( m_LoggerfontSpecs.m_bgColorHasChanged )
-    {
-        s += " background: rgb("+
-            QString::number(m_LoggerfontSpecs.bgColor.red())+","+
-            QString::number(m_LoggerfontSpecs.bgColor.green())+","+
-            QString::number(m_LoggerfontSpecs.bgColor.blue()) +");";
-    }
-    s += " font-weight: " + m_LoggerfontSpecs.getFontWeight() +
-        "; font-style: " + m_LoggerfontSpecs.getFontStyle() +
-        "; font-decoration: " + m_LoggerfontSpecs.getFontDecoration() +
-        "\">";
-    return s;
-}
-
-void TConsole::logger_set_text_properties( QString tags )
-{
-    switch( tags.toInt() )
-    {
-    case 0:
-        m_LoggerfontSpecs.reset();
-        break;
-    case 1:
-        m_LoggerfontSpecs.bold = true;
-        break;
-    case 2:
-        m_LoggerfontSpecs.bold = false;
-        break;
-    case 3:
-        m_LoggerfontSpecs.italics = true;
-        break;
-    case 4:
-        m_LoggerfontSpecs.underline = true;
-    case 5:
-        break; //FIXME support blinking
-    case 6:
-        break; //FIXME support fast blinking
-    case 7:
-        break; //FIXME support inverse
-    case 9:
-        break; //FIXME support strikethrough
-    case 22:
-        m_LoggerfontSpecs.bold = false;
-        break;
-    case 23:
-        m_LoggerfontSpecs.italics = false;
-        break;
-    case 24:
-        m_LoggerfontSpecs.underline = false;
-        break;
-    case 27:
-        break; //FIXME inverse off
-    case 29:
-        break; //FIXME
-    case 30:
-        m_LoggerfontSpecs.fgColor = mpHost->mBlack;
-        m_LoggerfontSpecs.fgColorLight = mpHost->mLightBlack;
-        m_LoggerfontSpecs.fg_color_change();
-        break;
-    case 31:
-        m_LoggerfontSpecs.fgColor = mpHost->mRed;
-        m_LoggerfontSpecs.fgColorLight = mpHost->mLightRed;
-        m_LoggerfontSpecs.fg_color_change();
-        break;
-    case 32:
-        m_LoggerfontSpecs.fgColor = mpHost->mGreen;
-        m_LoggerfontSpecs.fgColorLight = mpHost->mLightGreen;
-        m_LoggerfontSpecs.fg_color_change();
-        break;
-    case 33:
-        m_LoggerfontSpecs.fgColor = mpHost->mYellow;
-        m_LoggerfontSpecs.fgColorLight = mpHost->mLightYellow;
-        m_LoggerfontSpecs.fg_color_change();
-        break;
-    case 34:
-        m_LoggerfontSpecs.fgColor = mpHost->mBlue;
-        m_LoggerfontSpecs.fgColorLight = mpHost->mLightBlue;
-        m_LoggerfontSpecs.fg_color_change();
-        break;
-    case 35:
-        m_LoggerfontSpecs.fgColor = mpHost->mMagenta;
-        m_LoggerfontSpecs.fgColorLight = mpHost->mLightMagenta;
-        m_LoggerfontSpecs.fg_color_change();
-        break;
-    case 36:
-        m_LoggerfontSpecs.fgColor = mpHost->mCyan;
-        m_LoggerfontSpecs.fgColorLight = mpHost->mLightCyan;
-        m_LoggerfontSpecs.fg_color_change();
-        break;
-    case 37:
-        m_LoggerfontSpecs.fgColor = mpHost->mWhite;
-        m_LoggerfontSpecs.fgColorLight = mpHost->mLightWhite;
-        m_LoggerfontSpecs.fg_color_change();
-        break;
-    case 39:
-        m_LoggerfontSpecs.bgColor = mpHost->mBgColor;//mWhite
-        m_LoggerfontSpecs.bg_color_change();
-        break;
-    case 40:
-        m_LoggerfontSpecs.bgColor = mpHost->mBlack;
-        m_LoggerfontSpecs.bg_color_change();
-        break;
-    case 41:
-        m_LoggerfontSpecs.bgColor = mpHost->mRed;
-        m_LoggerfontSpecs.bg_color_change();
-        break;
-    case 42:
-        m_LoggerfontSpecs.bgColor = mpHost->mGreen;
-        m_LoggerfontSpecs.bg_color_change();
-        break;
-    case 43:
-        m_LoggerfontSpecs.bgColor = mpHost->mYellow;
-        m_LoggerfontSpecs.bg_color_change();
-        break;
-    case 44:
-        m_LoggerfontSpecs.bgColor = mpHost->mBlue;
-        m_LoggerfontSpecs.bg_color_change();
-        break;
-    case 45:
-        m_LoggerfontSpecs.bgColor = mpHost->mMagenta;
-        m_LoggerfontSpecs.bg_color_change();
-        break;
-    case 46:
-        m_LoggerfontSpecs.bgColor = mpHost->mCyan;
-        m_LoggerfontSpecs.bg_color_change();
-        break;
-    case 47:
-        m_LoggerfontSpecs.bgColor = mpHost->mWhite;
-        m_LoggerfontSpecs.bg_color_change();
-        break;
-    };
-}
-
-
-QString TConsole::logger_translate( QString & s )
-{
      /* ANSI color codes: sequence = "ESCAPE + [ code_1; ... ; code_n m"
       -----------------------------------------
       0 reset
@@ -1345,7 +1203,7 @@ QString TConsole::logger_translate( QString & s )
       23 italics off
       24 underline off
       27 inverse off
-      28 strikethrough off
+      29 strikethrough off
       30 fg black
       31 fg red
       32 fg green
@@ -1364,49 +1222,6 @@ QString TConsole::logger_translate( QString & s )
       46 bg cyan
       47 bg white
       49 bg black     */
-
-
-    //s.replace(QChar('\\'), "\\\\");
-    s.replace(QChar('\n'), "<br />");
-    s.replace(QChar('\t'), "     ");
-    int sequence_begin = 0;
-    int sequence_end = 0;
-    QString sequence;
-    while( (sequence_begin = s.indexOf(QString("\033["),0) ) != -1 )
-    {
-        sequence_end = s.indexOf(QChar('m'),sequence_begin);
-        int sequence_length = abs(sequence_begin - sequence_end )+1;
-        if( sequence_end != -1 )
-        {
-            sequence = s.mid(sequence_begin+2,sequence_length-3); // weil 3 elemente ausgelassen werden
-            QStringList textPropertyList;
-            if( sequence.indexOf(QChar(';'),0) )
-            {
-                textPropertyList = sequence.split(QChar(';'),QString::SkipEmptyParts);
-            }
-            else
-            {
-                textPropertyList << sequence;
-            }
-            for( int i=0; i<textPropertyList.size(); i++ )
-            {
-                m_LoggerfontSpecs.m_fgColorHasChanged = false;
-                m_LoggerfontSpecs.m_bgColorHasChanged = false;
-                logger_set_text_properties(textPropertyList[i]);
-                //            qDebug()<<"set property:"<<textPropertyList[i];
-            }
-            QString html_tags = assemble_html_font_specs();
-            s.replace(sequence_begin,sequence_length,html_tags);
-        }
-        else
-        {
-            break; // sequenzende befindet sich im naechsten tcp/ip packet
-        }
-    }
-
-    return s;
-}
-
 
 void TConsole::scrollDown( int lines )
 {
@@ -1481,12 +1296,13 @@ void TConsole::reset()
     mFormatCurrent.fgR = mStandardFormat.fgR;
     mFormatCurrent.fgG = mStandardFormat.fgG;
     mFormatCurrent.fgB = mStandardFormat.fgB;
-    mFormatCurrent.bold = false;
-    mFormatCurrent.italics = false;
-    mFormatCurrent.underline = false;
+    mFormatCurrent.flags &= ~(TCHAR_BOLD);
+    mFormatCurrent.flags &= ~(TCHAR_ITALICS);
+    mFormatCurrent.flags &= ~(TCHAR_UNDERLINE);
+    mFormatCurrent.flags &= ~(TCHAR_STRIKEOUT);
 }
 
-void TConsole::insertLink( QString text, QStringList & func, QStringList & hint, QPoint P, bool customFormat )
+void TConsole::insertLink(const QString& text, QStringList & func, QStringList & hint, QPoint P, bool customFormat )
 {
     int x = P.x();
     int y = P.y();
@@ -1520,7 +1336,9 @@ void TConsole::insertLink( QString text, QStringList & func, QStringList & hint,
                 buffer.insertInLine( P, text, mFormatCurrent );
             else
             {
-                TChar _f = TChar(0,0,255,mBgColor.red(), mBgColor.green(), mBgColor.blue(), false, false, true );
+                TChar _f = TChar( 0, 0, 255,
+                                  mBgColor.red(), mBgColor.green(), mBgColor.blue(),
+                                  false, false, true, false );
                 buffer.insertInLine( P, text, _f );
             }
             buffer.applyLink( P, P2, text, func, hint );
@@ -1532,7 +1350,9 @@ void TConsole::insertLink( QString text, QStringList & func, QStringList & hint,
                 buffer.insertInLine( P, text, mFormatCurrent );
             else
             {
-                TChar _f = TChar(0,0,255,mBgColor.red(), mBgColor.green(), mBgColor.blue(), false, false, true );
+                TChar _f = TChar( 0, 0, 255,
+                                  mBgColor.red(), mBgColor.green(), mBgColor.blue(),
+                                  false, false, true, false );
                 buffer.insertInLine( P, text, _f );
             }
             buffer.applyLink( P, P2, text, func, hint );
@@ -1547,7 +1367,9 @@ void TConsole::insertLink( QString text, QStringList & func, QStringList & hint,
                 buffer.addLink( mTriggerEngineMode, text, func, hint, mFormatCurrent );
             else
             {
-                TChar _f = TChar(0,0,255,mBgColor.red(), mBgColor.green(), mBgColor.blue(), false, false, true );
+                TChar _f = TChar( 0, 0, 255,
+                                  mBgColor.red(), mBgColor.green(), mBgColor.blue(),
+                                  false, false, true, false );
                 buffer.addLink( mTriggerEngineMode, text, func, hint, _f );
             }
 
@@ -1575,7 +1397,9 @@ void TConsole::insertLink( QString text, QStringList & func, QStringList & hint,
                                      mFormatCurrent );
             else
             {
-                TChar _f = TChar(0,0,255,mBgColor.red(), mBgColor.green(), mBgColor.blue(), false, false, true );
+                TChar _f = TChar( 0, 0, 255,
+                                  mBgColor.red(), mBgColor.green(), mBgColor.blue(),
+                                  false, false, true, false );
                 buffer.insertInLine( mUserCursor,
                                      text,
                                      _f );
@@ -1605,7 +1429,7 @@ void TConsole::insertLink( QString text, QStringList & func, QStringList & hint,
     }
 }
 
-void TConsole::insertText( QString text, QPoint P )
+void TConsole::insertText(const QString& text, QPoint P )
 {
     int x = P.x();
     int y = P.y();
@@ -1654,9 +1478,10 @@ void TConsole::insertText( QString text, QPoint P )
                            mFormatCurrent.bgR,
                            mFormatCurrent.bgG,
                            mFormatCurrent.bgB,
-                           mFormatCurrent.bold,
-                           mFormatCurrent.italics,
-                           mFormatCurrent.underline );
+                           mFormatCurrent.flags & TCHAR_BOLD,
+                           mFormatCurrent.flags & TCHAR_ITALICS,
+                           mFormatCurrent.flags & TCHAR_UNDERLINE,
+                           mFormatCurrent.flags & TCHAR_STRIKEOUT );
             console->showNewLines();
             console2->showNewLines();
         }
@@ -1680,7 +1505,7 @@ void TConsole::insertText( QString text, QPoint P )
 }
 
 
-void TConsole::replace( QString text )
+void TConsole::replace(const QString& text )
 {
     int x = P_begin.x();
     int o = P_end.x() - P_begin.x();
@@ -1718,7 +1543,9 @@ void TConsole::skipLine()
     }
 }
 
-bool TConsole::saveMap(QString location)
+// TODO: It may be worth considering moving the (now) three following methods
+// to the TMap class...?
+bool TConsole::saveMap(const QString& location)
 {
     QDir dir_map;
     QString filename_map;
@@ -1745,31 +1572,165 @@ bool TConsole::saveMap(QString location)
     return true;
 }
 
-bool TConsole::loadMap(QString location)
+bool TConsole::loadMap(const QString& location)
 {
-    if( !mpHost ) return false;
-    if( !mpHost->mpMap || !mpHost->mpMap->mpMapper )
-    {
-        mudlet::self()->slot_mapper();
-    }
-    if( !mpHost->mpMap || !mpHost->mpMap->mpMapper ) return false;
-
-    mpHost->mpMap->mapClear();
-
-    if ( mpHost->mpMap->restore(location) )
-    {
-        mpHost->mpMap->init( mpHost );
-        mpHost->mpMap->mpMapper->mp2dMap->init();
-        mpHost->mpMap->mpMapper->show();
-        if( mpHost->mpMap )
-            if( mpHost->mpMap->mpMapper )
-                mpHost->mpMap->mpMapper->updateAreaComboBox();
-        // previous selections stay, so we need to clear it
-        //mpHost->mpMap->mpMapper->mp2dMap->deselect();
-        return true;
+    Host * pHost = mpHost;
+    if( ! pHost ) {
+        // Check for valid mpHost pointer (mpHost was/is/will be a QPoint<Host>
+        // in later software versions and is a weak pointer until used
+        // (I think - Slysven ?)
+        return false;
     }
 
-    return false;
+    if( ! pHost->mpMap || ! pHost->mpMap->mpMapper ) {
+        // No map or map currently loaded - so try and created mapper
+        // but don't load a map here by default, we do that below and it may not
+        // be the default map anyhow
+        mudlet::self()->createMapper( false );
+    }
+
+    if( ! pHost->mpMap || ! pHost->mpMap->mpMapper ) {
+        // And that failed so give up
+        return false;
+    }
+
+    pHost->mpMap->mapClear();
+
+    qDebug() << "TConsole::loadMap() - restore map case 1.";
+    pHost->mpMap->pushErrorMessagesToFile( tr( "Pre-Map loading(1) report" ), true );
+    QDateTime now( QDateTime::currentDateTime() );
+
+    bool result = false;
+    if( pHost->mpMap->restore( location ) ) {
+        pHost->mpMap->audit();
+        pHost->mpMap->mpMapper->mp2dMap->init();
+        pHost->mpMap->mpMapper->updateAreaComboBox();
+        pHost->mpMap->mpMapper->resetAreaComboBoxToPlayerRoomArea();
+        pHost->mpMap->mpMapper->show();
+        result = true;
+    }
+    else {
+        pHost->mpMap->mpMapper->mp2dMap->init();
+        pHost->mpMap->mpMapper->updateAreaComboBox();
+        pHost->mpMap->mpMapper->show();
+    }
+
+    if( location.isEmpty() ) {
+        pHost->mpMap->pushErrorMessagesToFile( tr( "Loading map(1) at %1 report" ).arg( now.toString( Qt::ISODate ) ), true );
+    }
+    else {
+        pHost->mpMap->pushErrorMessagesToFile( tr( "Loading map(1) \"%1\" at %2 report" ).arg( location ).arg( now.toString( Qt::ISODate ) ), true );
+    }
+
+    return result;
+}
+
+// Used by TLuaInterpreter::loadMap() and dlgProfilePreferences for import/load
+// of files ending in ".xml"
+// The TLuaInterpreter::loadMap() supplies a pointer to an error Message which
+// it requires in the event of an error (it should be written in a structure
+// to match "loadMap: XXXXX." format) - the presence of a non-null pointer here
+// should be used to suppress the writing of error messages direct to the
+// console - if possible!
+bool TConsole::importMap( const QString & location, QString * errMsg )
+{
+    Host * pHost = mpHost;
+    if( ! pHost ) {
+        // Check for valid mpHost pointer (mpHost was/is/will be a QPoint<Host>
+        // in later software versions and is a weak pointer until used
+        // (I think - Slysven ?)
+        if( errMsg ) {
+            *errMsg = tr( "loadMap: NULL Host pointer {in TConsole::importMap(...)} - something is wrong!" );
+        }
+        return false;
+    }
+
+    if( ! pHost->mpMap || ! pHost->mpMap->mpMapper ) {
+        // No map or mapper currently loaded/present - so try and create mapper
+        mudlet::self()->createMapper( false );
+    }
+
+    if( ! pHost->mpMap || ! pHost->mpMap->mpMapper ) {
+        // And that failed so give up
+        if( errMsg ) {
+            *errMsg = tr( "loadMap: unable to initialise mapper {in TConsole::importMap(...)} - something is wrong!" );
+        }
+        return false;
+    }
+
+    // Dump any outstanding map errors from past activities that had not yet
+    // been logged...
+    qDebug() << "TConsole::importingMap() - importing map case 1.";
+    pHost->mpMap->pushErrorMessagesToFile( tr( "Pre-Map importing(1) report" ), true );
+    QDateTime now( QDateTime::currentDateTime() );
+
+    bool result = false;
+
+    QFileInfo fileInfo( location );
+    QString filePathNameString;
+    if( ! fileInfo.filePath().isEmpty() ) {
+        if( fileInfo.isRelative() ) {
+            // Resolve the name relative to the profile home directory:
+            filePathNameString = QDir::cleanPath( QStringLiteral( "%1/.config/mudlet/profiles/%2/%3" )
+                                                  .arg( QDir::homePath() )
+                                                  .arg( pHost->getName() )
+                                                  .arg( fileInfo.filePath() ) );
+        }
+        else {
+            if( fileInfo.exists() ) {
+                filePathNameString = fileInfo.canonicalFilePath(); // Cannot use cannonical path if file doesn't exist!
+            }
+            else {
+                filePathNameString = fileInfo.absoluteFilePath();
+            }
+        }
+    }
+
+    QFile file( filePathNameString );
+    if( ! file.exists() ) {
+        if( ! errMsg ) {
+            QString infoMsg = tr( "[ ERROR ]  - Map file not found, path and name used was:\n"
+                                               "%1." )
+                              .arg( filePathNameString );
+            pHost->postMessage( infoMsg );
+        }
+        else {
+            // error message for lua loadMap()
+            *errMsg = tr( "loadMap: bad argument #1 value (filename used: \n"
+                         "\"%1\" was not found)." )
+                     .arg( filePathNameString );
+        }
+        return false;
+    }
+
+    if( file.open( QFile::ReadOnly | QFile::Text ) ) {
+
+        if( ! errMsg ) {
+            QString infoMsg = tr( "[ INFO ]  - Map file located and opened, now parsing it..." );
+            pHost->postMessage( infoMsg );
+        }
+
+        result = pHost->mpMap->importMap( file, errMsg );
+
+        file.close();
+        pHost->mpMap->pushErrorMessagesToFile( tr( "Importing map(1) \"%1\" at %2 report" ).arg( location ).arg( now.toString( Qt::ISODate ) ) );
+    }
+    else {
+        if( ! errMsg ) {
+            QString infoMsg = tr( "[ INFO ]  - Map file located but it could not opened, please check permissions on:"
+                                  "\"%1\"." )
+                              .arg( filePathNameString );
+            pHost->postMessage( infoMsg );
+        }
+        else {
+            *errMsg = tr( "loadMap: bad argument #1 value (filename used: \n"
+                         "\"%1\" could not be opened for reading)." )
+                     .arg( filePathNameString );
+        }
+        return false;
+    }
+
+    return result;
 }
 
 bool TConsole::deleteLine( int y )
@@ -1785,17 +1746,17 @@ bool TConsole::hasSelection()
         return false;
 }
 
-void TConsole::insertText( QString msg )
+void TConsole::insertText(const QString& msg )
 {
     insertText( msg, mUserCursor );
 }
 
-void TConsole::insertLink( QString text, QStringList & func, QStringList & hint, bool customFormat )
+void TConsole::insertLink(const QString& text, QStringList & func, QStringList & hint, bool customFormat )
 {
     insertLink( text, func, hint, mUserCursor, customFormat );
 }
 
-void TConsole::insertHTML( QString text )
+void TConsole::insertHTML(const QString& text )
 {
     insertText( text );
 }
@@ -1976,10 +1937,10 @@ bool TConsole::setMiniConsoleFontSize( std::string & buf, int size )
     {
         TConsole * pC = mSubConsoleMap[key];
         if( ! pC ) return false;
-        pC->console->mDisplayFont = QFont("Bitstream Vera Sans Mono", size, QFont::Courier);
+        pC->console->mDisplayFont = QFont("Bitstream Vera Sans Mono", size, QFont::Normal);
         pC->console->updateScreenView();
         pC->console->forceUpdate();
-        pC->console2->mDisplayFont = QFont("Bitstream Vera Sans Mono", size, QFont::Courier);
+        pC->console2->mDisplayFont = QFont("Bitstream Vera Sans Mono", size, QFont::Normal);
         pC->console2->updateScreenView();
         pC->console2->forceUpdate();
         return true;
@@ -2048,7 +2009,7 @@ void TConsole::setUserWindow()
     mUserConsole = true;
 }
 
-int TConsole::select( QString text, int numOfMatch )
+int TConsole::select(const QString& text, int numOfMatch )
 {
     if( mUserCursor.y()<0 ) return -1;
     if( mUserCursor.y()>=buffer.size() ) return -1;
@@ -2110,27 +2071,45 @@ bool TConsole::selectSection( int from, int to )
     return true;
 }
 
-void TConsole::setLink( QString & linkText, QStringList & linkFunction, QStringList & linkHint )
+void TConsole::setLink(const QString & linkText, QStringList & linkFunction, QStringList & linkHint )
 {
     buffer.applyLink( P_begin, P_end, linkText, linkFunction, linkHint );
 }
 
 void TConsole::setBold( bool b )
 {
-    mFormatCurrent.bold = b;
+    if( b )
+        mFormatCurrent.flags |= TCHAR_BOLD;
+    else
+        mFormatCurrent.flags &= ~(TCHAR_BOLD);
     buffer.applyBold( P_begin, P_end, b );
 }
 
 void TConsole::setItalics( bool b )
 {
-    mFormatCurrent.italics = b;
+    if( b )
+        mFormatCurrent.flags |= TCHAR_ITALICS;
+    else
+        mFormatCurrent.flags &= ~(TCHAR_ITALICS);
     buffer.applyItalics( P_begin, P_end, b );
 }
 
 void TConsole::setUnderline( bool b )
 {
-    mFormatCurrent.underline = b;
+    if( b )
+        mFormatCurrent.flags |= TCHAR_UNDERLINE;
+    else
+        mFormatCurrent.flags &= ~(TCHAR_UNDERLINE);
     buffer.applyUnderline( P_begin, P_end, b );
+}
+
+void TConsole::setStrikeOut( bool b )
+{
+    if( b )
+        mFormatCurrent.flags |= TCHAR_STRIKEOUT;
+    else
+        mFormatCurrent.flags &= ~(TCHAR_STRIKEOUT);
+    buffer.applyStrikeOut( P_begin, P_end, b );
 }
 
 void TConsole::setFgColor( int r, int g, int b )
@@ -2173,6 +2152,7 @@ void TConsole::printCommand( QString & msg )
                            mCommandBgColor.blue(),
                            false,
                            false,
+                           false,
                            false );
     }
     else
@@ -2208,11 +2188,11 @@ void TConsole::printCommand( QString & msg )
             }
         }
         msg.append("\n");
-        print( msg, mCommandFgColor.red(), mCommandFgColor.green(), mCommandFgColor.blue(), mCommandBgColor.red(), mCommandBgColor.green(), mCommandBgColor.blue() );
+        print( msg, mCommandFgColor, mCommandBgColor );
     }
 }
 
-void TConsole::echoLink( QString & text, QStringList & func, QStringList & hint, bool customFormat )
+void TConsole::echoLink(const QString & text, QStringList & func, QStringList & hint, bool customFormat )
 {
     if( customFormat )
         buffer.addLink( mTriggerEngineMode, text, func, hint, mFormatCurrent );
@@ -2220,18 +2200,22 @@ void TConsole::echoLink( QString & text, QStringList & func, QStringList & hint,
     {
         if( ! mIsSubConsole && ! mIsDebugConsole )
         {
-            TChar f = TChar(0, 0, 255, mpHost->mBgColor.red(), mpHost->mBgColor.green(), mpHost->mBgColor.blue(), false, false, true);
+            TChar f = TChar( 0, 0, 255,
+                             mpHost->mBgColor.red(), mpHost->mBgColor.green(), mpHost->mBgColor.blue(),
+                             false, false, true, false );
             buffer.addLink( mTriggerEngineMode, text, func, hint, f );
         }
         else
         {
-            TChar f = TChar(0, 0, 255, mBgColor.red(), mBgColor.green(), mBgColor.blue(), false, false, true);
+            TChar f = TChar(0, 0, 255,
+                            mBgColor.red(), mBgColor.green(), mBgColor.blue(),
+                            false, false, true, false);
             buffer.addLink( mTriggerEngineMode, text, func, hint, f );
         }
     }
 }
 
-void TConsole::echo( QString & msg )
+void TConsole::echo(const QString & msg )
 {
     if( mTriggerEngineMode )
     {
@@ -2244,9 +2228,10 @@ void TConsole::echo( QString & msg )
                            mFormatCurrent.bgR,
                            mFormatCurrent.bgG,
                            mFormatCurrent.bgB,
-                           mFormatCurrent.bold,
-                           mFormatCurrent.italics,
-                           mFormatCurrent.underline );
+                           mFormatCurrent.flags & TCHAR_BOLD,
+                           mFormatCurrent.flags & TCHAR_ITALICS,
+                           mFormatCurrent.flags & TCHAR_UNDERLINE,
+                           mFormatCurrent.flags & TCHAR_STRIKEOUT );
     }
     else
     {
@@ -2266,14 +2251,15 @@ void TConsole::print( const char * txt )
                    mFormatCurrent.bgR,
                    mFormatCurrent.bgG,
                    mFormatCurrent.bgB,
-                   mFormatCurrent.bold,
-                   mFormatCurrent.italics,
-                   mFormatCurrent.underline );
+                   mFormatCurrent.flags & TCHAR_BOLD,
+                   mFormatCurrent.flags & TCHAR_ITALICS,
+                   mFormatCurrent.flags & TCHAR_UNDERLINE,
+                   mFormatCurrent.flags & TCHAR_STRIKEOUT );
     console->showNewLines();
     console2->showNewLines();
 }
 
-void TConsole::printDebug( QColor & c, QColor & d, QString & msg )
+void TConsole::printDebug( QColor & c, QColor & d, const QString & msg )
 {
     buffer.append( msg,
                    0,
@@ -2286,18 +2272,19 @@ void TConsole::printDebug( QColor & c, QColor & d, QString & msg )
                    d.blue(),
                    false,
                    false,
+                   false,
                    false );
 
     console->showNewLines();
     console2->showNewLines();
 }
 
-TConsole * TConsole::createBuffer( QString & name )
+TConsole * TConsole::createBuffer(const QString & name )
 {
     std::string key = name.toLatin1().data();
     if( mSubConsoleMap.find( key ) == mSubConsoleMap.end() )
     {
-        TConsole * pC = new TConsole( mpHost, false );
+        auto pC = new TConsole( mpHost, false );
         mSubConsoleMap[key] = pC;
         pC->setWindowTitle(name);
         pC->setContentsMargins(0,0,0,0);
@@ -2337,17 +2324,18 @@ void TConsole::resetMainConsole()
     mLabelMap.clear();
 }
 
-TConsole * TConsole::createMiniConsole( QString & name, int x, int y, int width, int height )
+TConsole * TConsole::createMiniConsole(const QString & name, int x, int y, int width, int height )
 {
     std::string key = name.toLatin1().data();
     if( mSubConsoleMap.find( key ) == mSubConsoleMap.end() )
     {
-        TConsole * pC = new TConsole(mpHost, false, mpMainFrame );
+        auto pC = new TConsole(mpHost, false, mpMainFrame );
         if( ! pC )
         {
             return 0;
         }
         mSubConsoleMap[key] = pC;
+        pC->setObjectName( name );
         pC->setFocusPolicy( Qt::NoFocus );
         pC->setUserWindow();
         pC->console->setIsMiniConsole();
@@ -2368,13 +2356,14 @@ TConsole * TConsole::createMiniConsole( QString & name, int x, int y, int width,
     }
 }
 
-TLabel * TConsole::createLabel( QString & name, int x, int y, int width, int height, bool fillBackground )
+TLabel * TConsole::createLabel(const QString & name, int x, int y, int width, int height, bool fillBackground )
 {
     std::string key = name.toLatin1().data();
     if( mLabelMap.find( key ) == mLabelMap.end() )
     {
-        TLabel * pC = new TLabel( mpMainFrame );
+        auto pC = new TLabel( mpMainFrame );
         mLabelMap[key] = pC;
+        pC->setObjectName( name );
         pC->setAutoFillBackground( fillBackground );
         pC->resize( width, height );
         pC->setContentsMargins(0,0,0,0);
@@ -2392,33 +2381,42 @@ void TConsole::createMapper( int x, int y, int width, int height )
 {
     if( ! mpMapper )
     {
-        mpMapper = new dlgMapper( mpMainFrame, mpHost, mpHost->mpMap );
+        mpMapper = new dlgMapper( mpMainFrame, mpHost, mpHost->mpMap.data() );
         mpHost->mpMap->mpM = mpMapper->glWidget;
         mpHost->mpMap->mpHost = mpHost;
         mpHost->mpMap->mpMapper = mpMapper;
-        mpMapper->mpHost = mpHost;
-        mpHost->mpMap->restore("");
-        mpHost->mpMap->init( mpHost );
+        qDebug() << "TConsole::createMapper() - restore map case 2.";
+        mpHost->mpMap->pushErrorMessagesToFile( tr( "Pre-Map loading(2) report" ), true );
+        QDateTime now( QDateTime::currentDateTime() );
+
+        if( mpHost->mpMap->restore( QString() ) ) {
+            mpHost->mpMap->audit();
+            mpMapper->mp2dMap->init();
+            mpMapper->updateAreaComboBox();
+            mpMapper->resetAreaComboBoxToPlayerRoomArea();
+        }
+
+        mpHost->mpMap->pushErrorMessagesToFile( tr( "Loading map(2) at %1 report" ).arg( now.toString( Qt::ISODate ) ), true );
 
         TEvent mapOpenEvent;
-        mapOpenEvent.mArgumentList.append( "mapOpenEvent" );
+        mapOpenEvent.mArgumentList.append(QLatin1String("mapOpenEvent"));
         mapOpenEvent.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
-        mpHost->raiseEvent( & mapOpenEvent );
+        mpHost->raiseEvent( mapOpenEvent );
     }
     mpMapper->resize( width, height );
     mpMapper->move( x, y );
-    //mpMapper->mp2dMap->init();
     mpMapper->mp2dMap->gridMapSizeChange = true; //mapper size has changed, but only init grid map when necessary
     mpMapper->show();
 }
 
-bool TConsole::createButton( QString & name, int x, int y, int width, int height, bool fillBackground )
+bool TConsole::createButton(const QString & name, int x, int y, int width, int height, bool fillBackground )
 {
     std::string key = name.toLatin1().data();
     if( mLabelMap.find( key ) == mLabelMap.end() )
     {
-        TLabel * pC = new TLabel( mpMainFrame );
+        auto pC = new TLabel( mpMainFrame );
         mLabelMap[key] = pC;
+        pC->setObjectName( name );
         pC->setAutoFillBackground( fillBackground );
         pC->resize( width, height );
         pC->setContentsMargins(0,0,0,0);
@@ -2430,7 +2428,7 @@ bool TConsole::createButton( QString & name, int x, int y, int width, int height
         return false;
 }
 
-bool TConsole::setBackgroundImage( QString & name, QString & path )
+bool TConsole::setBackgroundImage(const QString & name, const QString & path )
 {
     std::string key = name.toLatin1().data();
     if( mLabelMap.find( key ) != mLabelMap.end() )
@@ -2443,7 +2441,7 @@ bool TConsole::setBackgroundImage( QString & name, QString & path )
         return false;
 }
 
-bool TConsole::setBackgroundColor( QString & name, int r, int g, int b, int alpha )
+bool TConsole::setBackgroundColor(const QString & name, int r, int g, int b, int alpha )
 {
     std::string key = name.toLatin1().data();
     if( mSubConsoleMap.find( key ) != mSubConsoleMap.end() )
@@ -2467,7 +2465,43 @@ bool TConsole::setBackgroundColor( QString & name, int r, int g, int b, int alph
 
 }
 
-bool TConsole::showWindow( QString & name )
+bool TConsole::raiseWindow(const QString & name )
+{
+    std::string key = name.toLatin1().data();
+    if( mSubConsoleMap.find( key ) != mSubConsoleMap.end() )
+    {
+        mSubConsoleMap[key]->raise();
+        return true;
+    }
+    else if( mLabelMap.find( key ) != mLabelMap.end() )
+    {
+        mLabelMap[key]->raise();
+        return true;
+    }
+    else
+        return false;
+}
+
+bool TConsole::lowerWindow(const QString & name )
+{
+    std::string key = name.toLatin1().data();
+    if( mSubConsoleMap.find( key ) != mSubConsoleMap.end() )
+    {
+        mSubConsoleMap[key]->lower();
+        mpMainDisplay->lower();
+        return true;
+    }
+    else if( mLabelMap.find( key ) != mLabelMap.end() )
+    {
+        mLabelMap[key]->lower();
+        mpMainDisplay->lower();
+        return true;
+    }
+    else
+        return false;
+}
+
+bool TConsole::showWindow(const QString & name )
 {
     std::string key = name.toLatin1().data();
     if( mSubConsoleMap.find( key ) != mSubConsoleMap.end() )
@@ -2490,7 +2524,7 @@ bool TConsole::showWindow( QString & name )
         return false;
 }
 
-bool TConsole::hideWindow( QString & name )
+bool TConsole::hideWindow(const QString & name )
 {
     std::string key = name.toLatin1().data();
     if( mSubConsoleMap.find( key ) != mSubConsoleMap.end() )
@@ -2508,7 +2542,7 @@ bool TConsole::hideWindow( QString & name )
         return false;
 }
 
-bool TConsole::printWindow( QString & name, QString & text )
+bool TConsole::printWindow(const QString & name, const QString & text )
 {
     std::string key = name.toLatin1().data();
     if( mSubConsoleMap.find( key ) != mSubConsoleMap.end() )
@@ -2525,7 +2559,7 @@ bool TConsole::printWindow( QString & name, QString & text )
         return false;
 }
 
-void TConsole::print( QString & msg )
+void TConsole::print(const QString & msg )
 {
     buffer.append(  msg,
                     0,
@@ -2536,24 +2570,26 @@ void TConsole::print( QString & msg )
                     mFormatCurrent.bgR,
                     mFormatCurrent.bgG,
                     mFormatCurrent.bgB,
-                    mFormatCurrent.bold,
-                    mFormatCurrent.italics,
-                    mFormatCurrent.underline );
+                    mFormatCurrent.flags & TCHAR_BOLD,
+                    mFormatCurrent.flags & TCHAR_ITALICS,
+                    mFormatCurrent.flags & TCHAR_UNDERLINE,
+                    mFormatCurrent.flags & TCHAR_STRIKEOUT );
     console->showNewLines();
     console2->showNewLines();
 }
 
-void TConsole::print( QString & msg, int fgColorR, int fgColorG, int fgColorB, int bgColorR, int bgColorG, int bgColorB )
+void TConsole::print(const QString & msg, const QColor fgColor, const QColor bgColor )
 {
     buffer.append(  msg,
                     0,
                     msg.size(),
-                    fgColorR,
-                    fgColorG,
-                    fgColorB,
-                    bgColorR,
-                    bgColorG,
-                    bgColorB,
+                    fgColor.red(),
+                    fgColor.green(),
+                    fgColor.blue(),
+                    bgColor.red(),
+                    bgColor.green(),
+                    bgColor.blue(),
+                    false,
                     false,
                     false,
                     false );
@@ -2562,7 +2598,7 @@ void TConsole::print( QString & msg, int fgColorR, int fgColorG, int fgColorB, i
 }
 
 
-void TConsole::printSystemMessage( QString & msg )
+void TConsole::printSystemMessage(const QString & msg )
 {
     assert( mpHost );
 
@@ -2592,12 +2628,13 @@ void TConsole::printSystemMessage( QString & msg )
                     mSystemMessageBgColor.blue(),
                     false,
                     false,
+                    false,
                     false );
     console->showNewLines();
     console2->showNewLines();
 }
 
-void TConsole::echoUserWindow( QString & msg )
+void TConsole::echoUserWindow(const QString & msg )
 {
     print( msg );
 }
@@ -2654,14 +2691,12 @@ void TConsole::slot_stop_all_triggers( bool b )
     if( b )
     {
         mpHost->stopAllTriggers();
-        QIcon icon2(":/icons/red-bomb.png");
-        emergencyStop->setIcon( icon2 );
+        emergencyStop->setIcon( QIcon( QStringLiteral( ":/icons/red-bomb.png" ) ) );
     }
     else
     {
         mpHost->reenableAllTriggers();
-        QIcon icon2(":/icons/edit-bomb.png");
-        emergencyStop->setIcon( icon2 );
+        emergencyStop->setIcon( QIcon( QStringLiteral( ":/icons/edit-bomb.png" ) ) );
     }
 }
 
@@ -2675,7 +2710,7 @@ void TConsole::showStatistics()
 
     QString h = header.join("");
     QString msg = h;
-    print( msg, 150, 120, 0, 0, 0, 0 );
+    print( msg, QColor(150, 120, 0), Qt::black );
 
     QString script = "setFgColor(190,150,0); setUnderline(true);echo([[\n\nGMCP events:\n]]);setUnderline(false);setFgColor(150,120,0);display( gmcp );";
     mpHost->mLuaInterpreter.compileAndExecuteScript( script );
@@ -2690,14 +2725,14 @@ void TConsole::showStatistics()
 
     QString r1 = mpHost->getTriggerUnit()->assembleReport();
     msg = r1;
-    print( msg, 150, 120, 0, 0, 0, 0 );
+    print( msg, QColor(150, 120, 0), Qt::black );
     script = "setFgColor(190,150,0); setUnderline(true);echo([[\n\nTimer Report:\n\n]]);setBold(false);setUnderline(false);setFgColor(150,120,0)";
     mpHost->mLuaInterpreter.compileAndExecuteScript( script );
     QString r2 = mpHost->getTimerUnit()->assembleReport();
     QString footer = QString("\n+--------------------------------------------------------------+\n" );
     msg = r2;
-    print( msg, 150, 120, 0, 0, 0, 0 );
-    mpHost->mpConsole->print( footer, 150, 120, 0, 0, 0, 0 );
+    print( msg, QColor(150, 120, 0), Qt::black );
+    mpHost->mpConsole->print( footer, QColor(150, 120, 0), Qt::black );
     script = "resetFormat();";
     mpHost->mLuaInterpreter.compileAndExecuteScript( script );
 
@@ -2795,5 +2830,33 @@ QSize TConsole::getMainWindowSize() const
     return mainWindowSize;
 }
 
+void TConsole::slot_reloadMap( QList<QString> profilesList )
+{
+    Host * pHost = getHost();
+    if( ! pHost ) {
+        return;
+    }
 
+    QString ourName = pHost->getName();
+    if( ! profilesList.contains( ourName ) ) {
+        qDebug() << "TConsole::slot_reloadMap("
+                 << profilesList
+                 << ") request received but we:"
+                 << ourName
+                 << "are not mentioned - so we are ignoring it...!";
+        return;
+    }
 
+    QString infoMsg = tr( "[ INFO ]  - Map reload request received from system..." );
+    pHost->postMessage( infoMsg );
+
+    QString outcomeMsg;
+    if( loadMap( QString() ) ) {
+        outcomeMsg = tr( "[  OK  ]  - ... System Map reload request completed." );
+    }
+    else {
+        outcomeMsg = tr( "[ WARN ]  - ... System Map reload request failed." );
+    }
+
+    pHost->postMessage( outcomeMsg );
+}

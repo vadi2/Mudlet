@@ -1,6 +1,10 @@
+#ifndef MUDLET_GLWIDGET_H
+#define MUDLET_GLWIDGET_H
+
 /***************************************************************************
- *   Copyright (C) 2010 by Heiko Koehn ( KoehnHeiko@googlemail.com )       *
- *                                                                         *
+ *   Copyright (C) 2010-2011 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
+ *   Copyright (C) 2016 by Stephen Lyons - slysven@virginmedia.com         *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -18,42 +22,33 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#ifndef GLWIDGET_H
-#define GLWIDGET_H
-class TMap;
-#include <QtOpenGL/qgl.h>//<QGLWidget>
-#include "TMap.h"
-#include "Host.h"
+
+#include "pre_guard.h"
+#include <QtOpenGL/qgl.h> //problem with git
+#include <QPointer>
+#include "post_guard.h"
 
 class Host;
+class TMap;
 
 
 class GLWidget : public QGLWidget
 {
     Q_OBJECT
 
+    Q_DISABLE_COPY(GLWidget)
+
 public:
-    GLWidget(QWidget *parent = 0);
-    GLWidget(TMap * pM, QWidget *parent = 0);
+    GLWidget(QWidget* parent = 0);
+    GLWidget(TMap* pM, QWidget* parent = 0);
     ~GLWidget();
-    void wheelEvent ( QWheelEvent * e );
+    void wheelEvent(QWheelEvent* e) override;
+    void setViewCenter(int, int, int, int);
 
-    bool is2DView;
-
-    QSize minimumSizeHint() const;
-    QSize sizeHint() const;
-
-    int mRID;
-    int mAID;
-    int mOx;
-    int mOy;
-    int mOz;
-    bool mShiftMode;
-    bool mShowInfo;
-
+    QSize minimumSizeHint() const override;
+    QSize sizeHint() const override;
 
 public slots:
-
     void showInfo();
     void shiftUp();
     void shiftDown();
@@ -61,7 +56,6 @@ public slots:
     void shiftRight();
     void shiftZup();
     void shiftZdown();
-    void showArea(QString);
     void setXRotation(int angle);
     void setYRotation(int angle);
     void setZRotation(int angle);
@@ -69,7 +63,7 @@ public slots:
     void setYDist(int angle);
     void setZDist(int angle);
     void setScale(int);
-    void goRoom(const QString &);
+    void goRoom(const QString&);
     void fullView();
     void singleView();
     void increaseTop();
@@ -89,14 +83,27 @@ signals:
     void zDistChanged(int angle);
 
 protected:
-    void initializeGL();
-    void paintGL();
-    void resizeGL(int width, int height);
-    void mousePressEvent(QMouseEvent *event);
-    void mouseMoveEvent(QMouseEvent *event);
-    void mouseReleaseEvent(QMouseEvent *event);
+    void initializeGL() override;
+    void paintGL() override;
+    void resizeGL(int width, int height) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
 
 public:
+    TMap* mpMap;
+
+private:
+    bool is2DView;
+
+    int mRID;
+    int mAID;
+    int mOx;
+    int mOy;
+    int mOz;
+    bool mShiftMode;
+    bool mShowInfo;
+
     float xRot;
     float yRot;
     float zRot;
@@ -112,9 +119,9 @@ public:
 
     GLfloat rotTri, rotQuad;
     float mScale;
-    TMap * mpMap;
     int mTarget;
-    Host * mpHost;
-    QMap<int,int> mQuads;
+    QPointer<Host> mpHost;
+    QMap<int, int> mQuads;
 };
-#endif
+
+#endif // MUDLET_GLWIDGET_H

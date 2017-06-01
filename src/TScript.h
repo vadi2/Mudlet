@@ -1,10 +1,9 @@
-
-#ifndef _TSCRIPT_H_
-#define _TSCRIPT_H_
+#ifndef MUDLET_TSCRIPT_H
+#define MUDLET_TSCRIPT_H
 
 /***************************************************************************
- *   Copyright (C) 2008-2009 by Heiko Koehn                                     *
- *   KoehnHeiko@googlemail.com                                             *
+ *   Copyright (C) 2008-2012 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -23,21 +22,14 @@
  ***************************************************************************/
 
 
-
-#include <iostream>
-#include <fstream>
-#include <list>
-#include <string>
-#include <QMutex>
-#include <QTimer>
-#include <QString>
-#include <QRegExp>
 #include "Tree.h"
-#include <QDataStream>
-#include "Host.h"
-#include <QTextBlock>
-#include "TLuaInterpreter.h"
 
+#include "pre_guard.h"
+#include <QPointer>
+#include <QStringList>
+#include "post_guard.h"
+
+class Host;
 class TEvent;
 
 
@@ -47,45 +39,37 @@ class TScript : public Tree<TScript>
     friend class XMLimport;
 
 public:
+    virtual ~TScript();
+    TScript(TScript* parent, Host* pHost);
+    TScript(const QString& name, Host* pHost);
 
+    QString getName() { return mName; }
+    void setName(const QString& name) { mName = name; }
+    void compile();
+    void compileAll();
+    bool compileScript();
+    void execute();
+    QString getScript() { return mScript; }
+    bool setScript(const QString& script);
+    bool isFolder() { return mIsFolder; }
+    void setIsFolder(bool b) { mIsFolder = b; }
+    bool registerScript();
+    void callEventHandler(const TEvent&);
+    void setEventHandlerList(QStringList handlerList);
+    QStringList getEventHandlerList() { return mEventHandlerList; }
+    bool exportItem;
+    bool mModuleMasterFolder;
 
-    virtual          ~TScript();
-                     TScript( TScript * parent, Host * pHost );
-                     TScript( QString name, Host * pHost );
-                     TScript& clone(const TScript& );
-
-    QString          getName()                                         { return mName; }
-    void             setName( QString name )                           { mName = name; }
-    void             compile();
-    void             compileAll();
-    bool             compileScript();
-    void             execute();
-    QString          getScript()                                       { return mScript; }
-    bool             setScript( QString & script );
-    bool             isFolder()                                        { return mIsFolder; }
-    void             setIsFolder( bool b )                             { mIsFolder = b; }
-    bool             registerScript();
-    //bool             serialize( QDataStream & );
-    //bool             restore( QDataStream & fs, bool );
-    void             callEventHandler( TEvent * );
-    void             setEventHandlerList( QStringList handlerList );
-    QStringList      getEventHandlerList()                             { return mEventHandlerList; }
-    bool             isClone(TScript &b) const;
-    bool             exportItem;
-    bool            mModuleMasterFolder;
 private:
-
-                     TScript(){};
-    QString          mName;
-    QString          mScript;
-    QString          mFuncName;
-    bool             mIsFolder;
-    Host *           mpHost;
-    bool             mNeedsToBeCompiled;
-    QStringList      mEventHandlerList;
-    bool                  mModuleMember;
-
+    TScript(){};
+    QString mName;
+    QString mScript;
+    QString mFuncName;
+    bool mIsFolder;
+    QPointer<Host> mpHost;
+    bool mNeedsToBeCompiled;
+    QStringList mEventHandlerList;
+    bool mModuleMember;
 };
 
-#endif
-
+#endif // MUDLET_TSCRIPT_H

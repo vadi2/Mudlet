@@ -1,10 +1,10 @@
-
-#ifndef _TALIAS_H_
-#define _TALIAS_H_
+#ifndef MUDLET_TALIAS_H
+#define MUDLET_TALIAS_H
 
 /***************************************************************************
- *   Copyright (C) 2008-2009 by Heiko Koehn                                     *
- *   KoehnHeiko@googlemail.com                                             *
+ *   Copyright (C) 2008-2012 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
+ *   Copyright (C) 2017 by Stephen Lyons - slysven@virginmedia.com         *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -23,71 +23,64 @@
  ***************************************************************************/
 
 
-
-#include <iostream>
-#include <fstream>
-#include <list>
-#include <string>
-#include <QMutex>
-#include <QTimer>
-#include <QString>
-#include <QRegExp>
 #include "Tree.h"
-#include <QDataStream>
-#include "Host.h"
+
+#include "pre_guard.h"
+#include <QApplication>
+#include <QPointer>
+#include <QSharedPointer>
+#include "post_guard.h"
+
 #include <pcre.h>
 
-class TLuaInterpreter;
+class Host;
+
 
 class TAlias : public Tree<TAlias>
 {
+    Q_DECLARE_TR_FUNCTIONS(TAlias) // Needed so we can use tr() even though TAlias is NOT derived from QObject
     friend class XMLexport;
     friend class XMLimport;
 
 public:
+    virtual ~TAlias();
+    TAlias(TAlias* parent, Host* pHost);
+    TAlias(const QString& name, Host* pHost);
+    void compileAll();
+    void compileRegex();
+    QString getName() { return mName; }
+    void setName(const QString& name);
+    void compile();
+    bool compileScript();
+    void execute();
+    QString getScript() { return mScript; }
+    bool setScript(const QString& script);
+    QString getRegexCode() { return mRegexCode; }
+    void setRegexCode(const QString&);
+    void setCommand(const QString& command) { mCommand = command; }
+    QString getCommand() { return mCommand; }
+    bool isFolder() { return mIsFolder; }
+    void setIsFolder(bool b) { mIsFolder = b; }
+    bool match(const QString& toMatch);
+    bool registerAlias();
+    bool isTempAlias() { return mIsTempAlias; }
+    void setIsTempAlias(bool b) { mIsTempAlias = b; }
 
 
-    virtual          ~TAlias();
-                     TAlias( TAlias * parent, Host * pHost );
-                     TAlias( QString name, Host * pHost );
-                     TAlias& clone(const TAlias& );
-    void             compileAll();
-    QString          getName()                       { return mName; }
-    void             setName( QString name );
-    void             compile();
-    bool             compileScript();
-    void             execute();
-    QString          getScript()                     { return mScript; }
-    bool             setScript( QString & script );
-    QString          getRegexCode()                  { return mRegexCode; }
-    void             setRegexCode( QString );
-    void             setCommand( QString command )   { mCommand = command; }
-    QString          getCommand()                    { return mCommand; }
-    bool             isFolder()                      { return mIsFolder; }
-    void             setIsFolder( bool b )           { mIsFolder = b; }
-    bool             match( QString & toMatch );
-    bool             registerAlias();
-    bool             isClone(TAlias &b) const;
-    bool             isTempAlias()                   { return mIsTempAlias; }
-    void             setIsTempAlias( bool b )        { mIsTempAlias = b; }
-
-
-
-                     TAlias(){};
-    QString          mName;
-    QString          mCommand;
-    QString          mRegexCode;
-    pcre *           mpRegex;
-    QString          mScript;
-    bool             mIsFolder;
-    Host *           mpHost;
-    bool             mNeedsToBeCompiled;
-    bool             mIsTempAlias;
-    bool                  mModuleMember;
-    bool            mModuleMasterFolder;
-    QString          mFuncName;
-    bool             exportItem;
+    TAlias() {}
+    QString mName;
+    QString mCommand;
+    QString mRegexCode;
+    QSharedPointer<pcre> mpRegex;
+    QString mScript;
+    bool mIsFolder;
+    QPointer<Host> mpHost;
+    bool mNeedsToBeCompiled;
+    bool mIsTempAlias;
+    bool mModuleMember;
+    bool mModuleMasterFolder;
+    QString mFuncName;
+    bool exportItem;
 };
 
-#endif
-
+#endif // MUDLET_TALIAS_H

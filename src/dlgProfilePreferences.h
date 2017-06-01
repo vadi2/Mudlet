@@ -1,6 +1,9 @@
+#ifndef MUDLET_DLGPROFILEPREFERENCES_H
+#define MUDLET_DLGPROFILEPREFERENCES_H
+
 /***************************************************************************
- *   Copyright (C) 2008-2009 by Heiko Koehn   *
- *   KoehnHeiko@googlemail.com   *
+ *   Copyright (C) 2008-2012 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -18,31 +21,33 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#ifndef dlg_profile_preferences_area_h
-#define dlg_profile_preferences_area_h
 
+#include "pre_guard.h"
 #include "ui_profile_preferences.h"
-#include <QDialog>
 #include <QtCore>
+#include <QDialog>
 #include <QDir>
+#include "post_guard.h"
 
 class Host;
 
-class dlgProfilePreferences : public QDialog , public Ui::profile_preferences
+
+class dlgProfilePreferences : public QDialog, public Ui::profile_preferences
 {
     Q_OBJECT
 
+    Q_DISABLE_COPY(dlgProfilePreferences)
+
 public:
-
-    dlgProfilePreferences( QWidget *, Host * );
-
-    int mFontSize;
-
-signals:
-
+    dlgProfilePreferences(QWidget*, Host*);
 
 public slots:
+    // Fonts.
     void setFontSize();
+    void setDisplayFont();
+    void setCommandLineFont();
+
+    // Terminal colors.
     void setColorBlack();
     void setColorLightBlack();
     void setColorRed();
@@ -59,15 +64,15 @@ public slots:
     void setColorLightMagenta();
     void setColorWhite();
     void setColorLightWhite();
-    void setDisplayFont();
-    void setCommandLineFont();
     void setFgColor();
     void setBgColor();
     void setCommandLineBgColor();
     void setCommandLineFgColor();
-
     void setCommandFgColor();
     void setCommandBgColor();
+    void resetColors();
+
+    // Mapper colors.
     void setColorBlack2();
     void setColorLightBlack2();
     void setColorRed2();
@@ -86,16 +91,26 @@ public slots:
     void setColorLightWhite2();
     void setFgColor2();
     void setBgColor2();
-    void resetColors();
+    void resetColors2();
+
+    // Map.
     void downloadMap();
     void loadMap();
     void saveMap();
     void copyMap();
-    void hideActionLabel();
+    void slot_chooseProfilesChanged(QAction*);
+
+    // Save.
     void slot_save_and_exit();
+
+    void hideActionLabel();
 
 private:
     void setColors();
-    Host * mpHost;
+    void setColor(QPushButton* b, QColor& c);
+
+    int mFontSize;
+    QPointer<Host> mpHost;
 };
-#endif
+
+#endif // MUDLET_DLGPROFILEPREFERENCES_H

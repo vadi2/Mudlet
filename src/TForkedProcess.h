@@ -1,6 +1,9 @@
+#ifndef MUDLET_TFORKEDPROCESS_H
+#define MUDLET_TFORKEDPROCESS_H
+
 /***************************************************************************
- *   Copyright (C) 2009 by Benjamin Lerman                                 *
- *   mudlet@ambre.net                                                      *
+ *   Copyright (C) 2009 by Benjamin Lerman - mudlet@ambre.net              *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -18,45 +21,39 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#ifndef FORKED_PROCESS_H
-#define FORKED_PROCESS_H
+
+#include "pre_guard.h"
+#include <QProcess>
+#include "post_guard.h"
 
 #include "TLuaInterpreter.h"
 
-#include<QProcess>
 
-extern "C"
+class TForkedProcess : public QProcess
 {
-    #include "lua.h"
-    #include "lualib.h"
-    #include "lauxlib.h"
-}
-class TLuaInterpreter;
+    Q_OBJECT
 
-class TForkedProcess : public QProcess {
-
-Q_OBJECT
+    Q_DISABLE_COPY(TForkedProcess)
 
 public:
     virtual ~TForkedProcess();
 
-    static int startProcess( TLuaInterpreter *, lua_State *);
+    static int startProcess(TLuaInterpreter*, lua_State*);
 
 private:
-    TForkedProcess( TLuaInterpreter *, lua_State * );
+    TForkedProcess(TLuaInterpreter*, lua_State*);
 
     int callBackFunctionRef;
-    TLuaInterpreter *interpreter;
+    TLuaInterpreter* interpreter;
     bool running;
 
-    static int closeInputOfProcess ( lua_State * L );
-    static int isProcessRunning ( lua_State * L );
-    static int sendMessage( lua_State * L );
+    static int closeInputOfProcess(lua_State* L);
+    static int isProcessRunning(lua_State* L);
+    static int sendMessage(lua_State* L);
 
 private slots:
     void slotReceivedData();
     void slotFinish();
 };
 
-#endif
-
+#endif // MUDLET_TFORKEDPROCESS_H

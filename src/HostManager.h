@@ -1,9 +1,10 @@
-#ifndef _HOSTMANAGER_H_
-#define _HOSTMANAGER_H_
+#ifndef MUDLET_HOSTMANAGER_H
+#define MUDLET_HOSTMANAGER_H
 
 /***************************************************************************
- *   Copyright (C) 2008 by Heiko Koehn                                     *
- *   KoehnHeiko@googlemail.com                                             *
+ *   Copyright (C) 2008-2011 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
+ *   Copyright (C) 2016 by Stephen Lyons - slysven@virginmedia.com         *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -22,44 +23,34 @@
  ***************************************************************************/
 
 
+#include "Host.h"
+
+#include "pre_guard.h"
+#include <QList>
+#include <QMap>
+#include <QReadWriteLock>
 #include <QString>
 #include <QStringList>
-#include <string>
-#include "HostPool.h"
-#include "Host.h"
+#include "post_guard.h"
+
+
+class TEvent;
 
 
 class HostManager
 {
 public:
-
-    static             HostManager * self();
-    Host *             getHost( QString hostname );
-    Host *             getHost( std::string hostname );
-    QStringList        getHostList() { return mHostPool.getHostList(); }
-    QList<QString>     getHostNameList() { return mHostPool.getHostNameList(); }
-    Host *             getFirstHost(){ return mHostPool.getFirstHost(); }
-    Host *             getNextHost( QString LastHost ){ return mHostPool.getNextHost(LastHost); } //get next host key by providing a LastHost
-    bool               addHost( QString name, QString port, QString login, QString pass );
-    bool               deleteHost( QString );
-    bool               renameHost( QString );
-    Host *             getHostFromHostID( int id ){ return mHostPool.getHostFromHostID( id ); }
-    bool               serialize();
-    void               postIrcMessage(QString, QString, QString );
+    HostManager() /* : mpActiveHost() - Not needed */ {}
+    Host* getHost(QString hostname);
+    QStringList getHostList();
+    bool addHost(QString name, QString port, QString login, QString pass);
+    bool deleteHost(QString);
+    void postIrcMessage(QString, QString, QString);
+    void postInterHostEvent(const Host*, const TEvent&);
 
 private:
-
-                        HostManager(){;}
-    void                init();
-
-
-    static HostManager * _self;
-    HostPool            mHostPool;
-    QMutex              mLock;
-    Host *              mpActiveHost;
-
+    QReadWriteLock mPoolReadWriteLock; // Was QMutex, but we needed to allow concurrent read access
+    QMap<QString, QSharedPointer<Host>> mHostPool;
 };
 
-#endif
-
-
+#endif // MUDLET_HOSTMANAGER_H

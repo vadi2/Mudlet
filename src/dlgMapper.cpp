@@ -1,5 +1,7 @@
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2008-2013 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
+ *   Copyright (C) 2015-2016 by Stephen Lyons - slysven@virginmedia.com    *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -17,49 +19,59 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
+
 #include "dlgMapper.h"
-#include "TDebug.h"
+
+
 #include "Host.h"
+#include "TConsole.h"
+#include "TMap.h"
+#include "TRoom.h"
+#include "TRoomDB.h"
+
+#include "pre_guard.h"
+#include <QListWidget>
 #include <QMessageBox>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QProgressDialog>
+#include "post_guard.h"
+
 
 dlgMapper::dlgMapper( QWidget * parent, Host * pH, TMap * pM )
 : QWidget( parent )
 , mpMap( pM )
 , mpHost( pH )
+, mShowDefaultArea( true )
 {
     setupUi(this);
 
     glWidget->mpMap = pM;
     mp2dMap->mpMap = pM;
     mp2dMap->mpHost = pH;
-    QMapIterator<int, QString> it( mpMap->mpRoomDB->getAreaNamesMap() );
+    QMapIterator<int, QString> it(mpMap->mpRoomDB->getAreaNamesMap());
     //sort them alphabetically (case sensitive)
-    QMap <QString, QString> areaNames;
-    while( it.hasNext() )
-    {
+    QMap<QString, QString> areaNames;
+    while (it.hasNext()) {
         it.next();
         QString name = it.value();
         areaNames.insert(name.toLower(), name);
     }
     //areaNames.sort();
-    QMapIterator<QString, QString> areaIt( areaNames );
-    while( areaIt.hasNext() )
-    {
+    QMapIterator<QString, QString> areaIt(areaNames);
+    while (areaIt.hasNext()) {
         areaIt.next();
-        showArea->addItem( areaIt.value() );
+        showArea->addItem(areaIt.value());
     }
-    bubbles->setChecked( mpHost->mBubbleMode );
+    bubbles->setChecked(mpHost->mBubbleMode);
     mp2dMap->mBubbleMode = mpHost->mBubbleMode;
     d3buttons->setVisible(false);
-    roomSize->setValue(mpHost->mRoomSize*10);
+    roomSize->setValue(mpHost->mRoomSize * 10);
     lineSize->setValue(mpHost->mLineSize);
-    showInfo->setChecked( mpHost->mShowInfo );
+    showInfo->setChecked(mpHost->mShowInfo);
     mp2dMap->mShowInfo = mpHost->mShowInfo;
 
-    showRoomIDs->setChecked( mpHost->mShowRoomID );
+    showRoomIDs->setChecked(mpHost->mShowRoomID);
     mp2dMap->mShowRoomID = mpHost->mShowRoomID;
 
     panel->setVisible(mpHost->mShowPanel);
@@ -88,10 +100,9 @@ dlgMapper::dlgMapper( QWidget * parent, Host * pH, TMap * pM )
     connect(shiftUp, SIGNAL(pressed()), glWidget, SLOT(shiftUp()));
     connect(shiftDown, SIGNAL(pressed()), glWidget, SLOT(shiftDown()));
     connect(showInfo, SIGNAL(clicked()), glWidget, SLOT(showInfo()));
-    connect(showArea, SIGNAL(activated(QString)), mp2dMap, SLOT(switchArea(QString)));
-    connect(showArea, SIGNAL(activated(QString)), glWidget, SLOT(showArea(QString)));
+    connect(showArea, SIGNAL(activated(QString)), mp2dMap, SLOT(slot_switchArea(QString)));
     connect(defaultView, SIGNAL(pressed()), glWidget, SLOT(defaultView()));
-    connect(dim2,SIGNAL(pressed()), this, SLOT(show2dView()));
+    connect(dim2, SIGNAL(pressed()), this, SLOT(show2dView()));
     connect(sideView, SIGNAL(pressed()), glWidget, SLOT(sideView()));
     connect(topView, SIGNAL(pressed()), glWidget, SLOT(topView()));
     connect(togglePanel, SIGNAL(pressed()), this, SLOT(slot_togglePanel()));
@@ -101,10 +112,17 @@ dlgMapper::dlgMapper( QWidget * parent, Host * pH, TMap * pM )
     connect(xRot, SIGNAL(valueChanged(int)), glWidget, SLOT(setXRotation(int)));
     connect(yRot, SIGNAL(valueChanged(int)), glWidget, SLOT(setYRotation(int)));
     connect(zRot, SIGNAL(valueChanged(int)), glWidget, SLOT(setZRotation(int)));
-    mpDownloader = new QNetworkAccessManager( this );
-    connect(mpDownloader, SIGNAL(finished(QNetworkReply*)),this, SLOT(replyFinished(QNetworkReply*)));
     connect(showRoomIDs, SIGNAL(stateChanged(int)), this, SLOT(slot_toggleShowRoomIDs(int)));
-    mp2dMap->mFontHeight = QFontMetrics( mpHost->mDisplayFont ).height();
+    QFont mapperFont = QFont(mpHost->mDisplayFont.family());
+    if (mpHost->mNoAntiAlias) {
+        mapperFont.setStyleStrategy(QFont::NoAntialias);
+    } else {
+        mapperFont.setStyleStrategy(static_cast<QFont::StyleStrategy>(QFont::PreferAntialias | QFont::PreferQuality));
+    }
+    setFont(mapperFont);
+    // Explicitly set the font otherwise it changes between the Application and
+    // the default System one as the mapper is docked and undocked!
+    mp2dMap->mFontHeight = QFontMetrics(mpHost->mDisplayFont).height();
     glWidget->hide();
     mpMap->customEnvColors[257] = mpHost->mRed_2;
     mpMap->customEnvColors[258] = mpHost->mGreen_2;
@@ -122,34 +140,45 @@ dlgMapper::dlgMapper( QWidget * parent, Host * pH, TMap * pM )
     mpMap->customEnvColors[270] = mpHost->mLightCyan_2;
     mpMap->customEnvColors[271] = mpHost->mLightWhite_2;
     mpMap->customEnvColors[272] = mpHost->mLightBlack_2;
-    qDebug()<<"dlgMapper constructor -> call T2DMap::init()";
-    mp2dMap->init();
+// Not needed as already explicitly called, IMHO - Slysven
+//    qDebug()<<"dlgMapper constructor -> call T2DMap::init()";
+//    mp2dMap->init();
 }
 
 void dlgMapper::updateAreaComboBox()
 {
-    QMapIterator<int, QString> it( mpMap->mpRoomDB->getAreaNamesMap() );
-    //sort them alphabetically (case sensitive)
-    QMap <QString, QString> areaNames;
-    while( it.hasNext() )
-    {
-        it.next();
-        QString name = it.value();
-        areaNames.insert(name.toLower(), name);
+    QString oldValue = showArea->currentText(); // Remember where we were
+    QMapIterator<int, QString> itAreaNamesA(mpMap->mpRoomDB->getAreaNamesMap());
+    //insert sort them alphabetically (case INsensitive)
+    QMap<QString, QString> _areaNames;
+    while (itAreaNamesA.hasNext()) {
+        itAreaNamesA.next();
+        if (itAreaNamesA.key() == -1 && !mShowDefaultArea) {
+            continue; // Skip the default area from the listing if so directed
+        }
+
+        uint deduplicate = 0;
+        QString _name;
+        do {
+            _name = QStringLiteral("%1+%2").arg(itAreaNamesA.value().toLower()).arg(++deduplicate);
+            // Use a different suffix separator to one that area names
+            // deduplication uses ('_') - makes debugging easier?
+        } while (_areaNames.contains(_name));
+        _areaNames.insert(_name, itAreaNamesA.value());
     }
-    //areaNames.sort();
-    QMapIterator<QString, QString> areaIt( areaNames );
+
     showArea->clear();
-    while( areaIt.hasNext() )
-    {
-        areaIt.next();
-        showArea->addItem( areaIt.value() );
+    QMapIterator<QString, QString> itAreaNamesB(_areaNames);
+    while (itAreaNamesB.hasNext()) {
+        itAreaNamesB.next();
+        showArea->addItem(itAreaNamesB.value());
     }
+    showArea->setCurrentText(oldValue); // Try and reset to previous value
 }
 
 void dlgMapper::slot_toggleShowRoomIDs(int s)
 {
-    if( s == Qt::Checked )
+    if (s == Qt::Checked)
         mp2dMap->mShowRoomID = true;
     else
         mp2dMap->mShowRoomID = false;
@@ -157,7 +186,7 @@ void dlgMapper::slot_toggleShowRoomIDs(int s)
     mp2dMap->update();
 }
 
-void dlgMapper::slot_toggleStrongHighlight( int v )
+void dlgMapper::slot_toggleStrongHighlight(int v)
 {
     mpHost->mMapStrongHighlight = v == Qt::Checked ? true : false;
     mp2dMap->update();
@@ -173,103 +202,34 @@ void dlgMapper::show2dView()
 {
     glWidget->setVisible(!glWidget->isVisible());
     mp2dMap->setVisible(!mp2dMap->isVisible());
-    if(glWidget->isVisible())
+    if (glWidget->isVisible()) {
         d3buttons->setVisible(true);
-    else
+    } else {
         d3buttons->setVisible(false);
-
-}
-
-void dlgMapper::downloadMap()
-{
-    QString url = mpHost->mUrl;
-    url.prepend("http://www.");
-    url.append("/maps/map.xml");
-    //qDebug()<<"DOWNLOADING:"<<url;
-    mpReply = mpDownloader->get( QNetworkRequest( QUrl( url ) ) );
-    mpProgressDialog = new QProgressDialog("Downloading the map ...", "Abort", 0, 4000000, this);
-    connect(mpReply, SIGNAL(downloadProgress( qint64, qint64 )), this, SLOT(setDownloadProgress(qint64,qint64)));
-    connect(mpProgressDialog, SIGNAL(canceled()), this, SLOT(cancel()));
-    mpProgressDialog->show();
-}
-
-void dlgMapper::setDownloadProgress( qint64 got, qint64 tot )
-{
-    mpProgressDialog->setRange(0, static_cast<int>(tot) );
-    mpProgressDialog->setValue(static_cast<int>(got));
-}
-
-void dlgMapper::cancel()
-{
-    qDebug()<<"download was cancalled";
-    mpProgressDialog->close();
-    mpReply->abort();
-    mpHost->mpMap->init( mpHost );
-    glWidget->updateGL();
-}
-
-#include "XMLimport.h"
-
-void dlgMapper::replyFinished( QNetworkReply * reply )
-{
-    //qDebug()<<"download complete!";
-    mpProgressDialog->close();
-
-    QString name = QDir::homePath()+"/.config/mudlet/profiles/"+mpHost->getName()+"/map.xml";
-    QFile file(name);
-    file.open( QFile::WriteOnly );
-    file.write( reply->readAll() );
-    file.flush();
-    file.close();
-
-    if( ! file.open(QFile::ReadOnly | QFile::Text) )
-    {
-        QMessageBox::warning(this, tr("Import Map Package:"),
-                             tr("Cannot read file %1:\n%2.")
-                             .arg(name)
-                             .arg(file.errorString()));
-        return;
     }
-
-    XMLimport reader( mpHost );
-    reader.importPackage( & file );
-
-    mpHost->mpMap->init( mpHost );
-    glWidget->updateGL();
-
-    if( mpHost->mpMap )
-        if( mpHost->mpMap->mpMapper )
-            mpHost->mpMap->mpMapper->updateAreaComboBox();
-
-    TEvent mapDownloadEvent;
-    mapDownloadEvent.mArgumentList.append( "sysMapDownloadEvent" );
-    mapDownloadEvent.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
-    mpHost->raiseEvent( & mapDownloadEvent );
-
 }
 
-void dlgMapper::choseRoom(QListWidgetItem * pT )
+void dlgMapper::choseRoom(QListWidgetItem* pT)
 {
     QString txt = pT->text();
 
-    QMapIterator<int, TRoom *> it( mpMap->mpRoomDB->getRoomMap() );
-    while( it.hasNext() )
-    {
+    QHashIterator<int, TRoom*> it(mpMap->mpRoomDB->getRoomMap());
+    while (it.hasNext()) {
         it.next();
         int i = it.key();
-        TRoom * pR = mpMap->mpRoomDB->getRoom(i);
-        if( !pR ) continue;
-        if( pR->name == txt )
-        {
-            qDebug()<<"found room id="<<i;
+        TRoom* pR = mpMap->mpRoomDB->getRoom(i);
+        if (!pR) {
+            continue;
+        }
+        if (pR->name == txt) {
+            qDebug() << "found room id=" << i;
             mpMap->mTargetID = i;
-            if( ! mpMap->findPath( mpMap->mRoomId, i ) )
-            {
+            if (!mpMap->findPath(mpMap->mRoomIdHash.value(mpMap->mpHost->getName()), i)) {
                 QString msg = "Cannot find a path to this room.\n";
                 mpHost->mpConsole->printSystemMessage(msg);
-            }
-            else
+            } else {
                 mpMap->mpHost->startSpeedWalk();
+            }
             break;
         }
     }
@@ -316,14 +276,14 @@ void dlgMapper::goRoom()
 
 void dlgMapper::slot_roomSize(int d)
 {
-    float s = (float)d/10.0;
-    mp2dMap->setRoomSize( s );
+    float s = (float)d / 10.0;
+    mp2dMap->setRoomSize(s);
     mp2dMap->update();
 }
 
 void dlgMapper::slot_lineSize(int d)
 {
-    mp2dMap->setExitSize( d );
+    mp2dMap->setExitSize(d);
     mp2dMap->update();
 }
 
@@ -339,4 +299,38 @@ void dlgMapper::slot_info()
     mp2dMap->mShowInfo = showInfo->isChecked();
     mp2dMap->mpHost->mShowInfo = mp2dMap->mShowInfo;
     mp2dMap->update();
+}
+
+void dlgMapper::setDefaultAreaShown(bool state)
+{
+    if (mShowDefaultArea != state) {
+        mShowDefaultArea = state;
+        updateAreaComboBox();
+    }
+}
+
+void dlgMapper::resetAreaComboBoxToPlayerRoomArea()
+{
+    Host* pHost = mpHost;
+    if (!pHost) {
+        return;
+    }
+
+    TRoom* pR = mpMap->mpRoomDB->getRoom(mpMap->mRoomIdHash.value(pHost->getName()));
+    if (pR) {
+        int playerRoomArea = pR->getArea();
+        TArea* pA = mpMap->mpRoomDB->getArea(playerRoomArea);
+        if (pA) {
+            QString areaName = mpMap->mpRoomDB->getAreaNamesMap().value(playerRoomArea);
+            if (!areaName.isEmpty()) {
+                showArea->setCurrentText(areaName);
+            } else {
+                qDebug() << "dlgResetAreaComboBoxTolayerRoomArea() warning: player room area name not valid.";
+            }
+        } else {
+            qDebug() << "dlgResetAreaComboBoxTolayerRoomArea() warning: player room area valid.";
+        }
+    } else {
+        qDebug() << "dlgResetAreaComboBoxTolayerRoomArea() warning: player room not valid.";
+    }
 }

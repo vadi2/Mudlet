@@ -1,6 +1,9 @@
+#ifndef MUDLET_SCRIPTUNIT_H
+#define MUDLET_SCRIPTUNIT_H
+
 /***************************************************************************
- *   Copyright (C) 2008 by Heiko Koehn                                     *
- *   KoehnHeiko@googlemail.com                                             *
+ *   Copyright (C) 2008-2011 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -18,17 +21,19 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#ifndef _SCRIPT_UNIT_H
-#define _SCRIPT_UNIT_H
 
-#include "TScript.h"
-#include <list>
-#include <map>
+#include "pre_guard.h"
+#include <QMap>
 #include <QMutex>
-#include <QDataStream>
+#include <QPointer>
+#include <QString>
+#include "post_guard.h"
 
-class TScript;
+#include <list>
+
 class Host;
+class TScript;
+
 
 class ScriptUnit
 {
@@ -36,37 +41,37 @@ class ScriptUnit
     friend class XMLimport;
 
 public:
+    ScriptUnit(Host* pHost) : mpHost(pHost), mMaxID(0) {}
 
-    ScriptUnit( Host * pHost ) : mpHost(pHost), mMaxID(0) {;}
-    std::list<TScript *>  getScriptRootNodeList()   { QMutexLocker locker(& mScriptUnitLock); return mScriptRootNodeList; }
-    TScript *             getScript( int id );
-    void                  compileAll();
-    bool                  registerScript( TScript * pT );
-    void                  unregisterScript( TScript * pT );
-    void                  reParentScript( int childID, int oldParentID, int newParentID, int parentPosition = -1, int childPosition = -1 );
-    void                  stopAllTriggers();
-    void                  uninstall( QString );
-    void                  _uninstall( TScript * pChild, QString packageName );
-    qint64                getNewID();
-    QMutex                mScriptUnitLock;
-    QList<TScript*>        uninstallList;
+    std::list<TScript*> getScriptRootNodeList()
+    {
+        QMutexLocker locker(&mScriptUnitLock);
+        return mScriptRootNodeList;
+    }
+
+    TScript* getScript(int id);
+    void compileAll();
+    bool registerScript(TScript* pT);
+    void unregisterScript(TScript* pT);
+    void reParentScript(int childID, int oldParentID, int newParentID, int parentPosition = -1, int childPosition = -1);
+    void stopAllTriggers();
+    void uninstall(QString);
+    void _uninstall(TScript* pChild, QString packageName);
+    int getNewID();
+    QMutex mScriptUnitLock;
+    QList<TScript*> uninstallList;
 
 private:
-
-    ScriptUnit(){;}
-    TScript *             getScriptPrivate( int id );
-    void                  addScriptRootNode( TScript * pT, int parentPosition = -1, int childPosition = -1 );
-    void                  addScript( TScript * pT );
-    void                  removeScriptRootNode( TScript * pT );
-    void                  removeScript( TScript *);
-    Host *                mpHost;
-    QMap<int, TScript *>  mScriptMap;
-    std::list<TScript *>  mScriptRootNodeList;
-    qint64                mMaxID;
-
-
+    ScriptUnit() {}
+    TScript* getScriptPrivate(int id);
+    void addScriptRootNode(TScript* pT, int parentPosition = -1, int childPosition = -1);
+    void addScript(TScript* pT);
+    void removeScriptRootNode(TScript* pT);
+    void removeScript(TScript*);
+    QPointer<Host> mpHost;
+    QMap<int, TScript*> mScriptMap;
+    std::list<TScript*> mScriptRootNodeList;
+    int mMaxID;
 };
 
-
-#endif
-
+#endif // MUDLET_SCRIPTUNIT_H

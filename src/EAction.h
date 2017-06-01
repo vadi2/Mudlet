@@ -1,6 +1,10 @@
+#ifndef MUDLET_EACTION_H
+#define MUDLET_EACTION_H
+
 /***************************************************************************
- *   Copyright (C) 2008 by Heiko Koehn   *
- *   KoehnHeiko@googlemail.com   *
+ *   Copyright (C) 2008-2009 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
+ *   Copyright (C) 2017 by Stephen Lyons - slysven@virginmedia.com         *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -18,35 +22,34 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#ifndef _eaction_h
-#define _eaction_h
-#include "mudlet.h"
-#include "Host.h"
-#include "TFlipButton.h"
+
+#include "pre_guard.h"
 #include <QAction>
+#include <QPointer>
+#include "post_guard.h"
+
+class Host;
+class mudlet;
+
 
 class EAction : public QAction
 {
-Q_OBJECT
-      
-public:
-        
-                    EAction(QIcon &, QString &, mudlet * );
-    QWidget *       createWidget( QWidget * );
-    
-    int             mID;
-    Host *          mpHost;
-    
-public slots:
+    Q_OBJECT
 
-    void            slot_execute( bool checked );
+    Q_DISABLE_COPY(EAction)
+
+public:
+    EAction(QIcon&, QString&);
+
+public slots:
+    void slot_execute(bool checked);
 
 signals:
+    void triggered(QAction*);
 
-    void            triggered( QAction * );
-    
-    
+public: // TODO: private:
+    int mID;
+    QPointer<Host> mpHost;
 };
 
-#endif
-
+#endif // MUDLET_EACTION_H

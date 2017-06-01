@@ -1,6 +1,6 @@
 /***************************************************************************
- *   Copyright (C) 2008-2009 by Heiko Koehn   *
- *   KoehnHeiko@googlemail.com   *
+ *   Copyright (C) 2008-2009 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -19,22 +19,22 @@
  ***************************************************************************/
 
 
-#include <QMap>
-#include <QString>
-#include <QTextCursor>
-#include "mudlet.h"
 #include "TDebug.h"
 
+#include "TConsole.h"
+#include "mudlet.h"
+
+
 TDebug::TDebug(QColor c, QColor d)
-{ 
+{
     fgColor = c;
     bgColor = d;
     msg = "";
 }
 
-TDebug & TDebug::operator>>( const int code) 
-{ 
-    mudlet::mpDebugConsole->printDebug( fgColor, bgColor, msg );
+TDebug& TDebug::operator>>(const int code)
+{
+    mudlet::mpDebugConsole->printDebug(fgColor, bgColor, msg);
     return *this;
 }
 
@@ -42,28 +42,21 @@ TDebug::~TDebug()
 {
 }
 
-TDebug & TDebug::operator<<( const QString & t )
-{ 
-    msg += t; 
-    return *this; 
+TDebug& TDebug::operator<<(const QString& t)
+{
+    msg += t;
+    return *this;
 }
 
-TDebug & TDebug::operator<<( const int & t )
-{ 
-    msg += QString::number(t); 
+TDebug& TDebug::operator<<(const int& t)
+{
+    msg += QString::number(t);
     return *this;
 }
-    
-TDebug & TDebug::operator<<( QString & t ) 
-{ 
-    msg += t; 
-    return *this; 
-}
-    
-TDebug & TDebug::operator<<( const QMap<QString, QString> &map )
+
+TDebug& TDebug::operator<<(const QMap<QString, QString>& map)
 {
-    for( QMap<QString, QString>::const_iterator it = map.constBegin(); it != map.constEnd(); ++it) 
-    {
+    for (QMap<QString, QString>::const_iterator it = map.constBegin(); it != map.constEnd(); ++it) {
         msg += "(";
         msg += it.key();
         msg += ", ";
@@ -73,11 +66,10 @@ TDebug & TDebug::operator<<( const QMap<QString, QString> &map )
     msg += "), ";
     return *this;
 }
-    
-TDebug & TDebug::operator<<( const QMap<QString, int> &map )
+
+TDebug& TDebug::operator<<(const QMap<QString, int>& map)
 {
-    for( QMap<QString, int>::const_iterator it = map.constBegin(); it != map.constEnd(); ++it) 
-    {
+    for (QMap<QString, int>::const_iterator it = map.constBegin(); it != map.constEnd(); ++it) {
         msg += "(";
         msg += it.key();
         msg += ", ";
@@ -87,11 +79,10 @@ TDebug & TDebug::operator<<( const QMap<QString, int> &map )
     msg += "), ";
     return *this;
 }
-    
-TDebug & TDebug::operator<<( const QMap<int, QString> &map )
+
+TDebug& TDebug::operator<<(const QMap<int, QString>& map)
 {
-    for( QMap<int, QString>::const_iterator it = map.constBegin(); it != map.constEnd(); ++it) 
-    {
+    for (QMap<int, QString>::const_iterator it = map.constBegin(); it != map.constEnd(); ++it) {
         msg += "(";
         msg += QString::number(it.key());
         msg += ", ";
@@ -101,11 +92,10 @@ TDebug & TDebug::operator<<( const QMap<int, QString> &map )
     msg += "), ";
     return *this;
 }
-    
-TDebug & TDebug::operator<<( const QMap<int, int> &map )
+
+TDebug& TDebug::operator<<(const QMap<int, int>& map)
 {
-    for( QMap<int, int>::const_iterator it = map.constBegin(); it != map.constEnd(); ++it) 
-    {
+    for (QMap<int, int>::const_iterator it = map.constBegin(); it != map.constEnd(); ++it) {
         msg += "(";
         msg += QString::number(it.key());
         msg += ", ";
@@ -115,31 +105,23 @@ TDebug & TDebug::operator<<( const QMap<int, int> &map )
     msg += "), ";
     return *this;
 }
-    
-TDebug & TDebug::operator<<( const QList<QString> &list )
+
+TDebug& TDebug::operator<<(const QList<QString>& list)
 {
-    for( QList<QString>::const_iterator it = list.constBegin(); it != list.constEnd(); ++it) 
-    {
+    for (QList<QString>::const_iterator it = list.constBegin(); it != list.constEnd(); ++it) {
         msg += (*it);
         msg += ", ";
     }
     msg += ")";
     return *this;
 }
-    
-TDebug & TDebug::operator<<( const QList<int> &list )
+
+TDebug& TDebug::operator<<(const QList<int>& list)
 {
-    for( QList<int>::const_iterator it = list.constBegin(); it != list.constEnd(); ++it) 
-    {
+    for (QList<int>::const_iterator it = list.constBegin(); it != list.constEnd(); ++it) {
         msg += QString::number(*it);
         msg += ", ";
     }
     msg += "), ";
     return *this;
-}    
-    
-
-
-
-
-
+}

@@ -1,7 +1,9 @@
-#ifndef DLGCOMPOSER_H
-#define DLGCOMPOSER_H
+#ifndef MUDLET_DLGCOMPOSER_H
+#define MUDLET_DLGCOMPOSER_H
+
 /***************************************************************************
- *   Copyright (C) 2008-2009 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2008-2010 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -20,27 +22,31 @@
  ***************************************************************************/
 
 
+#include "pre_guard.h"
+#include "ui_composer.h"
+#include <QPointer>
+#include "post_guard.h"
+
 class Host;
 
-#include "ui_composer.h"
-#include <QMainWindow>
 
-
-class dlgComposer : public QMainWindow , public Ui::composer
+class dlgComposer : public QMainWindow, public Ui::composer
 {
-Q_OBJECT
+    Q_OBJECT
+
+    Q_DISABLE_COPY(dlgComposer)
 
 public:
+    dlgComposer(Host*);
 
-        dlgComposer( Host * );
-
-        void init( QString title, QString txt );
-        Host * mpHost;
+    void init(QString title, QString txt);
 
 public slots:
-        void save();
-        void cancel();
+    void save();
+    void cancel();
+
+private:
+    QPointer<Host> mpHost;
 };
 
-
-#endif // DLGCOMPOSER_H
+#endif // MUDLET_DLGCOMPOSER_H

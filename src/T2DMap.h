@@ -1,6 +1,10 @@
+#ifndef MUDLET_T2DMAP_H
+#define MUDLET_T2DMAP_H
 
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2008-2012 by Heiko Koehn - KoehnHeiko@googlemail.com    *
+ *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
+ *   Copyright (C) 2016 by Stephen Lyons - slysven@virginmedia.com         *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -18,90 +22,121 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#ifndef T2DMAP_H
-#define T2DMAP_H
 
-#include <QWidget>
-#include <TMap.h>
+#include "pre_guard.h"
+#include <QColor>
 #include <QPixmap>
+#include <QPointer>
+#include <QString>
+#include <QTreeWidget>
+#include <QWidget>
+#include "post_guard.h"
+
+class Host;
+class TMap;
+
+class QCheckBox;
+class QComboBox;
+class QListWidgetItem;
+class QPushButton;
+class QTreeWidgetItem;
+
 
 class T2DMap : public QWidget
 {
     Q_OBJECT
 
-public:
+    Q_DISABLE_COPY(T2DMap)
 
-    T2DMap();
-    explicit T2DMap( QWidget *parent = 0);
-    void     paintMap();
-    void     setMapZoom( int zoom );
-    QColor   getColor( int id );
-    QColor   _getColor( int id );
-    void     init();
-    void     exportAreaImage( int );
-    void     paintEvent( QPaintEvent * );
-    void     mousePressEvent(QMouseEvent * );
-    void     mouseDoubleClickEvent ( QMouseEvent * event );
-    bool     event(QEvent * event );
-    void     wheelEvent ( QWheelEvent * );
-    void     mouseMoveEvent( QMouseEvent * event );
-    void     mouseReleaseEvent(QMouseEvent * e );
-    int      getTopLeftSelection();
-    void     setRoomSize( double );
-    void     setExitSize( double );
-    void     createLabel( QRectF labelRect );
-    TMap *   mpMap;
-    Host *   mpHost;
-    int      xzoom;
-    int      yzoom;
-    int      _rx;
-    int      _ry;
-    QPoint   mPHighlight;
-    bool     mPick;
-    int      mTarget;
-    //int      mRoomSelection;
-    bool     mStartSpeedWalk;
+public:
+    explicit T2DMap(QWidget* parent = 0);
+    void paintMap();
+    void setMapZoom(int zoom);
+    QColor getColor(int id);
+    QColor _getColor(int id);
+    void init();
+    void exportAreaImage(int);
+    void paintEvent(QPaintEvent*) override;
+    void mousePressEvent(QMouseEvent*) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
+    bool event(QEvent* event) override;
+    void wheelEvent(QWheelEvent*) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* e) override;
+
+    // Was getTopLeft() which returned an index into mMultiSelectionList but that
+    // has been been changed to mMultiSelectionSet which cannot be accessed via
+    // an index in the same way - this function now sets
+    // mMultiSelectionHighlightRoomId and returns a (bool) on success or failure
+    // to do so.
+    bool getCenterSelection();
+
+    void setRoomSize(double);
+    void setExitSize(double);
+    void createLabel(QRectF labelRect);
+
+    TMap* mpMap;
+    QPointer<Host> mpHost;
+    int xzoom;
+    int yzoom;
+    int _rx;
+    int _ry;
+    QPoint mPHighlight;
+    bool mPick;
+    int mTarget;
+    bool mStartSpeedWalk;
     QMap<int, QPoint> mAreaExitList;
-    QMap<QString, QStringList> mUserActions; //string list: 0 is event name, 1 is menu it is under if it is
-    QMap<QString, QStringList> mUserMenus; //unique name, List:parent name ("" if null), display name
-    QPoint   mMoveTarget;
-    bool     mRoomBeingMoved;
-    QPoint   mPHighlightMove;
-    float    mTX;
-    float    mTY;
-    int      mChosenRoomColor;
-    float    xspan;
-    float    yspan;
-    bool     mMultiSelection;
-    QRectF   mMultiRect;
-    bool     mPopupMenu;
-    QList<int> mMultiSelectionList;
-    QPoint   mOldMousePos;
-    bool     mNewMoveAction;
-    QRectF   mMapInfoRect;
-    int      mFontHeight;
-    bool     mShowRoomID;
-    QMap<int,QPixmap> mPixMap;
-//    QMap<int, QPixmap > mGridPix;
-    int      gzoom;
-    double   rSize;
-    double   eSize;
-    int      mRID;
-    int      mAID;
-    int      mOx;
-    int      mOy;
-    int      mOz;
-    bool     mShiftMode;
-    bool     mShowInfo;
-    QComboBox * arealist_combobox;
-    QDialog * mpCustomLinesDialog;
-    int  mCustomLinesRoomFrom;
-    int  mCustomLinesRoomTo;
+
+    // string list: 0 is event name, 1 is menu it is under if it is
+    QMap<QString, QStringList> mUserActions;
+
+    // unique name, List:parent name ("" if null), display name
+    QMap<QString, QStringList> mUserMenus;
+
+    QPoint mMoveTarget;
+    bool mRoomBeingMoved;
+    QPoint mPHighlightMove;
+    float mTX;
+    float mTY;
+    int mChosenRoomColor;
+    float xspan;
+    float yspan;
+
+    // Flag that the "drag to select rectangle"
+    // (mMultiRect) is active and is being *resized*
+    // by dragging
+    bool mMultiSelection;
+
+    QRectF mMultiRect;
+    bool mPopupMenu;
+    QSet<int> mMultiSelectionSet; // was mMultiSelectList
+    QPoint mOldMousePos;
+    bool mNewMoveAction;
+    QRectF mMapInfoRect;
+    int mFontHeight;
+    bool mShowRoomID;
+    QMap<int, QPixmap> mPixMap;
+    int gzoom;
+    double rSize;
+    double eSize;
+    int mRID;
+    int mAID;
+    int mOx;
+    int mOy;
+    int mOz;
+    bool mShiftMode;
+    bool mShowInfo;
+    QComboBox* arealist_combobox;
+    QPointer<QDialog> mpCustomLinesDialog;
+    int mCustomLinesRoomFrom;
+    int mCustomLinesRoomTo;
     QString mCustomLinesRoomExit;
-    QComboBox * mpCurrentLineStyle;
-    QPushButton * mpCurrentLineColor;
+    QComboBox* mpCurrentLineStyle;
+    QString mCurrentLineStyle;
+    QPushButton* mpCurrentLineColor;
     QColor mCurrentLineColor;
-    QCheckBox * mpCurrentLineArrow;
+    QCheckBox* mpCurrentLineArrow;
+    bool mCurrentLineArrow;
     bool mShowGrid;
     QPointF mLastMouseClick;
     bool mBubbleMode;
@@ -117,8 +152,6 @@ public:
     bool isCenterViewCall;
     QString mHelpMsg;
 
-signals:
-
 public slots:
 
     void slot_roomSelectionChanged();
@@ -131,7 +164,7 @@ public slots:
     void slot_customLineColor();
     void shiftZup();
     void shiftZdown();
-    void switchArea(QString);
+    void slot_switchArea(QString);
     void toggleShiftMode();
     void shiftUp();
     void shiftDown();
@@ -141,7 +174,7 @@ public slots:
     void slot_setImage();
     void slot_movePosition();
     void slot_defineNewColor();
-    void slot_selectRoomColor(QListWidgetItem * pI );
+    void slot_selectRoomColor(QListWidgetItem* pI);
     void slot_moveRoom();
     void slot_deleteRoom();
     void slot_changeColor();
@@ -150,12 +183,46 @@ public slots:
     void slot_setExits();
     void slot_setUserData();
     void slot_lockRoom();
+    void slot_unlockRoom();
     void slot_setRoomWeight();
     void slot_setArea();
     void slot_setCustomLine();
     void slot_setCustomLine2();
     void slot_userAction(QString);
     void slot_setCustomLine2B(QTreeWidgetItem*, int);
+    void slot_undoCustomLineLastPoint();
+    void slot_doneCustomLine();
+    void slot_customLineProperties();
+    void slot_customLineAddPoint();
+    void slot_customLineRemovePoint();
+    void slot_cancelCustomLineDialog();
+
+private:
+    void resizeMultiSelectionWidget();
+
+    bool mDialogLock;
+
+    // When more than zero rooms are selected this
+    // is either the first (only) room in the set
+    // or if getCenterSelectionId() is used the
+    // room that is selected - this is so that it
+    // can be painted in yellow rather than orange
+    // when more than one room is selected to
+    // indicate the particular room that will be
+    // modified or be the center of those
+    // modifications. {for slot_spread(),
+    // slot_shrink(), slot_setUserData() - if ever
+    // implimented, slot_setExits(),
+    // slot_movePosition(), etc.}
+    int mMultiSelectionHighlightRoomId;
+
+    bool mIsSelectionSorting;
+    bool mIsSelectionSortByNames;
+
+    // Used to keep track of if sorting the multiple
+    // room listing/selection widget, and by what,
+    // as we now show room names (if present) as well.
+    bool mIsSelectionUsingNames;
 };
 
-#endif // T2DMAP_H
+#endif // MUDLET_T2DMAP_H
