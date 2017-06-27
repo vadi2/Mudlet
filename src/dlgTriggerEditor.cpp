@@ -6406,8 +6406,13 @@ void dlgTriggerEditor::slot_changeEditorTextOptions(QTextOption::Flags state)
 {
     edbee::TextEditorConfig* config = mpSourceEditorEdbee->config();
 
-    config->setShowWhitespaceMode(state & QTextOption::ShowTabsAndSpaces);
+    // Although this option seems to be a binary choice the Edbee editor widget
+    // needs a integer 1 to show whitespace characters and an integer 0 to hide
+    // them:
+    config->beginChanges();
+    config->setShowWhitespaceMode(state & QTextOption::ShowTabsAndSpaces ? 1 : 0);
     config->setUseLineSeparator(state & QTextOption::ShowLineAndParagraphSeparators);
+    config->endChanges();
 }
 
 //
