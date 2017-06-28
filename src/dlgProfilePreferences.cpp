@@ -178,7 +178,7 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pH) : QDialog(pF
     connect(reset_colors_button, &QAbstractButton::clicked, this, &dlgProfilePreferences::resetColors);
     connect(reset_colors_button_2, &QAbstractButton::clicked, this, &dlgProfilePreferences::resetColors2);
 
-    connect(fontComboBox, SIGNAL(currentFontChanged(const QFont&)), this, SLOT(slot_setDisplayFont()));
+    connect(fontComboBox, SIGNAL(currentFontChanged(const QFont&)), this, SLOT(setDisplayFont()));
     QStringList sizeList;
     for (int i = 1; i < 40; i++) {
         sizeList << QString::number(i);
@@ -1426,7 +1426,9 @@ void dlgProfilePreferences::slot_save_and_exit()
 
     pHost->mEditorTheme = code_editor_theme_selection_combobox->currentText();
     pHost->mEditorThemeFile = code_editor_theme_selection_combobox->currentData().toString();
-    mudlet::self()->setEditorTheme(pHost->mEditorTheme);
+    if (pHost->mpEditorDialog) {
+        pHost->mpEditorDialog->setThemeAndOtherSettings(pHost->mEditorTheme);
+    }
 
     auto data = script_preview_combobox->currentData().value<QPair<QString, int>>();
     pHost->mThemePreviewItemID = data.second;
