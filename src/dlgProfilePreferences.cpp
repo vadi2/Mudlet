@@ -1815,11 +1815,6 @@ void dlgProfilePreferences::slot_script_selected(int index)
  */
 void dlgProfilePreferences::slot_changeShowSpacesAndTabs(const bool state)
 {
-    qDebug() << "dlgProfilePreferences::slot_changeShowSpacesAndTabs("
-             << state
-             << ") called, updating PREVIEW of editor for:"
-             << mpHost->getName();
-
     auto config = edbeePreviewWidget->config();
     config->beginChanges();
     config->setShowWhitespaceMode(state ? 1 : 0);
@@ -1828,15 +1823,16 @@ void dlgProfilePreferences::slot_changeShowSpacesAndTabs(const bool state)
 
 /*!
  * \brief dlgProfilePreferences::slot_changeShowLineFeedsAndParagraphs
- * \param state
+ * \param state \c true to show (currently) a graphic line under each line of text in editor
+ * \c false to hide them.
+ *
+ * A private slot function that (currently) adjusts the display of a horizontal
+ * "underline" acros the width of each line of text in the editor preview in the
+ * "Editor" tab although it was originally intended to show line-feeds and paragraph
+ * markers in the previous QTextEdit (and may in the future in the edbee) widget.
  */
 void dlgProfilePreferences::slot_changeShowLineFeedsAndParagraphs(const bool state)
 {
-    qDebug() << "dlgProfilePreferences::slot_showLineFeedsAndParagraphs("
-             << state
-             << ") called, updating PREVIEW of editor for:"
-             << mpHost->getName();
-
     auto config = edbeePreviewWidget->config();
     config->beginChanges();
     config->setUseLineSeparator(state);
