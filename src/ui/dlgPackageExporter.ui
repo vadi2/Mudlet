@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>680</width>
-    <height>480</height>
+    <height>626</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -23,77 +23,146 @@
    <iconset resource="../mudlet.qrc">
     <normaloff>:/icons/module-manager.png</normaloff>:/icons/module-manager.png</iconset>
   </property>
-  <layout class="QGridLayout" name="gridLayout">
-   <item row="0" column="0" colspan="2">
-    <widget class="QTreeWidget" name="treeWidget">
-     <column>
-      <property name="text">
-       <string>Check items to export</string>
-      </property>
-     </column>
-     <item>
-      <property name="text">
-       <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Triggers</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Aliases</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Timers</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Scripts</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Keys</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Buttons</string>
-      </property>
-     </item>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>Name your package</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout">
+      <item row="0" column="0">
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <item>
+         <widget class="QPushButton" name="pushButton">
+          <property name="text">
+           <string>Update existing package</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>or enter new name:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="lineEdit">
+          <property name="placeholderText">
+           <string>package name here</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
     </widget>
    </item>
-   <item row="1" column="0" colspan="2">
-    <widget class="QLabel" name="textLabel_informationText">
-     <property name="textFormat">
-      <enum>Qt::RichText</enum>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
      </property>
-     <property name="wordWrap">
-      <bool>true</bool>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
      </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>10</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBox_2">
+     <property name="title">
+      <string>Select what to export</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_2">
+      <property name="bottomMargin">
+       <number>18</number>
+      </property>
+      <item row="0" column="0">
+       <widget class="QTreeWidget" name="treeWidget">
+        <attribute name="headerVisible">
+         <bool>false</bool>
+        </attribute>
+        <column>
+         <property name="text">
+          <string>Check items to export</string>
+         </property>
+        </column>
+        <item>
+         <property name="text">
+          <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Triggers</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Aliases</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Timers</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Scripts</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Keys</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string comment="This text is used programmatically in the class implimentation and the associated dialog, ensure all instances have the same text (3 of 3)">Buttons</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="textLabel_exportLocation">
-     <property name="text">
-      <string>Export location:</string>
+   <item>
+    <spacer name="verticalSpacer_2">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
      </property>
-     <property name="buddy">
-      <cstring>lineEdit_filePath</cstring>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
      </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>10</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBox_3">
+     <property name="title">
+      <string>Include assets (images, sounds)</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <widget class="QTreeWidget" name="treeWidget_2">
+        <column>
+         <property name="text">
+          <string>Drag and drop files or folders here</string>
+         </property>
+        </column>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
-   <item row="2" column="1">
-    <widget class="QLineEdit" name="lineEdit_filePath">
-     <property name="enabled">
-      <bool>false</bool>
-     </property>
-     <property name="readOnly">
-      <bool>false</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="0" colspan="2">
+   <item>
     <widget class="QLabel" name="infoLabel">
      <property name="font">
       <font>
@@ -112,7 +181,31 @@
      </property>
     </widget>
    </item>
-   <item row="4" column="0" colspan="2">
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QLabel" name="textLabel_exportLocation">
+       <property name="text">
+        <string>Export location:</string>
+       </property>
+       <property name="buddy">
+        <cstring>lineEdit_filePath</cstring>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEdit_filePath">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="readOnly">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="standardButtons">
       <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel|QDialogButtonBox::Close|QDialogButtonBox::Reset</set>
@@ -122,7 +215,6 @@
   </layout>
  </widget>
  <tabstops>
-  <tabstop>treeWidget</tabstop>
   <tabstop>lineEdit_filePath</tabstop>
  </tabstops>
  <resources>
