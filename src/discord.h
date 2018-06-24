@@ -40,19 +40,20 @@ public:
     bool libraryLoaded();
 
 private:
+    // These are function pointers to functions located in the Discord RPC library:
     std::function<void(const char*, DiscordEventHandlers*, int, const char*)> Discord_Initialize;
     std::function<void(const DiscordRichPresence* presence)> Discord_UpdatePresence;
     std::function<void(void)> Discord_RunCallbacks;
     std::function<void(void)> Discord_Shutdown;
 
-    QMap<Host*, QString>mGamesNames;
-    QMap<Host*, QString>mAreas;
-    QMap<Host*, QString>mCharacterIcons;
-    QMap<Host*, QString>mCharacters;
+    QMap<Host*, QString>mGamesNames;  // Used to populate Discord's "details" as "Playing %s" (first line of text) and "Large icon key" from lower case version
+    QMap<Host*, QString>mAreas; // Used to populate Discord's "State" first part of second line of text (followed by X of Y numbers)
+    QMap<Host*, QString>mCharacterIcons; // Used to populate Discord's " "Small icon key"
+    QMap<Host*, QString>mCharacters; // Used to populate "Small image text"
+    QMap<Host*, int64_t>mStartTimes;
 
     QScopedPointer<QLibrary> mpLibrary;
     bool mLoaded;
-    int64_t mStartTime;
 
     QHash<QString, QVector<QString>> mKnownGames;
     QVector<QString> mKnownAddresses;
@@ -69,6 +70,8 @@ private:
 signals:
 
 public slots:
+    void slot_handleGameConnection(Host*);
+    void slot_handleGameDisconnection(Host*);
 
 };
 

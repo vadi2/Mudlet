@@ -15,9 +15,10 @@ Discord::Discord(QObject* parent)
 , mCharacterIcons{}
 , mCharacters{}
 , mLoaded{}
-, mStartTime{} // lowercase list of known games
+// lowercase list of known games
 // {game name, {game addresses}}
 , mKnownGames{{"midmud", {"midmud.com"}},
+              {"wotmud", {"game.wotmud.org"}},
               {"luminari", {}},
               {"achaea", {"achaea.com", "iron-ach.ironrealms.com"}},
               {"aetolia", {"aetolia.com", "iron-aet.ironrealms.com"}},
@@ -42,12 +43,12 @@ Discord::Discord(QObject* parent)
     Discord_Shutdown = reinterpret_cast<Discord_ShutdownPrototype>(mpLibrary->resolve("Discord_Shutdown"));
 
     if (!Discord_Initialize || !Discord_UpdatePresence || !Discord_RunCallbacks || !Discord_Shutdown) {
-        qDebug() << "Discord integration failed to load.";
+        qDebug() << "Discord integration failure, failed to load functions from library dynamically.";
         return;
     }
 
     mLoaded = true;
-    qDebug() << "Discord integration loaded.";
+    qDebug() << "Discord integration loaded. Using functions from:" << mpLibrary.data()->fileName();
 
     DiscordEventHandlers handlers;
     memset(&handlers, 0, sizeof(handlers));
@@ -58,10 +59,7 @@ Discord::Discord(QObject* parent)
     handlers.spectateGame = handleDiscordSpectateGame;
     handlers.joinRequest = handleDiscordJoinRequest;
 
-    mStartTime = static_cast<int64_t>(std::time(nullptr));
-
-    // 1234 is an optional Steam ID - we're not in Steam yet, so this value is fake one
-    Discord_Initialize(APPLICATION_ID, &handlers, 1, "1234");
+    Discord_Initialize(APPLICATION_ID, &handlers, 1);
 
     // mudlet instance is not available in this constructor as it's still being initialised, so postpone the connection
     QTimer::singleShot(0, [this]() {
@@ -141,6 +139,7 @@ void Discord::handleDiscordReady(const DiscordUser* request)
 {
     Q_UNUSED(request);
 
+    // Must use indirection via mudlet pointer because UpdatePresence is not a static method:
     mudlet::self()->mDiscord.UpdatePresence();
 }
 
@@ -175,16 +174,16 @@ void Discord::UpdatePresence()
         return;
     }
 
+    auto host = mudlet::self()->getActiveHost();
+    if (!host) {
+        return;
+    }
+
     DiscordRichPresence discordPresence;
     memset(&discordPresence, 0, sizeof(discordPresence));
 
     char buffer[256];
     buffer[0] = '\0';
-
-    auto host = mudlet::self()->getActiveHost();
-    if (!host) {
-        return;
-    }
 
     auto gameName = mGamesNames[host].toUtf8();
     auto gameNameLowercase = mGamesNames[host].toLower().toUtf8();
@@ -233,7 +232,7 @@ void Discord::UpdatePresence()
         }
     }
 
-//    discordPresence.startTimestamp = mStartTime;
+    discordPresence.startTimestamp = mStartTimes[host];
 
     discordPresence.instance = 1;
     Discord_UpdatePresence(&discordPresence);
@@ -247,4 +246,14 @@ bool Discord::gameIntegrationSupported(const QString& address)
 bool Discord::libraryLoaded()
 {
     return mLoaded;
+}
+
+void Discord::slot_handleGameConnection(Host* pHost)
+{
+    mStartTimes[pHost] = static_cast<int64_t>(std::time(nullptr));
+}
+
+void Discord::slot_handleGameDisconnection(Host* pHost)
+{
+    mStartTimes[pHost] = 0;
 }

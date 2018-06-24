@@ -122,6 +122,12 @@ cTelnet::cTelnet(Host* pH)
     connect(&socket, SIGNAL(disconnected()), this, SLOT(handle_socket_signal_disconnected()));
     connect(&socket, SIGNAL(readyRead()), this, SLOT(handle_socket_signal_readyRead()));
 
+    // Tempory - switch to signal_connected once ready to test on-line
+    if (mudlet::self()) {
+        // mudlet::self() is null during startup - for the Default host case
+        connect(this, SIGNAL(signal_connecting(Host*)), &mudlet::self()->mDiscord, SLOT(slot_handleGameConnection(Host*)));
+        connect(this, SIGNAL(signal_disconnected(Host*)), &mudlet::self()->mDiscord, SLOT(slot_handleGameDisconnection(Host*)));
+    }
     // initialize telnet session
     reset();
 
@@ -283,6 +289,8 @@ void cTelnet::connectIt(const QString& address, int port)
         return;
     }
 
+    emit signal_connecting(mpHost);
+
     hostName = address;
     hostPort = port;
     QString server = "[ INFO ]  - Looking up the IP address of server:" + address + ":" + QString::number(port) + " ...";
@@ -330,11 +338,15 @@ void cTelnet::handle_socket_signal_connected()
     event.mArgumentList.append(QStringLiteral("sysConnectionEvent"));
     event.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
     mpHost->raiseEvent(event);
+
+    emit signal_connected(mpHost);
 }
 
 void cTelnet::handle_socket_signal_disconnected()
 {
     postData();
+
+    emit signal_disconnected(mpHost);
 
     TEvent event;
     event.mArgumentList.append(QStringLiteral("sysDisconnectionEvent"));
