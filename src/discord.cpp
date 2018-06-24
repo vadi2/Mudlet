@@ -32,7 +32,7 @@ Discord::Discord(QObject* parent)
 
     mpLibrary.reset(new QLibrary(QStringLiteral("discord-rpc")));
 
-    using Discord_InitializePrototype = void (*)(const char*, DiscordEventHandlers*, int, const char*);
+    using Discord_InitializePrototype = void (*)(const char*, DiscordEventHandlers*, int);
     using Discord_UpdatePresencePrototype = void (*)(const DiscordRichPresence*);
     using Discord_RunCallbacksPrototype = void (*)();
     using Discord_ShutdownPrototype = void (*)();

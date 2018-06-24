@@ -41,7 +41,7 @@ public:
 
 private:
     // These are function pointers to functions located in the Discord RPC library:
-    std::function<void(const char*, DiscordEventHandlers*, int, const char*)> Discord_Initialize;
+    std::function<void(const char*, DiscordEventHandlers*, int)> Discord_Initialize;
     std::function<void(const DiscordRichPresence* presence)> Discord_UpdatePresence;
     std::function<void(void)> Discord_RunCallbacks;
     std::function<void(void)> Discord_Shutdown;
