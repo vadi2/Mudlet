@@ -42,7 +42,7 @@
       <enum>QTabWidget::Rounded</enum>
      </property>
      <property name="currentIndex">
-      <number>7</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="tab_general">
       <property name="sizePolicy">
@@ -2236,12 +2236,117 @@
          </layout>
         </widget>
        </item>
+       <item row="1" column="0">
+        <widget class="QGroupBox" name="groupBox_discordPrivacy">
+         <property name="title">
+          <string>Discord privacy and other settings</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_20">
+          <item row="0" column="0">
+           <widget class="QCheckBox" name="checkBox_discordGameAddress">
+            <property name="text">
+             <string>Hide game address</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QComboBox" name="comboBox_discordCharacter">
+            <property name="currentIndex">
+             <number>0</number>
+            </property>
+            <item>
+             <property name="text">
+              <string>Don't hide character icon or text</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Hide character text</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Hide character icon and text</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QCheckBox" name="checkBox_discordCurrentArea">
+            <property name="text">
+             <string>Hide current area</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QCheckBox" name="checkBox_discordLuaAPI">
+            <property name="toolTip">
+             <string>Lua API is currently always enabled for testing purposes</string>
+            </property>
+            <property name="text">
+             <string>Enable Lua API</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="2">
+           <widget class="QWidget" name="widget" native="true">
+            <layout class="QHBoxLayout" name="horizontalLayout_4">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_discordPresenceOverride">
+               <property name="text">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Discord &lt;i&gt;PresenceId&lt;/i&gt; override:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="buddy">
+                <cstring>lineEdit_presenceIdOverride</cstring>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="lineEdit_presenceIdOverride">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Entering the &lt;tt&gt;PresenceId&lt;/tt&gt; (&lt;tt&gt;ApplicationId&lt;/tt&gt;) of another Guild (a.k.a. Server or group of channels on Discord) for, say a MUD Server, will enable the use of icons on your Discord Rich Presence supplied by that Guild.  This may enable the use of a wide range of icons &lt;i&gt;specific to that Guild&lt;/i&gt; instead of a standard set that Mudlet provides to be shared amongst all its users.&lt;/p&gt;&lt;p&gt;An entry in this item will disable the use of &lt;code&gt;discordSetGame&lt;/code&gt;, &lt;code&gt;discordSetArea&lt;/code&gt;, &lt;code&gt;discordSetCharacter&lt;/code&gt; and &lt;code&gt;discordSetCharacterText&lt;/code&gt; lua functions; to return to the Mudlet default PresenceId use the clear button.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="inputMethodHints">
+                <set>Qt::ImhNoPredictiveText|Qt::ImhPreferNumbers</set>
+               </property>
+               <property name="maxLength">
+                <number>20</number>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+               </property>
+               <property name="placeholderText">
+                <string>use Mudlet's default</string>
+               </property>
+               <property name="clearButtonEnabled">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
        <item row="2" column="0">
         <widget class="QGroupBox" name="groupBox_ircOptions">
          <property name="title">
           <string>IRC client options</string>
          </property>
-         <layout class="QGridLayout" name="gridLayout_28" rowstretch="0,0">
+         <layout class="QGridLayout" name="gridLayout_28" rowstretch="0,0,0">
           <item row="0" column="1">
            <widget class="QLineEdit" name="ircHostName">
             <property name="inputMethodHints">
@@ -2359,61 +2464,6 @@
           </size>
          </property>
         </spacer>
-       </item>
-       <item row="1" column="0">
-        <widget class="QGroupBox" name="groupBox_discordPrivacy">
-         <property name="title">
-          <string>Discord privacy</string>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_20">
-          <item row="0" column="0">
-           <widget class="QCheckBox" name="checkBox_discordGameAddress">
-            <property name="text">
-             <string>Hide game address</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QCheckBox" name="checkBox_discordCurrentArea">
-            <property name="text">
-             <string>Hide current area</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QComboBox" name="comboBox_discordCharacter">
-            <property name="currentIndex">
-             <number>0</number>
-            </property>
-            <item>
-             <property name="text">
-              <string>Don't hide character icon or text</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide character text</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide character icon and text</string>
-             </property>
-            </item>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QCheckBox" name="checkBox_discordLuaAPI">
-            <property name="toolTip">
-             <string>Lua API is currently always enabled for testing purposes</string>
-            </property>
-            <property name="text">
-             <string>Enable Lua API</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
        </item>
       </layout>
      </widget>

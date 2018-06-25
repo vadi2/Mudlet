@@ -433,11 +433,23 @@ public:
     static int setDiscordCharacterIcon(lua_State* L);
     static int setDiscordCharacter(lua_State* L);
     static int setDiscordArea(lua_State *L);
+    static int setDiscordPresenceId(lua_State*);
+    static int isUsingDefaultDiscordPresenceId(lua_State*);
     static int setDiscordStateText(lua_State*);
     static int setDiscordDetailText(lua_State*);
     static int setDiscordLargeIcon(lua_State*);
+    static int setDiscordLargeIconText(lua_State*);
     static int setDiscordSmallIcon(lua_State*);
+    static int setDiscordSmallIconText(lua_State*);
+    static int getDiscordStateText(lua_State*);
+    static int getDiscordDetailText(lua_State*);
+    static int getDiscordLargeIcon(lua_State*);
+    static int getDiscordLargeIconText(lua_State*);
+    static int getDiscordSmallIcon(lua_State*);
+    static int getDiscordSmallIconText(lua_State*);
     // PLACEMARKER: End of Lua functions declarations
+
+
     static const QMap<Qt::MouseButton, QString> mMouseButtons;
     void freeLuaRegistryIndex(int index);
 

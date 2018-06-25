@@ -261,6 +261,7 @@ void dlgProfilePreferences::disableHostDetails()
     // groupBox_ircOptions enabled...
     need_reconnect_for_specialoption->hide();
     groupbox_searchEngineSelection->setEnabled(false);
+    groupBox_discordPrivacy->hide();
 }
 
 void dlgProfilePreferences::enableHostDetails()
@@ -439,9 +440,8 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
     checkBox_mUSE_FORCE_LF_AFTER_PROMPT->setChecked(pHost->mUSE_FORCE_LF_AFTER_PROMPT);
     USE_UNIX_EOL->setChecked(pHost->mUSE_UNIX_EOL);
 
-    if (!mudlet::self()->mDiscord.libraryLoaded()) {
-        groupBox_discordPrivacy->hide();
-    } else {
+    if (mudlet::self()->mDiscord.libraryLoaded()) {
+        groupBox_discordPrivacy->show();
         checkBox_discordGameAddress->setChecked(pHost->mDiscordHideAddress);
         checkBox_discordCurrentArea->setChecked(pHost->mDiscordHideCurrentArea);
         checkBox_discordLuaAPI->setChecked(!pHost->mDiscordDisableLua);
@@ -452,6 +452,7 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         } else {
             comboBox_discordCharacter->setCurrentIndex(2);
         }
+        lineEdit_presenceIdOverride->setText(pHost->getDiscordPresenceId());
     }
 
     checkBox_runAllKeyBindings->setChecked(pHost->getKeyUnit()->mRunAllKeyMatches);
@@ -2063,6 +2064,7 @@ void dlgProfilePreferences::slot_save_and_exit()
             pHost->mDiscordHideCharacterText = true;
             pHost->mDiscordHideCharacterIcon = true;
         }
+        pHost->setDiscordPresenceId(lineEdit_presenceIdOverride->text());
     }
 
 #if defined(INCLUDE_UPDATER)

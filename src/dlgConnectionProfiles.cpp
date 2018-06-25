@@ -297,6 +297,7 @@ void dlgConnectionProfiles::slot_update_discord_optin(int state)
 
     if (state == Qt::Checked) {
         pHost->mDiscordDisableServerSide = false;
+        // FIXME: this requests GMCP data to get Discord data but that is NOT a requirement to use DISCORD!
         pHost->mTelnet.requestDiscordInfo();
     } else {
         pHost->mDiscordDisableServerSide = true;
@@ -648,7 +649,7 @@ void dlgConnectionProfiles::slot_deleteProfile()
     delete_profile_dialog->raise();
 }
 
-QString dlgConnectionProfiles::readProfileData(QString profile, QString item)
+QString dlgConnectionProfiles::readProfileData(const QString& profile, const QString& item)
 {
     QFile file(mudlet::getMudletPath(mudlet::profileDataItemPath, profile, item));
     bool success = file.open(QIODevice::ReadOnly);
@@ -918,8 +919,14 @@ void dlgConnectionProfiles::slot_item_clicked(QListWidgetItem* pItem)
         autologin_checkBox->setChecked(false);
     }
 
+    mDiscordPresenceId = readProfileData(profile, QStringLiteral("discordPresenceId"));
+
+    // val will be null if this is the first time the profile has been read
+    // since an update to a Mudlet version supporting Discord - so a toint()
+    // will return 0 - which just happens to be Qt::Unchecked() but lets not
+    // rely on that...
     val = readProfileData(profile, QStringLiteral("discordoptin"));
-    if (val.toInt() == Qt::Checked) {
+    if ((!val.isEmpty()) && val.toInt() == Qt::Checked) {
         discord_optin_checkBox->setChecked(true);
     } else {
         discord_optin_checkBox->setChecked(false);
@@ -1081,20 +1088,36 @@ void dlgConnectionProfiles::slot_item_clicked(QListWidgetItem* pItem)
 
 void dlgConnectionProfiles::updateDiscordStatus()
 {
-    auto gameSupportsDiscord = mudlet::self()->mDiscord.gameIntegrationSupported(host_name_entry->text().trimmed());
     auto discordLoaded = mudlet::self()->mDiscord.libraryLoaded();
 
     if (!discordLoaded) {
         discord_optin_checkBox->setDisabled(true);
         discord_optin_checkBox->setChecked(false);
-        discord_optin_checkBox->setToolTip(tr("Enable Discord integration (not available on this platform)"));
-    } else if (!gameSupportsDiscord) {
+        discord_optin_checkBox->setToolTip(QStringLiteral("<html><head/><body>%1</body></htmk>")
+                                           .arg(tr("<p>Discord integration not available on this platform.</p>"
+                                                   "<p><i>This option is disabled because the required Discord RPC "
+                                                   "library has not been found; that may be because it is <b>not</b> "
+                                                   "available for <b>this</b> platform or because it is not where "
+                                                   "Mudlet expects to find it.</p>")));
+    } else if (mDiscordPresenceId.isEmpty()
+               && !mudlet::self()->mDiscord.gameIntegrationSupported(host_name_entry->text().trimmed())) {
+
+        // Disable discord support if it is not recognised by name and a
+        // Presence Id has not been previously entered:
         discord_optin_checkBox->setDisabled(true);
         discord_optin_checkBox->setChecked(false);
-        discord_optin_checkBox->setToolTip(tr("Enable Discord integration (not supported by game)"));
+        discord_optin_checkBox->setToolTip(QStringLiteral("<html><head/><body>%1</body></htmk>")
+                                           .arg(tr("<p>Discord integration not supported by game.</p>"
+                                                   "<p><i>This option is disabled because the game is not one "
+                                                   "that Mudlet has an icon for to use as a Discord <i>Rich "
+                                                   "Presence</i> or there is no Presence Id number to identify "
+                                                   "an alternative set of icons that, say a MUD Server, has "
+                                                   "arranged to make available for Mudlet and other applications "
+                                                   "to utilise.</p>")));
     } else {
         discord_optin_checkBox->setEnabled(true);
-        discord_optin_checkBox->setToolTip(tr("Enable Discord integration"));
+        discord_optin_checkBox->setToolTip(QStringLiteral("<html><head/><body>%1</body></htmk>")
+                                           .arg(tr("<p>Check to enable Discord integration.</p>")));
     }
 }
 
@@ -1590,6 +1613,10 @@ void dlgConnectionProfiles::slot_copy_profile()
                mudlet::getMudletPath(mudlet::profileHomePath, profile_name));
     mProfileList << profile_name;
     slot_item_clicked(pItem);
+    // Clear the Discord optin on the copied profile - just because the source
+    // one may have had it enabled does not mean we can assume the new one would
+    // want it set:
+    discord_optin_checkBox->setChecked(false);
 }
 
 void dlgConnectionProfiles::slot_connectToServer()
@@ -1668,6 +1695,9 @@ void dlgConnectionProfiles::slot_connectToServer()
         pHost->mTelnet.setEncoding(encoding, false); // Only time not to save the setting
         // Needed to ensure setting is correct on start-up:
         pHost->setWideAmbiguousEAsianGlyphs(pHost->getWideAmbiguousEAsianGlyphsControlState());
+
+        // This also writes the value out to the profile's base directory:
+        pHost->setDiscordPresenceId(mDiscordPresenceId);
     }
 
     if (needsGenericPackagesInstall) {

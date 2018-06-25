@@ -1304,6 +1304,12 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
             mudlet::self()->mDiscord.setGame(this, gameName.toString());
         }
 
+// Probably will be needed
+//        auto presenceId = json.value(QStringLiteral("presenceid"));
+//        if (gameName != QJsonValue::Undefined) {
+//            mudlet::self()->mDiscord.setPresence(this, presenceId.toString());
+//        }
+
         auto area = json.value(QStringLiteral("state"));
         if (area != QJsonValue::Undefined) {
             mudlet::self()->mDiscord.setArea(this, area.toString());
@@ -1342,18 +1348,28 @@ void Host::processDiscordMSDP(const QString& variable, QString value)
         return;
     }
 
+    // MSDP value comes padded with quotes - strip them (from the local copy of
+    // the supplied argument):
     if (value.startsWith(QLatin1String("\""))) {
-        value = value.remove(0, 1);
+        value = value.mid(1);
     }
 
     if (value.endsWith(QLatin1String("\""))) {
-        value = value.remove(value.length()-1, 1);
+        value.chop(1);
     }
 
-    // MSDP value comes padded with quotes - strip them
     if (variable == QLatin1String("SERVER_ID")) {
         mudlet::self()->mDiscord.setGame(this, value);
     } else if (variable == QLatin1String("AREA_NAME")) {
         mudlet::self()->mDiscord.setArea(this, value);
     }
+}
+
+void Host::setDiscordPresenceId(const QString& s)
+{
+    QMutexLocker locker(& mLock);
+    mDiscordPresenceId = s;
+    locker.unlock();
+
+    writeProfileData(QStringLiteral("discordPresenceId"), s);
 }

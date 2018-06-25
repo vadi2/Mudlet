@@ -94,6 +94,8 @@ public:
                                                                        return mAutoAmbigousWidthGlyphsSetting
                                                                                ? Qt::PartiallyChecked
                                                                                : (mWideAmbigousWidthGlyphs ? Qt::Checked : Qt::Unchecked); }
+    void               setDiscordPresenceId(const QString& s);
+    const QString&     getDiscordPresenceId() { QMutexLocker locker(& mLock); return mDiscordPresenceId; }
 
     void closingDown();
     bool isClosingDown();
@@ -430,6 +432,9 @@ private:
     QHash<QString, XMLexport*> writers;
 
     void installPackageFonts(const QString &packageName);
+
+    // Will be null/empty if is to use Mudlet's default/own presence
+    QString mDiscordPresenceId;
 };
 
 #endif // MUDLET_HOST_H
