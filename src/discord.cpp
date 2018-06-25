@@ -17,6 +17,7 @@ Discord::Discord(QObject* parent)
 , mLoaded{}
 // lowercase list of known games
 // {game name, {game addresses}}
+// The values are not currently used!
 , mKnownGames{{"midmud", {"midmud.com"}},
               {"wotmud", {"game.wotmud.org"}},
               {"luminari", {}},
@@ -99,6 +100,7 @@ std::tuple<bool, QString> Discord::setGame(Host* pHost, const QString& name)
 bool Discord::setArea(Host* pHost, const QString& area)
 {
     if (mLoaded) {
+        mRawMode[pHost] = false;
         mAreas[pHost] = area;
         UpdatePresence();
         return true;
@@ -109,6 +111,7 @@ bool Discord::setArea(Host* pHost, const QString& area)
 bool Discord::setCharacterIcon(Host* pHost, const QString& icon)
 {
     if (mLoaded) {
+        mRawMode[pHost] = false;
         mCharacterIcons[pHost] = icon;
         UpdatePresence();
         return true;
@@ -119,7 +122,52 @@ bool Discord::setCharacterIcon(Host* pHost, const QString& icon)
 bool Discord::setCharacter(Host* pHost, const QString& text)
 {
     if (mLoaded) {
+        mRawMode[pHost] = false;
         mCharacters[pHost] = text;
+        UpdatePresence();
+        return true;
+    }
+    return false;
+}
+
+bool Discord::setDetailText(Host* pHost, const QString& text)
+{
+    if (mLoaded) {
+        mRawMode[pHost] = true;
+        mDetailTexts[pHost] = text;
+        UpdatePresence();
+        return true;
+    }
+    return false;
+}
+
+bool Discord::setStateText(Host* pHost, const QString& text)
+{
+    if (mLoaded) {
+        mRawMode[pHost] = true;
+        mStateTexts[pHost] = text;
+        UpdatePresence();
+        return true;
+    }
+    return false;
+}
+
+bool Discord::setLargeIcon(Host* pHost, const QString& text)
+{
+    if (mLoaded) {
+        mRawMode[pHost] = true;
+        mLargeIcons[pHost] = text;
+        UpdatePresence();
+        return true;
+    }
+    return false;
+}
+
+bool Discord::setSmallIcon(Host* pHost, const QString& text)
+{
+    if (mLoaded) {
+        mRawMode[pHost] = true;
+        mSmallIcons[pHost] = text;
         UpdatePresence();
         return true;
     }
@@ -197,37 +245,53 @@ void Discord::UpdatePresence()
     // still display their character icon
     bool knownGame = mKnownGames.contains(gameNameLowercase);
 
-    if (!gameName.isEmpty()) {
-        sprintf(buffer, "Playing %s", gameName.constData());
-        discordPresence.details = buffer;
-        discordPresence.largeImageKey = gameNameLowercase.constData();
+    if (mRawMode.value(host, false)) {
+        discordPresence.details = mDetailTexts.value(host).toUtf8().constData();
+        discordPresence.state = mStateTexts.value(host).toUtf8().constData();
+        discordPresence.largeImageKey = mLargeIcons.value(host).toUtf8().constData();
+        discordPresence.smallImageKey = mSmallIcons.value(host).toUtf8().constData();
+        discordPresence.largeImageText = "";
+        discordPresence.smallImageText = "";
+        discordPresence.partySize = 1;
+        discordPresence.partyMax = 1;
+    } else {
+        if (!gameName.isEmpty()) {
+            sprintf(buffer, "Playing %s", gameName.constData());
+            discordPresence.details = buffer;
+            mDetailTexts[host] = QString::fromUtf8(buffer);
+            discordPresence.largeImageKey = gameNameLowercase.constData();
+            mLargeIcons[host] = gameNameLowercase;
 
-        if (!host->mDiscordHideAddress) {
-            discordPresence.largeImageText = QStringLiteral("%1:%2").arg(url, port).toUtf8().constData();
-        }
-    }
-
-    if (!host->mDiscordHideCurrentArea && !area.isEmpty()) {
-        discordPresence.state = area.constData();
-    }
-
-    if (!host->mDiscordHideCharacterIcon && !characterIcon.isEmpty()) {
-        // the game is unknown, set the small image as the big one so at least something shows
-        if (knownGame) {
-            discordPresence.smallImageKey = characterIcon.constData();
-        } else {
-            discordPresence.largeImageKey = characterIcon.constData();
-        }
-    }
-
-    if (!host->mDiscordHideCharacterText && !characterText.isEmpty()) {
-        if (knownGame) {
-            discordPresence.smallImageText = characterText.constData();
-        } else {
             if (!host->mDiscordHideAddress) {
-                discordPresence.largeImageText = QStringLiteral("%1:%2 | %3").arg(url, port, characterText).toUtf8().constData();
+                discordPresence.largeImageText = QStringLiteral("%1:%2").arg(url, port).toUtf8().constData();
+            }
+        }
+
+        if (!host->mDiscordHideCurrentArea && !area.isEmpty()) {
+            discordPresence.state = area.constData();
+            mStateTexts[host] = area;
+        }
+
+        if (!host->mDiscordHideCharacterIcon && !characterIcon.isEmpty()) {
+            //  the game is unknown, set the small image as the big one so at least something shows
+            if (knownGame) {
+                discordPresence.smallImageKey = characterIcon.constData();
+                mSmallIcons[host] = characterIcon;
             } else {
-                discordPresence.largeImageText = characterText.constData();
+                discordPresence.largeImageKey = characterIcon.constData();
+                mLargeIcons[host] = characterIcon;
+            }
+        }
+
+        if (!host->mDiscordHideCharacterText && !characterText.isEmpty()) {
+            if (knownGame) {
+                discordPresence.smallImageText = characterText.constData();
+            } else {
+                if (!host->mDiscordHideAddress) {
+                    discordPresence.largeImageText = QStringLiteral("%1:%2 | %3").arg(url, port, characterText).toUtf8().constData();
+                } else {
+                    discordPresence.largeImageText = characterText.constData();
+                }
             }
         }
     }

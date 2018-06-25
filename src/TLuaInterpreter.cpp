@@ -10321,9 +10321,8 @@ int TLuaInterpreter::setDiscordGame(lua_State* L)
         }
     } else {
         lua_pushfstring(L, "setDiscordGame: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
-        lua_error(L);
+        return lua_error(L);
     }
-    return 0;
 }
 
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordCharacterIcon
@@ -10402,6 +10401,102 @@ int TLuaInterpreter::setDiscordArea(lua_State *L)
         lua_error(L);
     }
     return 0;
+}
+
+int TLuaInterpreter::setDiscordLargeIcon(lua_State* L)
+{
+    auto& host = getHostFromLua(L);
+    if (host.mDiscordDisableLua) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (lua_isstring(L, 1)) {
+        if (mudlet::self()->mDiscord.setLargeIcon(&host, QString::fromUtf8(lua_tostring(L, 1)).toLower())) {
+            lua_pushboolean(L, true);
+            return 1;
+        } else {
+            lua_pushnil(L);
+            lua_pushstring(L, "Discord integration is not available");
+            return 2;
+        }
+    } else {
+        lua_pushfstring(L, "setLargeIcon: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
+        lua_error(L);
+    }
+}
+
+int TLuaInterpreter::setDiscordSmallIcon(lua_State* L)
+{
+    auto& host = getHostFromLua(L);
+    if (host.mDiscordDisableLua) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (lua_isstring(L, 1)) {
+        if (mudlet::self()->mDiscord.setSmallIcon(&host, QString::fromUtf8(lua_tostring(L, 1)).toLower())) {
+            lua_pushboolean(L, true);
+            return 1;
+        } else {
+            lua_pushnil(L);
+            lua_pushstring(L, "Discord integration is not available");
+            return 2;
+        }
+    } else {
+        lua_pushfstring(L, "setSmallIcon: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
+        lua_error(L);
+    }
+}
+
+int TLuaInterpreter::setDiscordDetailText(lua_State* L)
+{
+    auto& host = getHostFromLua(L);
+    if (host.mDiscordDisableLua) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (lua_isstring(L, 1)) {
+        if (mudlet::self()->mDiscord.setDetailText(&host, QString::fromUtf8(lua_tostring(L, 1)))) {
+            lua_pushboolean(L, true);
+            return 1;
+        } else {
+            lua_pushnil(L);
+            lua_pushstring(L, "Discord integration is not available");
+            return 2;
+        }
+    } else {
+        lua_pushfstring(L, "setDiscordDetailText: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
+        lua_error(L);
+    }
+}
+
+int TLuaInterpreter::setDiscordStateText(lua_State* L)
+{
+    auto& host = getHostFromLua(L);
+    if (host.mDiscordDisableLua) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (lua_isstring(L, 1)) {
+        if (mudlet::self()->mDiscord.setStateText(&host, QString::fromUtf8(lua_tostring(L, 1)))) {
+            lua_pushboolean(L, true);
+            return 1;
+        } else {
+            lua_pushnil(L);
+            lua_pushstring(L, "Discord integration is not available");
+            return 2;
+        }
+    } else {
+        lua_pushfstring(L, "setStateDetailText: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
+        lua_error(L);
+    }
 }
 
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getTime
@@ -12638,6 +12733,10 @@ void TLuaInterpreter::initLuaGlobals()
     lua_register(pGlobalLua, "setDiscordCharacterIcon", TLuaInterpreter::setDiscordCharacterIcon);
     lua_register(pGlobalLua, "setDiscordCharacter", TLuaInterpreter::setDiscordCharacter);
     lua_register(pGlobalLua, "setDiscordArea", TLuaInterpreter::setDiscordArea);
+    lua_register(pGlobalLua, "setDiscordStateText", TLuaInterpreter::setDiscordStateText);
+    lua_register(pGlobalLua, "setDiscordDetailText", TLuaInterpreter::setDiscordDetailText);
+    lua_register(pGlobalLua, "setDiscordLargeIcon", TLuaInterpreter::setDiscordLargeIcon);
+    lua_register(pGlobalLua, "setDiscordSmallIcon", TLuaInterpreter::setDiscordSmallIcon);
     // PLACEMARKER: End of main Lua interpreter functions registration
 
 

@@ -38,6 +38,11 @@ public:
     bool setCharacter(Host* pHost, const QString& text);
     bool gameIntegrationSupported(const QString& address);
     bool libraryLoaded();
+    bool setLargeIcon(Host* pHost, const QString& text);
+    bool setSmallIcon(Host* pHost, const QString& text);
+    bool setStateText(Host* pHost, const QString& text);
+    bool setDetailText(Host* pHost, const QString& text);
+
 
 private:
     // These are function pointers to functions located in the Discord RPC library:
@@ -53,7 +58,14 @@ private:
     QMap<Host*, int64_t>mStartTimes;
 
     QScopedPointer<QLibrary> mpLibrary;
+
     bool mLoaded;
+    QMap<Host*, QString>mDetailTexts;
+    QMap<Host*, QString>mStateTexts;
+    QMap<Host*, QString>mLargeIcons;
+    QMap<Host*, QString>mSmallIcons;
+
+    QMap<Host*, bool>mRawMode;
 
     QHash<QString, QVector<QString>> mKnownGames;
     QVector<QString> mKnownAddresses;
