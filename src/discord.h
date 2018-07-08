@@ -30,17 +30,8 @@
 #include <QTimer>
 #include <QTimerEvent>
 #include <QLibrary>
-
-#if (defined(Q_OS_LINUX) && defined(Q_PROCESSOR_X86_64)) || defined(Q_OS_MACOS) || defined(Q_OS_WIN32)
-// Discord does not provide support for 32Bit Linux processor - the blighters, 8-(
 #include "../3rdparty/discord/rpc/include/discord_register.h"
 #include "../3rdparty/discord/rpc/include/discord_rpc.h"
-#else
-// Unsupported OS/Processors
-// * FreeBSD
-// * 32Bit Linux
-#endif
-
 #include "post_guard.h"
 
 /*

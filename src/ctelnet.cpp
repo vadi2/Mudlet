@@ -122,12 +122,14 @@ cTelnet::cTelnet(Host* pH)
     connect(&socket, SIGNAL(disconnected()), this, SLOT(handle_socket_signal_disconnected()));
     connect(&socket, SIGNAL(readyRead()), this, SLOT(handle_socket_signal_readyRead()));
 
+#if defined(INCLUDE_DISCORD)
     // Tempory - switch to signal_connected once ready to test on-line
     if (mudlet::self()) {
         // mudlet::self() is null during startup - for the Default host case
         connect(this, SIGNAL(signal_connecting(Host*)), &mudlet::self()->mDiscord, SLOT(slot_handleGameConnection(Host*)));
         connect(this, SIGNAL(signal_disconnected(Host*)), &mudlet::self()->mDiscord, SLOT(slot_handleGameDisconnection(Host*)));
     }
+#endif
     // initialize telnet session
     reset();
 

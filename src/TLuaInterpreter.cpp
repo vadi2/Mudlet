@@ -10302,6 +10302,7 @@ int TLuaInterpreter::openWebPage(lua_State* L)
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordGame
 int TLuaInterpreter::setDiscordGame(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10323,11 +10324,17 @@ int TLuaInterpreter::setDiscordGame(lua_State* L)
         lua_pushfstring(L, "setDiscordGame: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordCharacterIcon
 int TLuaInterpreter::setDiscordCharacterIcon(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10349,11 +10356,17 @@ int TLuaInterpreter::setDiscordCharacterIcon(lua_State* L)
         lua_pushfstring(L, "setDiscordCharacterIcon: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordCharacter
 int TLuaInterpreter::setDiscordCharacter(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10375,11 +10388,17 @@ int TLuaInterpreter::setDiscordCharacter(lua_State* L)
         lua_pushfstring(L, "setDiscordCharacter: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordArea
 int TLuaInterpreter::setDiscordArea(lua_State *L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10401,6 +10420,11 @@ int TLuaInterpreter::setDiscordArea(lua_State *L)
         lua_pushfstring(L, "setDiscordArea: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 /* Overrides the Discord presence Id used for this profile
@@ -10422,6 +10446,7 @@ int TLuaInterpreter::setDiscordArea(lua_State *L)
  */
 int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10472,6 +10497,11 @@ int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
         lua_pushboolean(L, true);
         return 1;
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 // Could be used to check for Discord availability in Lua, will return nil if
@@ -10480,6 +10510,7 @@ int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
 // and the other ones that rely on THAT presence being "in use":
 int TLuaInterpreter::isUsingDefaultDiscordPresenceId(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10489,10 +10520,16 @@ int TLuaInterpreter::isUsingDefaultDiscordPresenceId(lua_State* L)
 
     lua_pushboolean(L, mudlet::self()->mDiscord.isUsingDefaultDiscordPresence(&host));
     return 1;
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::setDiscordLargeIcon(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10513,10 +10550,16 @@ int TLuaInterpreter::setDiscordLargeIcon(lua_State* L)
         lua_pushfstring(L, "setLargeIcon: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::getDiscordLargeIcon(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10533,12 +10576,18 @@ int TLuaInterpreter::getDiscordLargeIcon(lua_State* L)
         lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
         return 2;
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 // Discord calls the two pictures "LargeImage" and "SmallImage" but their
 // purpose are explained by being called "LargeIcon" and "SmallIcon"
 int TLuaInterpreter::setDiscordLargeIconText(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10559,10 +10608,16 @@ int TLuaInterpreter::setDiscordLargeIconText(lua_State* L)
         lua_pushfstring(L, "setLargeIconText: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::getDiscordLargeIconText(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10579,10 +10634,16 @@ int TLuaInterpreter::getDiscordLargeIconText(lua_State* L)
         lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
         return 2;
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::setDiscordSmallIcon(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10603,10 +10664,16 @@ int TLuaInterpreter::setDiscordSmallIcon(lua_State* L)
         lua_pushfstring(L, "setSmallIcon: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::getDiscordSmallIcon(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10623,10 +10690,16 @@ int TLuaInterpreter::getDiscordSmallIcon(lua_State* L)
         lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
         return 2;
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::setDiscordSmallIconText(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10647,10 +10720,16 @@ int TLuaInterpreter::setDiscordSmallIconText(lua_State* L)
         lua_pushfstring(L, "setSmallIconText: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::getDiscordSmallIconText(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10667,10 +10746,16 @@ int TLuaInterpreter::getDiscordSmallIconText(lua_State* L)
         lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
         return 2;
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::setDiscordDetailText(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10691,10 +10776,16 @@ int TLuaInterpreter::setDiscordDetailText(lua_State* L)
         lua_pushfstring(L, "setDiscordDetailText: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::getDiscordDetailText(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10711,10 +10802,16 @@ int TLuaInterpreter::getDiscordDetailText(lua_State* L)
         lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
         return 2;
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::setDiscordStateText(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10735,10 +10832,16 @@ int TLuaInterpreter::setDiscordStateText(lua_State* L)
         lua_pushfstring(L, "setStateDetailText: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 int TLuaInterpreter::getDiscordStateText(lua_State* L)
 {
+#if defined(INCLUDE_DISCORD)
     auto& host = getHostFromLua(L);
     if (host.mDiscordDisableLua) {
         lua_pushnil(L);
@@ -10755,6 +10858,11 @@ int TLuaInterpreter::getDiscordStateText(lua_State* L)
         lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
         return 2;
     }
+#else
+    lua_pushnil(L);
+    lua_pushstring(L, "Discord API is not available in this Mudlet version");
+    return 2;
+#endif
 }
 
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getTime

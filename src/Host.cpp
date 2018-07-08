@@ -1284,6 +1284,7 @@ void Host::setWideAmbiguousEAsianGlyphs(const Qt::CheckState state)
 // handles out of band (OOB) GMCP/MSDP data for Discord
 void Host::processDiscordGMCP(const QString& packageMessage, const QString& data)
 {
+#if defined(INCLUDE_DISCORD)
     if (mDiscordDisableServerSide) {
         return;
     }
@@ -1329,17 +1330,26 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
             mudlet::self()->mDiscord.setCharacter(this, character.toString());
         }
     }
+#else
+    Q_UNUSED(packageMessage)
+    Q_UNUSED(data)
+#endif
 }
 
-void Host::clearDiscordData() {
+void Host::clearDiscordData()
+{
+#if defined(INCLUDE_DISCORD)
     mudlet::self()->mDiscord.setGame(this, QString());
     mudlet::self()->mDiscord.setArea(this, QString());
     mudlet::self()->mDiscord.setCharacter(this, QString());
     mudlet::self()->mDiscord.setCharacterIcon(this, QString());
+#endif
 }
+
 
 void Host::processDiscordMSDP(const QString& variable, QString value)
 {
+#if defined(INCLUDE_DISCORD)
     if (mDiscordDisableServerSide) {
         return;
     }
@@ -1363,13 +1373,20 @@ void Host::processDiscordMSDP(const QString& variable, QString value)
     } else if (variable == QLatin1String("AREA_NAME")) {
         mudlet::self()->mDiscord.setArea(this, value);
     }
+#else
+    Q_UNUSED(variable)
+    Q_UNUSED(value)
+#endif
 }
+
 
 void Host::setDiscordPresenceId(const QString& s)
 {
+#if defined(INCLUDE_DISCORD)
     QMutexLocker locker(& mLock);
     mDiscordPresenceId = s;
     locker.unlock();
 
     writeProfileData(QStringLiteral("discordPresenceId"), s);
+#endif
 }

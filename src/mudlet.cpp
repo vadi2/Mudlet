@@ -47,7 +47,6 @@
 #include "dlgPackageExporter.h"
 #include "dlgProfilePreferences.h"
 #include "dlgTriggerEditor.h"
-#include "discord.h"
 
 #include "pre_guard.h"
 #include <QtUiTools/quiloader.h>
@@ -154,7 +153,9 @@ mudlet::mudlet()
 , mshowMapAuditErrors(false)
 , mTimeFormat(tr("hh:mm:ss",
                  "Formatting string for elapsed time display in replay playback - see QDateTime::toString(const QString&) for the gory details...!"))
+#if defined(INCLUDE_DISCORD)
 , mDiscord()
+#endif
 , mShowIconsOnDialogs(true)
 {
     setupUi(this);

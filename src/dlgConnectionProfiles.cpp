@@ -142,12 +142,17 @@ dlgConnectionProfiles::dlgConnectionProfiles(QWidget * parent)
     connect(host_name_entry, &QLineEdit::textChanged, this, &dlgConnectionProfiles::slot_update_url);
     connect(port_entry, &QLineEdit::textChanged, this, &dlgConnectionProfiles::slot_update_port);
     connect(autologin_checkBox, &QCheckBox::stateChanged, this, &dlgConnectionProfiles::slot_update_autologin);
-    connect(discord_optin_checkBox, &QCheckBox::stateChanged, this, &dlgConnectionProfiles::slot_update_discord_optin);
     connect(login_entry, &QLineEdit::textEdited, this, &dlgConnectionProfiles::slot_update_login);
     connect(character_password_entry, &QLineEdit::textEdited, this, &dlgConnectionProfiles::slot_update_pass);
     connect(mud_description_textedit, &QPlainTextEdit::textChanged, this, &dlgConnectionProfiles::slot_update_description);
     connect(profiles_tree_widget, &QListWidget::currentItemChanged, this, &dlgConnectionProfiles::slot_item_clicked);
     connect(profiles_tree_widget, &QListWidget::itemDoubleClicked, this, &dlgConnectionProfiles::accept);
+
+#if defined(INCLUDE_DISCORD)
+    connect(discord_optin_checkBox, &QCheckBox::stateChanged, this, &dlgConnectionProfiles::slot_update_discord_optin);
+#else
+    discord_optin_checkBox->hide();
+#endif
 
     // website_entry atm is only a label
     //connect( website_entry, SIGNAL(textEdited(const QString)), this, SLOT(slot_update_website(const QString)));
@@ -281,6 +286,7 @@ void dlgConnectionProfiles::slot_update_autologin(int state)
 
 void dlgConnectionProfiles::slot_update_discord_optin(int state)
 {
+#if defined(INCLUDE_DISCORD)
     QListWidgetItem* pItem = profiles_tree_widget->currentItem();
     if (!pItem) {
         return;
@@ -303,6 +309,9 @@ void dlgConnectionProfiles::slot_update_discord_optin(int state)
         pHost->mDiscordDisableServerSide = true;
         pHost->clearDiscordData();
     }
+#else
+    Q_UNUSED(state);
+#endif
 }
 
 void dlgConnectionProfiles::slot_update_port(const QString ignoreBlank)
@@ -919,6 +928,7 @@ void dlgConnectionProfiles::slot_item_clicked(QListWidgetItem* pItem)
         autologin_checkBox->setChecked(false);
     }
 
+#if defined(INCLUDE_DISCORD)
     mDiscordPresenceId = readProfileData(profile, QStringLiteral("discordPresenceId"));
 
     // val will be null if this is the first time the profile has been read
@@ -933,6 +943,7 @@ void dlgConnectionProfiles::slot_item_clicked(QListWidgetItem* pItem)
     }
 
     updateDiscordStatus();
+#endif
 
     mud_description_textedit->setPlainText(getDescription(host_url, host_port.toUInt(), profile_name));
 
@@ -1088,6 +1099,7 @@ void dlgConnectionProfiles::slot_item_clicked(QListWidgetItem* pItem)
 
 void dlgConnectionProfiles::updateDiscordStatus()
 {
+#if defined(INCLUDE_DISCORD)
     auto discordLoaded = mudlet::self()->mDiscord.libraryLoaded();
 
     if (!discordLoaded) {
@@ -1119,6 +1131,7 @@ void dlgConnectionProfiles::updateDiscordStatus()
         discord_optin_checkBox->setToolTip(QStringLiteral("<html><head/><body>%1</body></htmk>")
                                            .arg(tr("<p>Check to enable Discord integration.</p>")));
     }
+#endif
 }
 
 // (re-)creates the dialogs profile list
@@ -1696,8 +1709,10 @@ void dlgConnectionProfiles::slot_connectToServer()
         // Needed to ensure setting is correct on start-up:
         pHost->setWideAmbiguousEAsianGlyphs(pHost->getWideAmbiguousEAsianGlyphsControlState());
 
+#if defined(INCLUDE_DISCORD)
         // This also writes the value out to the profile's base directory:
-        pHost->setDiscordPresenceId(mDiscordPresenceId);
+        mudlet::self()->mDiscord.setPresence(pHost, mDiscordPresenceId);
+#endif
     }
 
     if (needsGenericPackagesInstall) {
