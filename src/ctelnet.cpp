@@ -336,12 +336,16 @@ void cTelnet::handle_socket_signal_connected()
         mTimerPass->start(3000);
     }
 
+// put out this signal (which affects the start time used for elapsed time
+// before raising the Lua sysConnectionEvent - so that a non-default Discord
+// Presence Id can be activated before any user/package/module code that might
+// be called from a lua event handler for that event is run.
+    emit signal_connected(mpHost);
+
     TEvent event;
     event.mArgumentList.append(QStringLiteral("sysConnectionEvent"));
     event.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
     mpHost->raiseEvent(event);
-
-    emit signal_connected(mpHost);
 }
 
 void cTelnet::handle_socket_signal_disconnected()

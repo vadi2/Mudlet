@@ -1307,9 +1307,14 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
 
 // Probably will be needed
 //        auto presenceId = json.value(QStringLiteral("presenceid"));
-//        if (gameName != QJsonValue::Undefined) {
+//        if (presenceId != QJsonValue::Undefined) {
 //            mudlet::self()->mDiscord.setPresence(this, presenceId.toString());
 //        }
+// May also want some means to obtain from the Server the names {a.k.a. "keys"}
+// that they provide from their Discord Guild/Server - though this will not be
+// necessary if they provide their own module/package to support using their
+// resources using the direct access that has been implimented in the Lua
+// sub-system.
 
         auto area = json.value(QStringLiteral("state"));
         if (area != QJsonValue::Undefined) {
@@ -1378,7 +1383,6 @@ void Host::processDiscordMSDP(const QString& variable, QString value)
     Q_UNUSED(value)
 #endif
 }
-
 
 void Host::setDiscordPresenceId(const QString& s)
 {

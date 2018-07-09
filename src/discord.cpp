@@ -557,39 +557,45 @@ bool Discord::libraryLoaded()
 void Discord::slot_handleGameConnection(Host* pHost)
 {
     mStartTimes[pHost] = static_cast<int64_t>(std::time(nullptr));
+    UpdatePresence();
 }
 
 void Discord::slot_handleGameDisconnection(Host* pHost)
 {
     mStartTimes[pHost] = 0;
+    UpdatePresence();
 }
 
-// AFAICT A Discord Application Id is an 18 digit number - this seems to
-// corresponds to an unsigned long long int (a.k.a. a quint64, or qulonglong)
-// but we won't assume anything here and stick to treating it as a QString.
+// AFAICT A Discord Application Id is an unsigned long long int (a.k.a. a
+// quint64, or qulonglong) but we won't assume anything here and stick to
+// treating it as a QString.
 bool Discord::setPresence(Host* pHost, const QString& text)
 {
+    QString oldPresenceId = mHostPresenceIds.value(pHost);
+    if (oldPresenceId == text) {
+        // No change so do nothing, sucessfully
+        return true;
+    }
+
     // Note what the current presenceId is for the given Host - will be an empty
     // string if not overridden from the default Mudlet one:
     if (text.isEmpty()) {
         // An empty or null string is the signal to switch back to default
         // "Mudlet" presence - and always succeeds
         mHostPresenceIds.remove(pHost);
+        pHost->setDiscordPresenceId(QString());
+        UpdatePresence();
 
         return true;
     }
-
-    QString oldPresenceId = mHostPresenceIds.value(pHost);
-    if (oldPresenceId == text) {
-        // No change so do nothing
-        return true;
-    }
-
 
     bool ok = false;
     if (text.toLongLong(&ok) && ok) {
         // Got something that makes a non-zero number - so assume it is ok
         mHostPresenceIds[pHost] = text;
+        pHost->setDiscordPresenceId(text);
+        UpdatePresence();
+
         return true;
 
     } else {
@@ -597,12 +603,6 @@ bool Discord::setPresence(Host* pHost, const QString& text)
         return false;
     }
 }
-
-// Check to see if the presence is still needed:
-//if ((!text.isEmpty()) && !mHostPresenceIds.values().contains(text)) {
-//    // No other Host instance is using the given Presence Id and it is
-//    // not the default one - so remove the
-//}
 
 DiscordRichPresence localDiscordPresence::convert() const
 {

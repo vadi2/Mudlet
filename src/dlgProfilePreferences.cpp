@@ -2071,7 +2071,7 @@ void dlgProfilePreferences::slot_save_and_exit()
             pHost->mDiscordHideCharacterText = true;
             pHost->mDiscordHideCharacterIcon = true;
         }
-        pHost->setDiscordPresenceId(lineEdit_presenceIdOverride->text());
+        pHost->setDiscordPresenceId(lineEdit_presenceIdOverride->text().trimmed());
     }
 
 #if defined(INCLUDE_UPDATER)

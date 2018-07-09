@@ -2244,6 +2244,9 @@
          <layout class="QGridLayout" name="gridLayout_20">
           <item row="0" column="0">
            <widget class="QCheckBox" name="checkBox_discordGameAddress">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If checked prevents MUD server information set by the &lt;tt&gt;setDiscordGame&lt;/tt&gt; command or by out-of-band protocols from the MUD server being displayed in the user's Discord Rich Presence&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Hide game address</string>
             </property>
@@ -2273,6 +2276,9 @@
           </item>
           <item row="1" column="0">
            <widget class="QCheckBox" name="checkBox_discordCurrentArea">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If checked prevents area information set by the &lt;tt&gt;setDiscordArea&lt;/tt&gt; command or by out-of-band protocols from the MUD server being displayed in the user's Discord Rich Presence&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Hide current area</string>
             </property>
@@ -2281,7 +2287,7 @@
           <item row="1" column="1">
            <widget class="QCheckBox" name="checkBox_discordLuaAPI">
             <property name="toolTip">
-             <string>Lua API is currently always enabled for testing purposes</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Needs to be checked to enable Lua API access to the Discord functions&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="text">
              <string>Enable Lua API</string>
@@ -2316,7 +2322,7 @@
              <item>
               <widget class="QLineEdit" name="lineEdit_presenceIdOverride">
                <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Entering the &lt;tt&gt;PresenceId&lt;/tt&gt; (&lt;tt&gt;ApplicationId&lt;/tt&gt;) of another Guild (a.k.a. Server or group of channels on Discord) for, say a MUD Server, will enable the use of icons on your Discord Rich Presence supplied by that Guild.  This may enable the use of a wide range of icons &lt;i&gt;specific to that Guild&lt;/i&gt; instead of a standard set that Mudlet provides to be shared amongst all its users.&lt;/p&gt;&lt;p&gt;An entry in this item will disable the use of &lt;code&gt;discordSetGame&lt;/code&gt;, &lt;code&gt;discordSetArea&lt;/code&gt;, &lt;code&gt;discordSetCharacter&lt;/code&gt; and &lt;code&gt;discordSetCharacterText&lt;/code&gt; lua functions; to return to the Mudlet default PresenceId use the clear button.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Entering the &lt;tt&gt;PresenceId&lt;/tt&gt; (&lt;tt&gt;ApplicationId&lt;/tt&gt;) of another Guild (a.k.a. Server or group of channels on Discord) for, say a MUD Server, will enable the use of icons on your Discord Rich Presence supplied by that Guild.  This may enable the use of a wide range of icons &lt;i&gt;specific to that Guild&lt;/i&gt; instead of a standard set that Mudlet provides to be shared amongst all its users.&lt;/p&gt;&lt;p&gt;An entry in this item will disable the use of &lt;tt&gt;discordSetGame&lt;/tt&gt;, &lt;tt&gt;discordSetArea&lt;/tt&gt;, &lt;tt&gt;discordSetCharacter&lt;/tt&gt; and &lt;tt&gt;discordSetCharacterText&lt;/tt&gt; lua functions; to return to the &lt;b&gt;Mudlet&lt;/b&gt; default PresenceId use the clear button.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="inputMethodHints">
                 <set>Qt::ImhNoPredictiveText|Qt::ImhPreferNumbers</set>
@@ -2346,7 +2352,7 @@
          <property name="title">
           <string>IRC client options</string>
          </property>
-         <layout class="QGridLayout" name="gridLayout_28" rowstretch="0,0,0">
+         <layout class="QGridLayout" name="gridLayout_28" rowstretch="0,0">
           <item row="0" column="1">
            <widget class="QLineEdit" name="ircHostName">
             <property name="inputMethodHints">

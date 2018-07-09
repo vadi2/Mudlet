@@ -10459,7 +10459,7 @@ int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
             // Treat it as a UTF-8 string because although it is likely to be an
             // unsigned long long integer (0 to 18446744073709551615) we want to
             // be able to handle any input so we can report bad input strings back:
-            QString inputText = QString::fromUtf8(lua_tostring(L, 1));
+            QString inputText = QString::fromUtf8(lua_tostring(L, 1)).trimmed();
             if (!inputText.isEmpty()) {
                 bool isOk = false;
                 quint64 numericEquivalent = inputText.toULongLong(&isOk);
