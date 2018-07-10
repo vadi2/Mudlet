@@ -443,7 +443,6 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
     checkBox_mUSE_FORCE_LF_AFTER_PROMPT->setChecked(pHost->mUSE_FORCE_LF_AFTER_PROMPT);
     USE_UNIX_EOL->setChecked(pHost->mUSE_UNIX_EOL);
 
-#if defined(INCLUDE_DISCORD)
     if (mudlet::self()->mDiscord.libraryLoaded()) {
         groupBox_discordPrivacy->show();
         checkBox_discordGameAddress->setChecked(pHost->mDiscordHideAddress);
@@ -458,7 +457,6 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         }
         lineEdit_presenceIdOverride->setText(pHost->getDiscordPresenceId());
     }
-#endif
 
     checkBox_runAllKeyBindings->setChecked(pHost->getKeyUnit()->mRunAllKeyMatches);
 
@@ -701,9 +699,7 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
     connect(pushButton_resetLogDir, SIGNAL(clicked()), this, SLOT(slot_resetLogDir()));
     connect(comboBox_logFileNameFormat, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_logFileNameFormatChange(int)));
     connect(mIsToLogInHtml, SIGNAL(clicked(bool)), this, SLOT(slot_changeLogFileAsHtml(bool)));
-#if defined(INCLUDE_DISCORD)
     connect(checkBox_discordGameAddress, &QAbstractButton::clicked, &mudlet::self()->mDiscord, &Discord::UpdatePresence);
-#endif
 }
 
 void dlgProfilePreferences::disconnectHostRelatedControls()
@@ -2118,9 +2114,7 @@ void dlgProfilePreferences::slot_save_and_exit()
     mudlet::self()->setEditorTextoptions(checkBox_showSpacesAndTabs->isChecked(), checkBox_showLineFeedsAndParagraphs->isChecked());
     mudlet::self()->setShowMapAuditErrors(checkBox_reportMapIssuesOnScreen->isChecked());
 
-#if defined(INCLUDE_DISCORD)
     mudlet::self()->mDiscord.UpdatePresence();
-#endif
 
     close();
 }

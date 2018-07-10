@@ -145,35 +145,6 @@ else()
   # and it is not obvious that there is a demand to do this currenly.
 endif()
 
-# Enable the inclusion of the Discord "Rich Presence" RPC support library and
-# our interface code. The latter is included in the binary code by default
-# unless the environmental variable WITH_DISCORD is defined AND is set to a
-# (case insensitive) value of "NO". Linux packagers for 32-bit targets will find
-# it useful to do this since Discord is not supported on that target and it
-# has proven hard to detect the target's bitness for both QMake and CMake build
-# systems. FreeBSD is also not supported but that is handled automatically.
-# WITH_DISCORD is an environmental value/variable (so could be a number, a
-# string, something else or not even exist).
-set(DISCORD_TEST $ENV{WITH_DISCORD})
-if((CMAKE_SYSTEM_NAME STREQUAL "Linux") OR (CMAKE_SYSTEM_NAME STREQUAL "Windows") OR (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
-  if(DEFINED DISCORD_TEST)
-      string(TOUPPER ${DISCORD_TEST} DISCORD_TEST)
-  else(DEFINED DISCORD_TEST)
-      # Set the CMake variable to the default if it (as a result of WITH_FONTS not
-      # existing) has not been defined, without the if(DEFINED ...) string(...)
-      # errors out - and so may further tests on the variable...
-      set(DISCORD_TEST "YES")
-  endif(DEFINED DISCORD_TEST)
-  if(DISCORD_TEST STREQUAL "NO")
-    option(USE_DISCORD "Include Discord Rich Presence RPC library support" OFF)
-  else(DISCORD_TEST STREQUAL "NO")
-    option(USE_DISCORD "Include Discord Rich Presence RPC library support" ON)
-  endif(DISCORD_TEST STREQUAL "NO")
-else()
-  # Option not available for other platforms
-  set(USE_UPDATER NO)
-endif()
-
 if(APPLE)
   # Needed (just) on MacOs as an #include in luazip.h:
   add_subdirectory(3rdparty/luazip)

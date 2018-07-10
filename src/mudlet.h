@@ -35,10 +35,7 @@
 #include "updater.h"
 #endif
 
-#if (defined(Q_OS_LINUX) && defined(Q_PROCESSOR_X86_64)) || defined(Q_OS_MACOS) || defined(Q_OS_WIN32)
-// Discord does not provide support for 32Bit Linux processor - the blighters, 8-(
 #include "discord.h"
-#endif
 
 #include "pre_guard.h"
 #include <QFlags>
@@ -94,9 +91,7 @@ public:
     static void start();
     HostManager& getHostManager() { return mHostManager; }    
     FontManager mFontManager;
-#if defined(INCLUDE_DISCORD)
     Discord mDiscord;
-#endif
     QPointer<QSettings> mpSettings;
     void addSubWindow(TConsole* p);
     int getColumnNumber(Host* pHost, QString& name);

@@ -30,6 +30,7 @@ set(mudlet_SRCS
     ActionUnit.cpp
     AliasUnit.cpp
     ctelnet.cpp
+    discord.cpp
     dlgAboutDialog.cpp
     dlgActionMainArea.cpp
     dlgAliasMainArea.cpp
@@ -127,6 +128,7 @@ set(mudlet_UIS
 
 set(mudlet_MOC_HDRS
     ctelnet.h
+    discord.h
     dlgAboutDialog.h
     dlgActionMainArea.h
     dlgAliasMainArea.h
@@ -213,11 +215,6 @@ if(USE_UPDATER)
   list(APPEND mudlet_SRCS updater.cpp)
   list(APPEND mudlet_MOC_HDRS updater.h)
 endif(USE_UPDATER)
-
-if(USE_DISCORD)
-  list(APPEND mudlet_SRCS discord.cpp)
-  list(APPEND mudlet_MOC_HDRS discord.h)
-endif(USE_DISCORD)
 
 if(MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -MP") # parallel builds
@@ -370,19 +367,6 @@ if((CMAKE_SYSTEM_NAME STREQUAL "Linux") OR (CMAKE_SYSTEM_NAME STREQUAL "Windows"
   endif(USE_UPDATER)
 else()
   message(STATUS "The Updater code is excluded as on-line updating is not available on this platform")
-endif()
-
-# Like the QMake mudlet.pro project file we ideally want to detect whether a
-# Linux target is a 32 or 64 bit system as only the latter is supported by
-# Discord
-if((CMAKE_SYSTEM_NAME STREQUAL "Linux") OR (CMAKE_SYSTEM_NAME STREQUAL "Windows") OR (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
-  if(USE_DISCORD)
-    message(STATUS "The Discord Rich Presence integration code is included in this configuration")
-  else(USE_DISCORD)
-    message(STATUS "The Discord Rich Presence integration code is excluded from this configuration")
-  endif(USE_DISCORD)
-else()
-  message(STATUS "The Discord Rich Presence integration code is excluded as it is not available on this platform")
 endif()
 
 if(WIN32)

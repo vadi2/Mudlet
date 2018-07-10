@@ -215,31 +215,6 @@ linux|macx|win32 {
 # else we are on another platform which the updater code will not support so
 # don't include it either
 
-######################### Auto Updater setting detection #########,#############
-# To remove the Discord support, set the environment WITH_DISCORD variable to
-# "NO" ie: export WITH_DISCORD"NO" qmake
-#
-# Note for Mudlet developers: as WITH_DISCORD could be a number, a string,
-# something else (or not even exist) we need to be careful in checking it exists
-# before doing much else with it. Also as an environmental variable it is tricky
-# to handle unless we read it into a qmake variable first:
-
-# FIXME: need to enhance the Linux check to only work for 64-bit versions as
-# Discord is NOT available for 32-bit Linux:
-linux|macx|win32 {
-    # We are on one of the supported platforms
-    DISCORD_TEST = $$upper($$(WITH_DISCORD))
-    isEmpty( DISCORD_TEST ) | !equals(DISCORD_TEST, "NO" ) {
-       # The environmental variable does not exist or it does and it is NOT the
-       # particular value we are looking out for - so include the updater code:
-       DEFINES += INCLUDE_DISCORD
-    }
-    # else the environment variable is the specific "don't include the updater
-    # code" setting - so don't!
-}
-# else we are on another platform which the updater code will not support so
-# don't include it either
-
 ###################### Platform Specific Paths and related #####################
 # Specify default location for Lua files, in OS specific LUA_DEFAULT_DIR value
 # below, if this is not done then a hardcoded default of a ./mudlet-lua/lua
@@ -364,6 +339,9 @@ macx:LIBS += \
     -lz \
     -lzzip
 
+# Pull in the headers for the Discord RPC library
+    INCLUDEPATH += ../3rdparty/discord/rpc/include
+
 # Define a preprocessor symbol with the default fallback location from which
 # to load installed mudlet lua files. Set LUA_DEFAULT_DIR to a
 # platform-specific value. If LUA_DEFAULT_DIR is unset, the root directory
@@ -478,6 +456,7 @@ SOURCES += \
     ActionUnit.cpp \
     AliasUnit.cpp \
     ctelnet.cpp \
+    discord.cpp \
     dlgAboutDialog.cpp \
     dlgActionMainArea.cpp \
     dlgAliasMainArea.cpp \
@@ -550,6 +529,7 @@ HEADERS += \
     ActionUnit.h \
     AliasUnit.h \
     ctelnet.h \
+    discord.h \
     dlgAboutDialog.h \
     dlgActionMainArea.h \
     dlgAliasMainArea.h \
@@ -680,26 +660,6 @@ linux|macx|win32 {
 } else {
     !build_pass{
         message("The Updater code is excluded as on-line updating is not available on this platform")
-    }
-}
-
-# FIXME - enhance Linux test to distinguish between 32 and 64 bit targets
-linux|macx|win32 {
-    contains( DEFINES, INCLUDE_DISCORD ) {
-        INCLUDEPATH += ../3rdparty/discord/rpc/include
-        HEADERS += discord.h
-        SOURCES += discord.cpp
-        !build_pass{
-            message("The Discord Rich Presence integration code is included in this configuration")
-        }
-    } else {
-        !build_pass{
-            message("The Discord Rich Presence integration code is excluded from this configuration")
-        }
-    }
-} else {
-    !build_pass{
-        message("The Discord Rich Presence integration code is excluded as it is not available on this platform")
     }
 }
 
