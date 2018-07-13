@@ -122,13 +122,6 @@ cTelnet::cTelnet(Host* pH)
     connect(&socket, SIGNAL(disconnected()), this, SLOT(handle_socket_signal_disconnected()));
     connect(&socket, SIGNAL(readyRead()), this, SLOT(handle_socket_signal_readyRead()));
 
-    // Tempory - switch to signal_connected once ready to test on-line
-    if (mudlet::self()) {
-        // mudlet::self() is null during startup - for the Default host case
-        connect(this, SIGNAL(signal_connecting(Host*)), &mudlet::self()->mDiscord, SLOT(slot_handleGameConnection(Host*)));
-        connect(this, SIGNAL(signal_disconnected(Host*)), &mudlet::self()->mDiscord, SLOT(slot_handleGameDisconnection(Host*)));
-    }
-
     // initialize telnet session
     reset();
 
@@ -259,20 +252,25 @@ QPair<bool, QString> cTelnet::setEncoding(const QString& newEncoding, const bool
     return qMakePair(true, QString());
 }
 
+// Only called from dlgConnectionPreferences when Discord opt-in checkbox state
+// is changed (either by user action or programmatically)
 void cTelnet::requestDiscordInfo()
 {
-    string data;
-    data = TN_IAC;
-    data += TN_SB;
-    data += GMCP;
-    data += string("External.Discord.Get");
-    data += TN_IAC;
-    data += TN_SE;
+    mudlet* pMudlet = mudlet::self();
+    if (pMudlet->mDiscord.libraryLoaded() && (mpHost->mDiscordAccessFlags & Host::DiscordServerAccessEnabled)) {
+        string data;
+        data = TN_IAC;
+        data += TN_SB;
+        data += GMCP;
+        data += string("External.Discord.Get");
+        data += TN_IAC;
+        data += TN_SE;
 
-    // some games are buggy with MCCP on and require actual input before GMCP is processed
-    data += "\n";
+        // some games are buggy with MCCP on and require actual input before GMCP is processed
+        data += "\n";
 
-    socketOutRaw(data);
+        socketOutRaw(data);
+    }
 }
 
 void cTelnet::connectIt(const QString& address, int port)
@@ -694,14 +692,52 @@ void cTelnet::processTelnetCommand(const string& command)
 
             socketOutRaw(_h);
 
-            _h = TN_IAC;
-            _h += TN_SB;
-            _h += GMCP;
-            _h += "External.Discord.Hello";
-            _h += TN_IAC;
-            _h += TN_SE;
+            if (mudlet::self()->mDiscord.libraryLoaded()
+                    && !mpHost->mDiscordDisableServerSide
+                    && (mpHost->mDiscordAccessFlags & Host::DiscordServerAccessEnabled)) {
 
-            socketOutRaw(_h);
+                _h = TN_IAC;
+                _h += TN_SB;
+                _h += GMCP;
+                _h += "External.Discord.Hello";
+                QStringList discordUserDetails = mudlet::self()->mDiscord.getDiscordUserDetails();
+                QString infoMessage;
+                if (!discordUserDetails.isEmpty() && (mpHost->mDiscordAccessFlags & Host::DiscordServerAccessToUserName)) {
+
+                    _h += QStringLiteral(" [ user: \"%1#%2\", private: true, presenceidinuse: \"%3\", canchangepresenceid: %4 ]")
+                          .arg(discordUserDetails.at(0),
+                               discordUserDetails.at(2),
+                               mudlet::self()->mDiscord.getPresenceId(mpHost),
+                               (mpHost->mDiscordAccessFlags & Host::DiscordServerCanSetPresenceId) ? QLatin1String("true") : QLatin1String("false"))
+                          .toUtf8().constData();
+
+                    if (mpHost->mDiscordAccessFlags & Host::DiscordServerCanSetPresenceId) {
+                        infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Username and Rich "
+                                                     "Presence Guild, Server is allowed to modify Guild to match Game.");
+                    } else {
+                        infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Username and Rich "
+                                                     "Presence Guild, Server is prohibited from modifying Guild.");
+                    }
+                } else {
+                    _h += QStringLiteral(" [ presenceidinuse: \"%1\", canchangepresenceid: %2 ]")
+                          .arg(mudlet::self()->mDiscord.getPresenceId(mpHost),
+                               (mpHost->mDiscordAccessFlags & Host::DiscordServerCanSetPresenceId) ? QLatin1String("true") : QLatin1String("false"))
+                          .toUtf8().constData();
+
+                    if (mpHost->mDiscordAccessFlags & Host::DiscordServerCanSetPresenceId) {
+                        infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Rich Presence Guild,"
+                                                     "Server is allowed to modify Guild to match Game.");
+                    } else {
+                        infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Rich Presence Guild,"
+                                                     "Server is prohibited from modifying Guild.");
+                    }
+                }
+                _h += TN_IAC;
+                _h += TN_SE;
+                postMessage(infoMessage);
+
+                socketOutRaw(_h);
+            }
 
             raiseProtocolEvent("sysProtocolEnabled", "GMCP");
             break;
@@ -952,6 +988,7 @@ void cTelnet::processTelnetCommand(const string& command)
             mpHost->mLuaInterpreter.msdp2Lua(_m.toUtf8().data(), _m.length());
             return;
         }
+
         // ATCP
         if (option == static_cast<char>(200)) {
             QString _m = command.c_str();
@@ -1179,6 +1216,7 @@ void cTelnet::setATCPVariables(const QString& msg)
     }
 }
 
+// Called for any GMCP Telnet Suboption negotiation:
 void cTelnet::setGMCPVariables(const QString& msg)
 {
     QString packageMessage;
@@ -1241,7 +1279,9 @@ void cTelnet::setGMCPVariables(const QString& msg)
     // remove \r's from the data, as yajl doesn't like it
     data.remove(QChar('\r'));
 
-    if (packageMessage.startsWith(QStringLiteral("External.Discord.Status"))) {
+    if (packageMessage.startsWith(QStringLiteral("External.Discord.Status"))
+        || packageMessage.startsWith(QStringLiteral("External.Discord.Info"))) {
+
         mpHost->processDiscordGMCP(packageMessage, data);
     }
 

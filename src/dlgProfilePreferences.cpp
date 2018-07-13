@@ -101,15 +101,16 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
     }
 
     // Set the properties of the log options
-    lineEdit_logFileFolder->setToolTip(QStringLiteral("<html><head/><body>%1</body></html>").arg(tr("<p>Location which will be used to store log files - matching logs will be appended to.</p>")));
-    pushButton_whereToLog->setToolTip(tr("<html><head/><body>%1</body></html>").arg("<p>Select a directory where logs will be saved.</p>"));
-    pushButton_resetLogDir->setToolTip(tr("<html><head/><body>%1</body></html>").arg("<p>Reset the directory so that logs are saved to the profile's <i>log</i> directory.</p>"));
-    comboBox_logFileNameFormat->setToolTip(tr("<html><head/><body>%1</body></html>")
-                                                   .arg("<p>This option sets the format of the log name.</p>"
-                                                        "<p>If <i>Named file</i> is selected, you can set a custom file name. (Logs are appended if a log file of the same name already exists.)</p>"));
-    lineEdit_logFileName->setToolTip(tr("<html><head/><body>%1</body></html>").arg("<p>Set a custom name for your log. (New logs are appended if a log file of the same name already exists).</p>"));
-    lineEdit_logFileName->setPlaceholderText(
-            tr("logfile", "Must be a valid default filename for a log-file and is used if the user does not enter any other value (Ensure all instances have the same translation {1 of 2})."));
+    lineEdit_logFileFolder->setToolTip(mudlet::htmlWrapper(tr("<p>Location which will be used to store log files - matching logs will be appended to.</p>")));
+    pushButton_whereToLog->setToolTip(mudlet::htmlWrapper(tr("<p>Select a directory where logs will be saved.</p>")));
+    pushButton_resetLogDir->setToolTip(mudlet::htmlWrapper(tr("<p>Reset the directory so that logs are saved to the profile's <i>log</i> directory.</p>")));
+    comboBox_logFileNameFormat->setToolTip(mudlet::htmlWrapper(tr("<p>This option sets the format of the log name.</p>"
+                                                                  "<p>If <i>Named file</i> is selected, you can set a custom file name. (Logs are appended "
+                                                                  "if a log file of the same name already exists.)</p>")));
+    lineEdit_logFileName->setToolTip(mudlet::htmlWrapper(tr("<p>Set a custom name for your log. (New logs are appended if a log file of the same name "
+                                                            "already exists).</p>")));
+    lineEdit_logFileName->setPlaceholderText(tr("logfile",
+                                                "Must be a valid default filename for a log-file and is used if the user does not enter any other value (Ensure all instances have the same translation {1 of 2})."));
     label_logFileNameExtension->setVisible(false);
     label_logFileName->setVisible(false);
     lineEdit_logFileName->setVisible(false);
@@ -127,7 +128,7 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
         // disabled in dev builds
         checkbox_noAutomaticUpdates->setChecked(true);
         checkbox_noAutomaticUpdates->setDisabled(true);
-        checkbox_noAutomaticUpdates->setToolTip(tr("Automatic updates are disabled in development builds to prevent an update from overwriting your Mudlet"));
+        checkbox_noAutomaticUpdates->setToolTip(mudlet::htmlWrapper(tr("<p>Automatic updates are disabled in development builds to prevent an update from overwriting your Mudlet.</p>")));
     } else {
         checkbox_noAutomaticUpdates->setChecked(!mudlet::self()->updater->updateAutomatically());
     }
@@ -142,51 +143,92 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
 
     // To be moved to a slot that is used on GUI language change when that gets
     // implimented:
-    pushButton_showGlyphUsage->setToolTip(QStringLiteral("<html><head/><body>%1</body></html>")
-                                          .arg(tr("<p>This will bring up a display showing all the symbols used in the current "
-                                                  "map and whether they can be drawn using just the specifed font, any other "
-                                                  "font, or not at all.  It also shows the sequence of Unicode <i>code-points</i> "
-                                                  "that make up that symbol, so that they can be identified even if they "
-                                                  "cannot be displayed; also, up to the first thirty two rooms that are using "
-                                                  "that symbol are listed, which may help to identify any unexpected or odd cases.<p>")));
-    fontComboBox_mapSymbols->setToolTip(QStringLiteral("<html><head/><body>%1</body></html>")
-                                        .arg(tr("<p>Select the only or the primary font used (depending on <i>Only use symbols "
-                                                "(glyphs) from chosen font</i> setting) to produce the 2D mapper room symbols.</p>")));
-    checkBox_isOnlyMapSymbolFontToBeUsed->setToolTip(QStringLiteral("<html><head/><body>%1</body></html>")
-                                                     .arg(tr("<p>Using a single font is likely to produce a more consistent style but may "
-                                                             "cause the <i>font replacement character</i> '<b>�</b>' to show if the font "
-                                                             "does not have a needed glyph (a font's individual character/symbol) to represent "
-                                                             "the grapheme (what is to be represented).  Clearing this checkbox will allow "
-                                                             "the best alternative glyph from another font to be used to draw that grapheme.</p>")));
-    checkBox_runAllKeyBindings->setToolTip(QStringLiteral("<html><head/><body>%1</body></html>")
-                                           .arg(tr("<p>If <b>not</b> checked Mudlet will only react to the first matching keybinding "
-                                                   "(combination of key and modifiers) even if more than one of them is set to be "
-                                                   "active. This means that a temporary keybinding (not visible in the Editor) "
-                                                   "created by a script or package may be used in preference to a permanent one "
-                                                   "that is shown and is set to be active. If checked then all matching keybindings "
-                                                   "will be run.</p>"
-                                                   "<p><i>It is recommended to not enable this option if you need to maintain compatibility "
-                                                   "with scripts or packages for Mudlet versions prior to <b>3.9.0</b>.</i></p>")));
-    checkBox_useWideAmbiguousEastAsianGlyphs->setToolTip(QStringLiteral("<html><head/><body>%1</body></html>")
-                                                         .arg("<p>Some East Asian MUDs may use glyphs (characters) that Unicode classifies as being "
-                                                              "of <i>Ambigous</i> width when drawn in a font with a so-called <i>fixed</i> pitch; in "
-                                                              "fact such text is <i>duo-spaced</i> when not using a proportional font. These symbols can be "
-                                                              "drawn using either a half or the whole space of a full character. By default Mudlet tries to "
-                                                              "chose the right width automatically but you can override the setting for each profile.</p>"
-                                                              "<p>This control has three settings:"
-                                                              "<ul><li><b>Unchecked</b> '<i>narrow</i>' = Draw ambiguous width characters in a single 'space'.</li>"
-                                                              "<li><b>Checked</b> '<i>wide</i>' = Draw ambiguous width characters two 'spaces' wide.</li>"
-                                                              "<li><b>Partly checked</b> <i>(Default) 'auto'</i> = Use 'wide' setting for MUD Server "
-                                                              "encodings of <b>GBK</b> or <b>GBK18030</b> and 'narrow' for all others.</li></ul></p>"
-                                                              "<p><i>This is a temporary arrangement and will likely to change when Mudlet gains "
-                                                              "full support for languages other than English.</i></p>"));
+    pushButton_showGlyphUsage->setToolTip(mudlet::htmlWrapper(tr("<p>This will bring up a display showing all the symbols used in the current "
+                                                                 "map and whether they can be drawn using just the specifed font, any other "
+                                                                 "font, or not at all.  It also shows the sequence of Unicode <i>code-points</i> "
+                                                                 "that make up that symbol, so that they can be identified even if they "
+                                                                 "cannot be displayed; also, up to the first thirty two rooms that are using "
+                                                                 "that symbol are listed, which may help to identify any unexpected or odd cases.<p>")));
+    fontComboBox_mapSymbols->setToolTip(mudlet::htmlWrapper(tr("<p>Select the only or the primary font used (depending on <i>Only use symbols "
+                                                               "(glyphs) from chosen font</i> setting) to produce the 2D mapper room symbols.</p>")));
+    checkBox_isOnlyMapSymbolFontToBeUsed->setToolTip(mudlet::htmlWrapper(tr("<p>Using a single font is likely to produce a more consistent style but may "
+                                                                            "cause the <i>font replacement character</i> '<b>�</b>' to show if the font "
+                                                                            "does not have a needed glyph (a font's individual character/symbol) to represent "
+                                                                            "the grapheme (what is to be represented).  Clearing this checkbox will allow "
+                                                                            "the best alternative glyph from another font to be used to draw that grapheme.</p>")));
+    checkBox_runAllKeyBindings->setToolTip(mudlet::htmlWrapper(tr("<p>If <b>not</b> checked Mudlet will only react to the first matching keybinding "
+                                                                  "(combination of key and modifiers) even if more than one of them is set to be "
+                                                                  "active. This means that a temporary keybinding (not visible in the Editor) "
+                                                                  "created by a script or package may be used in preference to a permanent one "
+                                                                  "that is shown and is set to be active. If checked then all matching keybindings "
+                                                                  "will be run.</p>"
+                                                                  "<p><i>It is recommended to not enable this option if you need to maintain compatibility "
+                                                                  "with scripts or packages for Mudlet versions prior to <b>3.9.0</b>.</i></p>")));
+    checkBox_useWideAmbiguousEastAsianGlyphs->setToolTip(mudlet::htmlWrapper(tr("<p>Some East Asian MUDs may use glyphs (characters) that Unicode classifies as being "
+                                                                                "of <i>Ambigous</i> width when drawn in a font with a so-called <i>fixed</i> pitch; in "
+                                                                                "fact such text is <i>duo-spaced</i> when not using a proportional font. These symbols can be "
+                                                                                "drawn using either a half or the whole space of a full character. By default Mudlet tries to "
+                                                                                "chose the right width automatically but you can override the setting for each profile.</p>"
+                                                                                "<p>This control has three settings:"
+                                                                                "<ul><li><b>Unchecked</b> '<i>narrow</i>' = Draw ambiguous width characters in a single 'space'.</li>"
+                                                                                "<li><b>Checked</b> '<i>wide</i>' = Draw ambiguous width characters two 'spaces' wide.</li>"
+                                                                                "<li><b>Partly checked</b> <i>(Default) 'auto'</i> = Use 'wide' setting for MUD Server "
+                                                                                "encodings of <b>GBK</b> or <b>GBK18030</b> and 'narrow' for all others.</li></ul></p>"
+                                                                                "<p><i>This is a temporary arrangement and will likely to change when Mudlet gains "
+                                                                                "full support for languages other than English.</i></p>")));
 
-    connect(checkBox_showSpacesAndTabs, SIGNAL(clicked(bool)), this, SLOT(slot_changeShowSpacesAndTabs(const bool)));
-    connect(checkBox_showLineFeedsAndParagraphs, SIGNAL(clicked(bool)), this, SLOT(slot_changeShowLineFeedsAndParagraphs(const bool)));
+    groupBox_discordServerAccess->setToolTip(mudlet::htmlWrapper(tr("<p>When checked allows the Game Server to use Out-of-Band protocols (currently only GMCP) to "
+                                                                    "control your Discord Rich Presence automatically. Fine grain control of individual aspects can be made using "
+                                                                    "the checkboxes within this group, the Mudlet Makers recommend that you should only uncheck those if you "
+                                                                    "understand what the effects will be as otherwise it may break whatever system that individual Game Servers "
+                                                                    "have arranged to use the system to enhance your Mudding...</p>")));
+    checkBox_discordPresenceIsServerSettable->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked to enable the Game Server to supply its own Discord <tt>PresenceId</tt> which "
+                                                                                "will be needed to access Icons that have been uploaded to its Discord Guild (Server) to be used for "
+                                                                                "your Rich Presence. If this option is unchecked then either Mudlet's own set of Icons (or those of "
+                                                                                "the override presence set below) specify what icons can be accessed which will prevent the Game "
+                                                                                "Server from using ones that it does not know about.</p>")));
+    checkBox_discordServerAccessToDetail->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the upper line of text in the Rich Presence.</p>")));
+    checkBox_discordServerAccessToState->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the lower line of text in the Rich Presence.</p>")));
+    checkBox_discordServerAccessToLargeIcon->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the large icon in the Rich Presence. If this "
+                                                                               "is cleared and no icon is set to be displayed via local (Lua API) code then the small icon cannot "
+                                                                               "be shown and neither can either of the tooltips.</p>")));
+    checkBox_discordServerAccessToLargeIconText->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the tooltip for the large icon in the "
+                                                                                   "Rich Presence.</p>")));
+    checkBox_discordServerAccessToSmallIcon->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the small icon in the Rich Presence. If this "
+                                                                               "is cleared and no icon is set to be displayed via local (Lua API) code then the tooltip for it will "
+                                                                               "not be able to be shown either.</p>")));
+    checkBox_discordServerAccessToSmallIconText->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the tooltip for the small icon in the "
+                                                                                   "Rich Presence.</p>")));
+    checkBox_discordServerAccessToUserName->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can find out your Discord user name. This may be useful "
+                                                                              "for it to know as it may enable authenticated communications or other features via Discord.</p>")));
+    checkBox_discordLuaAPI->setToolTip(mudlet::htmlWrapper(tr("<p>Needs to be checked to enable Lua API access to the Discord functions.</p>")));
+    lineEdit_presenceIdOverride->setToolTip(mudlet::htmlWrapper(tr("<p>Entering the <tt>PresenceId</tt> (<tt>ApplicationId</tt>) of another "
+                                                                   "Guild (a.k.a. Server or group of channels on Discord) for, say a MUD Server, "
+                                                                   "will enable the use of icons on your Discord Rich Presence supplied by that "
+                                                                   "Guild.  This may enable the use of a wide range of icons <i>specific to that Guild</i> "
+                                                                   "instead of a standard set that Mudlet provides to be shared amongst all its users.</p>")));
+    lineEdit_discordUserName->setToolTip(mudlet::htmlWrapper(tr("<p>When Mudlet connects to the locally running Discord application the latter will report "
+                                                                "the identity which you have logged into it with.  If you have multiple accounts, for instance for "
+                                                                "Mud character separation or other reasons, and if there is a user name entered here or a number to "
+                                                                "the right, and if they do not match the reported details, then Mudlet will refuse to provided a "
+                                                                "Rich Presence for this profile. Changing the entry here will take effect when this dialog is "
+                                                                "saved and closed but it is recommended to restart the profile to ensure that "
+                                                                "activation/deactivation proceeds completely.</p>")));
+    lineEdit_discordUserDiscriminator->setToolTip(mudlet::htmlWrapper(tr("<p>When Mudlet connects to the locally running Discord application the latter will report "
+                                                                         "the identity which you have logged into it with.  If you have multiple accounts, for instance for "
+                                                                         "Mud character separation or other reasons, and if there is a (4 digit) user number entered here or "
+                                                                         "a name to the left, and if they do not match the reported details, then Mudlet will refuse to provided a "
+                                                                         "Rich Presence for this profile. Changing the entry here will take effect when this dialog is "
+                                                                         "saved and closed but it is recommended to restart the profile to ensure that "
+                                                                         "activation/deactivation proceeds completely.</p>")));
+
+
+    connect(checkBox_showSpacesAndTabs, &QAbstractButton::clicked, this, &dlgProfilePreferences::slot_changeShowSpacesAndTabs);
+    connect(checkBox_showLineFeedsAndParagraphs, &QAbstractButton::clicked, this, &dlgProfilePreferences::slot_changeShowLineFeedsAndParagraphs);
     connect(closeButton, &QAbstractButton::pressed, this, &dlgProfilePreferences::slot_save_and_exit);
-    connect(mudlet::self(), SIGNAL(signal_hostCreated(Host*, quint8)), this, SLOT(slot_handleHostAddition(Host*, quint8)));
-    connect(mudlet::self(), SIGNAL(signal_hostDestroyed(Host*, quint8)), this, SLOT(slot_handleHostDeletion(Host*)));
-    connect(comboBox_menuBarVisibility, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_changeShowMenuBar(int)));
+    connect(mudlet::self(), &mudlet::signal_hostCreated, this, &dlgProfilePreferences::slot_handleHostAddition);
+    connect(mudlet::self(), &mudlet::signal_hostDestroyed, this, &dlgProfilePreferences::slot_handleHostDeletion);
+    connect(comboBox_menuBarVisibility, qOverload<int>(&QComboBox::currentIndexChanged), this, &dlgProfilePreferences::slot_changeShowMenuBar);
     connect(comboBox_toolBarVisibility, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_changeShowToolBar(int)));
 }
 
@@ -444,17 +486,20 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
     USE_UNIX_EOL->setChecked(pHost->mUSE_UNIX_EOL);
 
     if (mudlet::self()->mDiscord.libraryLoaded()) {
+        Host::DiscordOptionFlags discordFlags = pHost->mDiscordAccessFlags;
         groupBox_discordPrivacy->show();
-        checkBox_discordGameAddress->setChecked(pHost->mDiscordHideAddress);
-        checkBox_discordCurrentArea->setChecked(pHost->mDiscordHideCurrentArea);
-        checkBox_discordLuaAPI->setChecked(!pHost->mDiscordDisableLua);
-        if (!pHost->mDiscordHideCharacterIcon && !pHost->mDiscordHideCharacterText) {
-            comboBox_discordCharacter->setCurrentIndex(0);
-        } else if (!pHost->mDiscordHideCharacterIcon && pHost->mDiscordHideCharacterText) {
-            comboBox_discordCharacter->setCurrentIndex(1);
-        } else {
-            comboBox_discordCharacter->setCurrentIndex(2);
-        }
+        checkBox_discordLuaAPI->setChecked(discordFlags & Host::DiscordLuaAccessEnabled);
+        groupBox_discordServerAccess->setChecked(discordFlags & Host::DiscordServerAccessEnabled);
+        checkBox_discordServerAccessToLargeIcon->setChecked(discordFlags & Host::DiscordServerAccessToLargeIcon);
+        checkBox_discordServerAccessToLargeIconText->setChecked(discordFlags & Host::DiscordServerAccessToLargeIconText);
+        checkBox_discordServerAccessToSmallIcon->setChecked(discordFlags & Host::DiscordServerAccessToSmallIcon);
+        checkBox_discordServerAccessToSmallIconText->setChecked(discordFlags & Host::DiscordServerAccessToSmallIconText);
+        checkBox_discordServerAccessToUserName->setChecked(discordFlags & Host::DiscordServerAccessToUserName);
+        checkBox_discordServerAccessToDetail->setChecked(discordFlags & Host::DiscordServerAccessToDetail);
+        checkBox_discordServerAccessToState->setChecked(discordFlags & Host::DiscordServerAccessToState);
+        checkBox_discordPresenceIsServerSettable->setChecked(discordFlags & Host::DiscordServerCanSetPresenceId);
+        lineEdit_discordUserName->setText(pHost->mRequiredDiscordUserName);
+        lineEdit_discordUserDiscriminator->setText(pHost->mRequiredDiscordUserDiscriminator);
         lineEdit_presenceIdOverride->setText(pHost->getDiscordPresenceId());
     }
 
@@ -699,7 +744,6 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
     connect(pushButton_resetLogDir, SIGNAL(clicked()), this, SLOT(slot_resetLogDir()));
     connect(comboBox_logFileNameFormat, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_logFileNameFormatChange(int)));
     connect(mIsToLogInHtml, SIGNAL(clicked(bool)), this, SLOT(slot_changeLogFileAsHtml(bool)));
-    connect(checkBox_discordGameAddress, &QAbstractButton::clicked, &mudlet::self()->mDiscord, &Discord::UpdatePresence);
 }
 
 void dlgProfilePreferences::disconnectHostRelatedControls()
@@ -776,7 +820,6 @@ void dlgProfilePreferences::disconnectHostRelatedControls()
     disconnect(pushButton_resetLogDir, SIGNAL(clicked()));
     disconnect(comboBox_logFileNameFormat, SIGNAL(currentIndexChanged(int)));
     disconnect(mIsToLogInHtml, SIGNAL(clicked(bool)));
-    disconnect(checkBox_discordGameAddress, &QAbstractButton::clicked, nullptr, nullptr);
 }
 
 void dlgProfilePreferences::clearHostDetails()
@@ -866,10 +909,19 @@ void dlgProfilePreferences::clearHostDetails()
     mSearchEngineMap.clear();
     search_engine_combobox->clear();
 
-    checkBox_discordGameAddress->setChecked(false);
     checkBox_discordLuaAPI->setChecked(false);
-    checkBox_discordCurrentArea->setChecked(false);
-    comboBox_discordCharacter->setCurrentIndex(0);
+    groupBox_discordServerAccess->setChecked(false);
+    checkBox_discordServerAccessToLargeIcon->setChecked(false);
+    checkBox_discordServerAccessToLargeIconText->setChecked(false);
+    checkBox_discordServerAccessToSmallIcon->setChecked(false);
+    checkBox_discordServerAccessToSmallIconText->setChecked(false);
+    checkBox_discordServerAccessToUserName->setChecked(false);
+    checkBox_discordServerAccessToDetail->setChecked(false);
+    checkBox_discordServerAccessToState->setChecked(false);
+    checkBox_discordPresenceIsServerSettable->setChecked(false);
+    lineEdit_presenceIdOverride->clear();
+    lineEdit_discordUserName->clear();
+    lineEdit_discordUserDiscriminator->clear();
 }
 
 void dlgProfilePreferences::loadEditorTab()
@@ -2054,20 +2106,26 @@ void dlgProfilePreferences::slot_save_and_exit()
 
         pHost->mSearchEngineName = search_engine_combobox->currentText();
 
-        pHost->mDiscordHideAddress = checkBox_discordGameAddress->isChecked();
-        pHost->mDiscordDisableLua = !checkBox_discordLuaAPI->isChecked();
-        pHost->mDiscordHideCurrentArea = checkBox_discordCurrentArea->isChecked();
-        if (comboBox_discordCharacter->currentIndex() == 0) {
-            pHost->mDiscordHideCharacterText = false;
-            pHost->mDiscordHideCharacterIcon = false;
-        } else if (comboBox_discordCharacter->currentIndex() == 1) {
-            pHost->mDiscordHideCharacterIcon = false;
-            pHost->mDiscordHideCharacterText = true;
-        } else {
-            pHost->mDiscordHideCharacterText = true;
-            pHost->mDiscordHideCharacterIcon = true;
-        }
+        pHost->mDiscordAccessFlags = static_cast<Host::DiscordOptionFlags>(
+                                         (checkBox_discordServerAccessToLargeIcon->isChecked() ? Host::DiscordServerAccessToLargeIcon : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToLargeIconText->isChecked() ? Host::DiscordServerAccessToLargeIconText : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToSmallIcon->isChecked() ? Host::DiscordServerAccessToSmallIcon : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToSmallIconText->isChecked() ? Host::DiscordServerAccessToSmallIconText : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordServerAccessToDetail : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordServerAccessToState : Host::DiscordNoOption)
+                                         | (groupBox_discordServerAccess->isChecked() ? Host::DiscordServerAccessEnabled : Host::DiscordNoOption)
+                                         | (checkBox_discordPresenceIsServerSettable->isChecked() ? Host::DiscordServerCanSetPresenceId : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToUserName->isChecked() ? Host::DiscordServerAccessToUserName : Host::DiscordNoOption)
+                                         | (checkBox_discordLuaAPI->isChecked() ? Host::DiscordLuaAccessEnabled : Host::DiscordNoOption));
+
         pHost->setDiscordPresenceId(lineEdit_presenceIdOverride->text().trimmed());
+        pHost->mRequiredDiscordUserName = lineEdit_discordUserName->text().trimmed();
+        if (lineEdit_discordUserDiscriminator->hasAcceptableInput()) {
+            // The input mask specifies 4 digits [0-9]
+            pHost->mRequiredDiscordUserDiscriminator = lineEdit_discordUserDiscriminator->text();
+        } else {
+            pHost->mRequiredDiscordUserDiscriminator.clear();
+        }
     }
 
 #if defined(INCLUDE_UPDATER)

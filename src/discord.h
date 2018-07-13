@@ -56,10 +56,10 @@
  *
  *
  * typedef struct DiscordUser {
- *    const char* userId;
- *    const char* username;
- *    const char* discriminator;
- *    const char* avatar;
+ *    const char* userId; // max 32 bytes
+ *    const char* username; // max 344 bytes
+ *    const char* discriminator; // max 8 bytes
+ *    const char* avatar; // max 128 bytes
  * } DiscordUser;
  */
 
@@ -93,8 +93,10 @@ public:
     void setJoinSecret(const QString&);
     void setMatchSecret(const QString&);
     void setSpectateSecret(const QString&);
+    void setPartySize(const int n) { mPartySize = n; }
+    void setPartyMax(const int n) { mPartyMax = n; }
     DiscordRichPresence convert() const;
-    const QString& getStateText() const { return QString::fromUtf8(mState); }
+    QString getStateText() const { return QString::fromUtf8(mState); }
     QString getDetailText() const { return QString::fromUtf8(mDetails); }
     int64_t getStartTimeStamp() const { return mStartTimestamp; }
     int64_t getEndTimeStamp() const { return mEndTimestamp; }
@@ -111,20 +113,20 @@ public:
     int8_t getInstance() const { return mInstance; }
 
 private:
-    char mState[128]; // max 128 bytes
-    char mDetails[128]; // max 128 bytes
+    char mState[128];
+    char mDetails[128];
     int64_t mStartTimestamp;
     int64_t mEndTimestamp;
-    char mLargeImageKey[32]; // max 32 bytes
-    char mLargeImageText[128]; // max 128 bytes
-    char mSmallImageKey[32]; // max 32 bytes
-    char mSmallImageText[128]; // max 128 bytes
-    char mPartyId[128]; // max 128 bytes
+    char mLargeImageKey[32];
+    char mLargeImageText[128];
+    char mSmallImageKey[32];
+    char mSmallImageText[128];
+    char mPartyId[128];
     int mPartySize;
     int mPartyMax;
-    char mMatchSecret[128]; // max 128 bytes
-    char mJoinSecret[128]; // max 128 bytes
-    char mSpectateSecret[128]; // max 128 bytes
+    char mMatchSecret[128];
+    char mJoinSecret[128];
+    char mSpectateSecret[128];
     int8_t mInstance;
 };
 
@@ -145,9 +147,11 @@ inline QDebug& operator<<(QDebug& debug, const localDiscordPresence& ldp)
                           ldp.getSmallImageKey(), ldp.getSmallImageText());
 
     result.append(QStringLiteral("    mPartyId: \"%1\"  mPartySize: %2 mPartyMax %3\n"
-                                 "    mMatchSecret: \"%4\"  mJoinSecret: \"%5\" mSpectateSecret \"%6\")\n")
-                  .arg(ldp.getMatchSecret(), ldp.getJoinSecret(), ldp.getSpectateSecret(),
-                       ldp.getPartyId(), QString::number(ldp.getPartySize()), QString::number(ldp.getPartyMax())));
+                                 "    mMatchSecret: \"%4\"  mJoinSecret: \"%5\" mSpectateSecret \"%6\"\n"
+                                 "    mStartTimeStamp: %7  mEndTimeStamp: %8)\n")
+                  .arg(ldp.getPartyId(), QString::number(ldp.getPartySize()), QString::number(ldp.getPartyMax()),
+                       ldp.getMatchSecret(), ldp.getJoinSecret(), ldp.getSpectateSecret(),
+                       QString::number(ldp.getStartTimeStamp()), QString::number(ldp.getEndTimeStamp())));
 
     debug.nospace().noquote() << result;
     return debug;
@@ -159,59 +163,49 @@ class Discord : public QObject
     Q_OBJECT
 
 public:
-    explicit Discord(QObject *parent = nullptr);    
+    explicit Discord(QObject *parent = nullptr);
     ~Discord() override;
 
-    void UpdatePresence();
-    // The next four methods only work when using the default Mudlet presenceId
-    // they also clear the mRawMode flag for the given host so that the update
-    // process used the values entered for them:
-
-    // Sets the "detailText" to "Playing Xxxx" and the LargeImageKey to the
-    // lower-case form of name for Games that Mudlet knows about:
-    std::tuple<bool, QString> setGame(Host* pHost, const QString& name);
-    // Sets the "stateText" to the given "area":
-    std::tuple<bool, QString> setArea(Host* pHost, const QString& area);
-    // If the game is one Mudlet "knows" about, sets the small icon to the given
-    // key - otherwise sets the large one (which will not otherwise have been
-    // given an icon) to that key - however this must be enabled by a perission
-    // on the "Special options" tab of the "Profile Preferences":
-    std::tuple<bool, QString> setCharacterIcon(Host* pHost, const QString& icon);
-    // If the game is one Mudlet "knows" about, sets the small icon tooltip to
-    // the given text - otherwise sets the large icon tooltip to the text if
-    // the Mud Server address is set to be hidden:
-    std::tuple<bool, QString> setCharacter(Host* pHost, const QString& text);
-
-
-    bool gameIntegrationSupported(const QString& address);
     bool libraryLoaded();
-
-    // The next six methods work when using any presenceId they also set the
-    // mRawMode flag for the given host so that the update process uses them
-    // directly - effectively they give lua access to the Discord RPC via
-    // a buffer that caches the values so they can be retrieved afterwards:
-    bool setLargeImage(Host*, const QString&);
-    bool setLargeImageText(Host*, const QString&);
-    bool setSmallImage(Host*, const QString&);
-    bool setSmallImageText(Host*, const QString&);
-    bool setStateText(Host*, const QString&);
-    bool setDetailText(Host*, const QString&);
-    bool setPresence(Host*, const QString&);
-
     bool isUsingDefaultDiscordPresence(Host*) const;
 
-    // These retrieve the cached data - even if it was entered via the Mudlet
-    // Presence Id specific methods:
-    std::tuple<bool, QString> getDetailText(Host*) const;
-    std::tuple<bool, QString> getStateText(Host*) const;
-    std::tuple<bool, QString> getLargeImage(Host*) const;
-    std::tuple<bool, QString> getLargeImageText(Host*) const;
-    std::tuple<bool, QString> getSmallImage(Host*) const;
-    std::tuple<bool, QString> getSmallImageText(Host*) const;
+    void UpdatePresence();
+
+    QString deduceGameName(const QString& address);
+    QPair<bool, QString> gameIntegrationSupported(const QString& address);
+
+    void setLargeImage(Host*, const QString&);
+    void setLargeImageText(Host*, const QString&);
+    void setSmallImage(Host*, const QString&);
+    void setSmallImageText(Host*, const QString&);
+    void setStateText(Host*, const QString&);
+    void setDetailText(Host*, const QString&);
+    void setStartTimeStamp(Host*, int64_t);
+    void setEndTimeStamp(Host*, int64_t);
+    void setParty(Host*, int);
+    void setParty(Host*, int, int);
+    bool setPresence(Host*, const QString&);
+    QString getPresenceId(Host* pHost) const;
+
+    // These retrieve the cached data:
+    QString getDetailText(Host* pHost) const { return mDetailTexts.value(pHost); }
+    QString getStateText(Host* pHost) const { return mStateTexts.value(pHost); }
+    QString getLargeImage(Host* pHost) const { return mLargeImages.value(pHost); }
+    QString getLargeImageText(Host* pHost) const { return mLargeImageTexts.value(pHost); }
+    QString getSmallImage(Host* pHost) const { return mSmallImages.value(pHost); }
+    QString getSmallImageText(Host* pHost) const { return mSmallImageTexts.value(pHost); }
+    QPair<int64_t ,int64_t> getTimeStamps(Host* pHost) const { return qMakePair(mStartTimes.value(pHost), mEndTimes.value(pHost)); }
+    QPair<int, int> getParty(Host* pHost) const { return qMakePair(mPartySize.value(pHost), mPartyMax.value(pHost)); }
 
     // Returns the Discord user received from the Discord_Ready callback
-    // this is typically send every minute, perhaps?
-    const QStringList& getDiscordUserDetails() const;
+    QStringList getDiscordUserDetails() const;
+
+    // Runs the Host::discordUserIdMatch(...) check for the given Host:
+    bool discordUserIdMatch(Host* pHost) const;
+
+
+    const static QString csmMudletPresenceId;
+
 
 private:
     static void handleDiscordReady(const DiscordUser* request);
@@ -227,7 +221,7 @@ private:
 
     // These are function pointers to functions located in the Discord RPC library:
     std::function<void(const char*, DiscordEventHandlers*, int)> Discord_Initialize;
-    std::function<void(const DiscordRichPresence* presence)> Discord_UpdatePresence;
+    std::function<void(const DiscordRichPresence*)> Discord_UpdatePresence;
     std::function<void(void)> Discord_RunCallbacks;
     std::function<void(void)> Discord_Shutdown;
 
@@ -241,52 +235,44 @@ private:
     // profiles can have the same presence but defaults to the nullptr one for
     // Mudlet:
     QMap<Host*, QString>mHostPresenceIds;
-    // Used to populate Discord's "details" as "Playing %s" (first line of text)
-    // and "Large icon key" from lower case version:
-    QMap<Host*, QString>mGamesNames;
-    // Used to populate Discord's "State" first part of second line of text
-    // (followed by X of Y numbers {Party Size/Party Max)
-    QMap<Host*, QString>mAreas;
-    // Used to populate Discord's " "Small image key"
-    QMap<Host*, QString>mCharacterIcons;
-    // Used to populate "Small image text"
-    QMap<Host*, QString>mCharacters;
 
     QScopedPointer<QLibrary> mpLibrary;
 
+    // Used to hold the per profile data independently of whichever presenceId
+    // it will be used with:
     QMap<Host*, int64_t>mStartTimes;
+    QMap<Host*, int64_t>mEndTimes;
     QMap<Host*, QString>mDetailTexts;
     QMap<Host*, QString>mStateTexts;
     QMap<Host*, QString>mLargeImages;
     QMap<Host*, QString>mLargeImageTexts;
     QMap<Host*, QString>mSmallImages;
     QMap<Host*, QString>mSmallImageTexts;
+    QMap<Host*, int>mPartySize;
+    QMap<Host*, int>mPartyMax;
 
-    QMap<Host*, bool>mRawMode;
-
+    // Hash with game name as key and various URL forms that might be used for
+    // it as values:
     QHash<QString, QVector<QString>> mKnownGames;
+
+    // The presenceId that is currently the one that the Discord RPC library
+    // has been set to use - only ONE can be active at a time currently,
+    // though an Issue does exist to revise that at Discord:
+    // https://github.com/discordapp/discord-rpc/issues/202
     QString mCurrentPresenceId;
 
     // Protect the four values after this one from async processes:
     static QReadWriteLock smReadWriteLock;
-    // These may be needed in the future to validate the local user's presence
-    // on Discord is the one that they want to be associated with a profile's
-    // character name - it may be desired to not reveal the character name on
-    // Discord until that has confirmed that a currently active
-    // Discord/Discord-PTB/Discord-Canary application is using the expected
-    // User identity (reflected in the User Avatar image and name within that
-    // application).
+    // These are needed to validate the local user's presence on Discord to
+    // the one that they want to be associated with a profile's character name
+    // - it may be desired to not reveal the character name on Discord until
+    // that has confirmed that a currently active Discord/Discord-PTB/
+    // Discord-Canary application is using the expected User identity (reflected
+    // in the User Avatar image and name within that application).
     static QString smUserName;
     static QString smUserId;
     static QString smDiscriminator;
     static QString smAvatar;
-
-signals:
-
-public slots:
-    void slot_handleGameConnection(Host*);
-    void slot_handleGameDisconnection(Host*);
-
 };
 
 #endif // DISCORD_H

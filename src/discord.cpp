@@ -27,7 +27,6 @@
 #include <QHash>
 #include <ctime>
 #include <string.h> // For strncpy
-#include <stdio.h> // For snprinf
 #include "post_guard.h"
 
 QReadWriteLock Discord::smReadWriteLock;
@@ -36,32 +35,29 @@ QString Discord::smUserName;
 QString Discord::smUserId;
 QString Discord::smDiscriminator;
 QString Discord::smAvatar;
+const QString Discord::csmMudletPresenceId = QLatin1String("450571881909583884");
 
 Discord::Discord(QObject* parent)
 : QObject(parent)
-, mGamesNames{}
-, mAreas{}
-, mCharacterIcons{}
-, mCharacters{}
 , mLoaded{}
-// lowercase list of known games
-// {game name, {game addresses}}
-// The values are not currently used!
-, mKnownGames{{"midmud", {"midmud.com"}},
-              {"wotmud", {"game.wotmud.org"}},
-              {"luminari", {}},
-              {"achaea", {"achaea.com", "iron-ach.ironrealms.com"}},
-              {"aetolia", {"aetolia.com", "iron-aet.ironrealms.com"}},
-              {"imperian", {"imperian.com", " iron-imp.ironrealms.com"}},
-              {"lusternia", {"lusternia.com", "iron-lus.ironrealms.com"}},
-              {"starmourn", {"starmourn.com"}}}
 // For details see https://discordapp.com/developers/docs/rich-presence/how-to#initialization
 // Initialise with a nullptr one with Mudlet's own ID
 // N. B. for testing the following MUDs have registered:
 // "midmud"  is "460618737712889858", has "server-icon", "exventure" and "mudlet" icons
 // "carinus" is "438335628942376960", has "server-icon" and "mudlet" icons
-// "wotmud"  is "464945517156106240", has "mudlet" icon
-,mHostPresenceIds{{nullptr,"450571881909583884"}}
+// "wotmud"  is "464945517156106240", has "mudlet", "ajar_(red|green|yellow|blue|white|grey|brown)"
+, mHostPresenceIds{{nullptr, csmMudletPresenceId}}
+// lowercase list of known games
+// {game name, {game addresses}}
+// The values are not currently used!
+, mKnownGames{{"midmud", {"midmud.com"}},
+              {"wotmud", {"game.wotmud.org"}},
+              {"luminari", {"luminarimud.com"}},
+              {"achaea", {"achaea.com", "iron-ach.ironrealms.com"}},
+              {"aetolia", {"aetolia.com", "iron-aet.ironrealms.com"}},
+              {"imperian", {"imperian.com", " iron-imp.ironrealms.com"}},
+              {"lusternia", {"lusternia.com", "iron-lus.ironrealms.com"}},
+              {"starmourn", {"starmourn.com"}}}
 {
     qDebug() << "Will search for Discord RPC library file in:";
     for (QString libraryPath : qApp->libraryPaths()) {
@@ -132,191 +128,114 @@ Discord::~Discord()
     }
 }
 
-std::tuple<bool, QString> Discord::setGame(Host* pHost, const QString& name)
+// For all the setters below the caller is supposed to check that they have the
+// permission to do the operation
+void Discord::setDetailText(Host* pHost, const QString& text)
 {
-    if (!mLoaded) {
-        return std::tuple<bool, QString>(false, QStringLiteral("Discord integration is not available"));
-    }
-
-    if (isUsingDefaultDiscordPresence(pHost)) {
-        mGamesNames[pHost] = name;
+    mDetailTexts[pHost] = text;
+    if (mLoaded) {
         UpdatePresence();
-        if (mKnownGames.contains(name.toLower())) {
-            return std::tuple<bool, QString>(true, QString());
-        } else {
-            // set the game anyway to what the user would like, but warn
-            return std::tuple<bool, QString>(false, QStringLiteral("changed text, but %1 is not a known game - no icon will be displayed unless it has been added since this version of Mudlet was created").arg(name));
+    }
+}
+
+void Discord::setStateText(Host* pHost, const QString& text)
+{
+    mStateTexts[pHost] = text;
+    if (mLoaded) {
+        UpdatePresence();
+    }
+}
+
+void Discord::setLargeImage(Host* pHost, const QString& text)
+{
+    mLargeImages[pHost] = text;
+    if (mLoaded) {
+        UpdatePresence();
+    }
+}
+
+void Discord::setLargeImageText(Host* pHost, const QString& text)
+{
+    mLargeImageTexts[pHost] = text;
+    if (mLoaded) {
+        UpdatePresence();
+    }
+}
+
+void Discord::setSmallImage(Host* pHost, const QString& text)
+{
+    mSmallImages[pHost] = text;
+    if (mLoaded) {
+        UpdatePresence();
+    }
+}
+
+void Discord::setSmallImageText(Host* pHost, const QString& text)
+{
+    mSmallImageTexts[pHost] = text;
+    if (mLoaded) {
+        UpdatePresence();
+    }
+}
+
+void Discord::setStartTimeStamp(Host* pHost, int64_t epochTimeStamp)
+{
+    mStartTimes[pHost] = epochTimeStamp;
+    mEndTimes.remove(pHost);
+    if (mLoaded) {
+        UpdatePresence();
+    }
+}
+
+void Discord::setEndTimeStamp(Host* pHost, int64_t epochTimeStamp)
+{
+    mEndTimes[pHost] = epochTimeStamp;
+    mStartTimes.remove(pHost);
+    if (mLoaded) {
+        UpdatePresence();
+    }
+}
+
+void Discord::setParty(Host* pHost, int partySize)
+{
+    int validPartySize = qMax(0, partySize);
+    if ( validPartySize ) {
+        // Is more than zero:
+        if (mPartyMax.value(pHost) < validPartySize) {
+            mPartyMax[pHost] = validPartySize;
         }
+
+        mPartySize[pHost] = validPartySize;
+    } else if (mPartyMax.contains(pHost)) {
+        // There is a max size set - so zero this value
+        mPartySize[pHost] = 0;
     } else {
-        return std::tuple<bool, QString>(false, QStringLiteral("setDiscordGame function only available when using default (Mudlet's) own Discord Presence Id"));
+        // There isn't a party size set so remove this (zero) value
+        mPartySize.remove(pHost);
     }
-}
-
-std::tuple<bool, QString> Discord::setArea(Host* pHost, const QString& area)
-{
-    if (!mLoaded) {
-        return std::tuple<bool, QString>(false, QStringLiteral("Discord integration is not available"));
-    }
-
-    if (isUsingDefaultDiscordPresence(pHost)) {
-        mRawMode[pHost] = false;
-        mAreas[pHost] = area;
+    if (mLoaded) {
         UpdatePresence();
-        return std::tuple<bool, QString>(true, QString());
-    } else {
-        return std::tuple<bool, QString>(false, QStringLiteral("setDiscordArea function only available when using default (Mudlet's) own Discord Presence Id"));
     }
 }
 
-std::tuple<bool, QString> Discord::setCharacterIcon(Host* pHost, const QString& icon)
+void Discord::setParty(Host* pHost, int partySize, int partyMax)
 {
-    if (!mLoaded) {
-        return std::tuple<bool, QString>(false, QStringLiteral("Discord integration is not available"));
-    }
+    int validPartySize = qMax(0, partySize);
+    int validPartyMax = qMax(0, partyMax);
 
-    if (isUsingDefaultDiscordPresence(pHost)) {
-        mRawMode[pHost] = false;
-        mCharacterIcons[pHost] = icon;
+    if (validPartyMax) {
+        // We have a party max size that is a positive number - so use the
+        // largest of it and the size as the maximum:
+        mPartyMax[pHost] = qMax(validPartySize, validPartyMax);
+        mPartySize[pHost] = validPartySize;
+    } else {
+        // We have explicitly set the party maximum size to 0 (or less) - so
+        // clear things:
+        mPartySize.remove(pHost);
+        mPartyMax.remove(pHost);
+    }
+    if (mLoaded) {
         UpdatePresence();
-        return std::tuple<bool, QString>(true, QString());
-    } else {
-        return std::tuple<bool, QString>(false, QStringLiteral("setDiscordCharacterIcon function only available when using default (Mudlet's) own Discord Presence Id"));
-    }
-}
-
-std::tuple<bool, QString> Discord::setCharacter(Host* pHost, const QString& text)
-{
-    if (!mLoaded) {
-        return std::tuple<bool, QString>(false, QStringLiteral("Discord integration is not available"));
-    }
-
-    if (isUsingDefaultDiscordPresence(pHost)) {
-        mRawMode[pHost] = false;
-        mCharacters[pHost] = text;
-        UpdatePresence();
-        return std::tuple<bool, QString>(true, QString());
-    } else {
-        return std::tuple<bool, QString>(false, QStringLiteral("setDiscordCharacter function only available when using default (Mudlet's) own Discord Presence Id"));
-    }
-}
-
-bool Discord::setDetailText(Host* pHost, const QString& text)
-{
-    if (mLoaded) {
-        mRawMode[pHost] = true;
-        mDetailTexts[pHost] = text;
-        UpdatePresence();
-        return true;
-    }
-    return false;
-}
-
-std::tuple<bool, QString> Discord::getDetailText(Host* pHost) const
-{
-    if (mLoaded) {
-        return std::tuple<bool, QString>(true, mDetailTexts.value(pHost));
-    } else {
-        return std::tuple<bool, QString>(false, QStringLiteral("Discord integration is not available"));
-    }
-}
-
-bool Discord::setStateText(Host* pHost, const QString& text)
-{
-    if (mLoaded) {
-        mRawMode[pHost] = true;
-        mStateTexts[pHost] = text;
-        UpdatePresence();
-        return true;
-    }
-    return false;
-}
-
-std::tuple<bool, QString> Discord::getStateText(Host* pHost) const
-{
-    if (mLoaded) {
-        return std::tuple<bool, QString>(true, mStateTexts.value(pHost));
-    } else {
-        return std::tuple<bool, QString>(false, QStringLiteral("Discord integration is not available"));
-    }
-}
-
-bool Discord::setLargeImage(Host* pHost, const QString& text)
-{
-    if (mLoaded) {
-        mRawMode[pHost] = true;
-        mLargeImages[pHost] = text;
-        UpdatePresence();
-        return true;
-    }
-    return false;
-}
-
-std::tuple<bool, QString> Discord::getLargeImage(Host* pHost) const
-{
-    if (mLoaded) {
-        return std::tuple<bool, QString>(true, mLargeImages.value(pHost));
-    } else {
-        return std::tuple<bool, QString>(false, QStringLiteral("Discord integration is not available"));
-    }
-}
-
-bool Discord::setLargeImageText(Host* pHost, const QString& text)
-{
-    if (mLoaded) {
-        mRawMode[pHost] = true;
-        mLargeImageTexts[pHost] = text;
-        UpdatePresence();
-        return true;
-    }
-    return false;
-}
-
-std::tuple<bool, QString> Discord::getLargeImageText(Host* pHost) const
-{
-    if (mLoaded) {
-        return std::tuple<bool, QString>(true, mLargeImageTexts.value(pHost));
-    } else {
-        return std::tuple<bool, QString>(false, QStringLiteral("Discord integration is not available"));
-    }
-}
-
-bool Discord::setSmallImage(Host* pHost, const QString& text)
-{
-    if (mLoaded) {
-        mRawMode[pHost] = true;
-        mSmallImages[pHost] = text;
-        UpdatePresence();
-        return true;
-    }
-    return false;
-}
-
-std::tuple<bool, QString> Discord::getSmallImage(Host* pHost) const
-{
-    if (mLoaded) {
-        return std::tuple<bool, QString>(true, mSmallImages.value(pHost));
-    } else {
-        return std::tuple<bool, QString>(false, QStringLiteral("Discord integration is not available"));
-    }
-}
-
-bool Discord::setSmallImageText(Host* pHost, const QString& text)
-{
-    if (mLoaded) {
-        mRawMode[pHost] = true;
-        mSmallImageTexts[pHost] = text;
-        UpdatePresence();
-        return true;
-    }
-    return false;
-}
-
-std::tuple<bool, QString> Discord::getSmallImageText(Host* pHost) const
-{
-    if (mLoaded) {
-        return std::tuple<bool, QString>(true, mSmallImageTexts.value(pHost));
-    } else {
-        return std::tuple<bool, QString>(false, QStringLiteral("Discord integration is not available"));
     }
 }
 
@@ -345,7 +264,7 @@ void Discord::handleDiscordReady(const DiscordUser* request)
     mudlet::self()->mDiscord.UpdatePresence();
 }
 
-const QStringList& Discord::getDiscordUserDetails() const
+QStringList Discord::getDiscordUserDetails() const
 {
     QStringList results;
     if (Discord::smReadWriteLock.tryLockForRead()) {
@@ -396,6 +315,12 @@ void Discord::UpdatePresence()
         return;
     }
 
+    if (!pHost->discordUserIdMatch(Discord::smUserName, Discord::smDiscriminator)) {
+        // Oh dear - the current Discord User does not match the required user
+        // details (if set) - must abort
+        return;
+    }
+
     // Need to establish which presence to use - will be null if it has not been overridden:
     QString presenceId = mHostPresenceIds.value(pHost);
 
@@ -437,78 +362,28 @@ void Discord::UpdatePresence()
         mCurrentPresenceId = presenceId;
     }
 
-    if (mRawMode.value(pHost, false)) {
-        pDiscordPresence->setDetailText(mDetailTexts.value(pHost));
-        pDiscordPresence->setStateText(mStateTexts.value(pHost));
-        pDiscordPresence->setLargeImageKey(mLargeImages.value(pHost));
-        pDiscordPresence->setLargeImageText(mLargeImageTexts.value(pHost));
-        pDiscordPresence->setSmallImageKey(mSmallImages.value(pHost));
-        pDiscordPresence->setSmallImageText(mSmallImageTexts.value(pHost));
+    pDiscordPresence->setDetailText(mDetailTexts.value(pHost));
+    pDiscordPresence->setStateText(mStateTexts.value(pHost));
+    pDiscordPresence->setLargeImageKey(mLargeImages.value(pHost));
+    pDiscordPresence->setLargeImageText(mLargeImageTexts.value(pHost));
+    pDiscordPresence->setSmallImageKey(mSmallImages.value(pHost));
+    pDiscordPresence->setSmallImageText(mSmallImageTexts.value(pHost));
+
+    if (mPartyMax.value(pHost)) {
+        pDiscordPresence->setPartySize(mPartySize.value(pHost));
+        pDiscordPresence->setPartyMax(mPartyMax.value(pHost));
     } else {
-        int port = pHost->getPort();
-        QString url = pHost->getUrl();
-        QString gameName = mGamesNames.value(pHost).toUtf8();
-        if (!gameName.isEmpty()) {
-            // CHECKME: Consider changing to show {"%1 (Connected)"|"%1 (Connecting)"|"%1 (Disconnected)"} to reflect connection status...
-            mDetailTexts[pHost] = tr("Playing %1",
-                                     "This is an awkward case - it is visible to others who may be using various languages "
-                                     "but it is not appropriate to NOT translate it according to the current user's "
-                                     "requirements - we have to assume that they will be playing using a language "
-                                     "that their collegues will also be using and would expect to see..."
-                                     "Also, the introduction (the fixed text part, NOT the parameter), really wants to be "
-                                     "the shortest possible word so that it takes up the least amount of space on the "
-                                     "player's Discord Icon/Rich Presence report.").arg(gameName);
-            pDiscordPresence->setDetailText(mDetailTexts.value(pHost));
-
-            mLargeImages[pHost] = gameName.toLower();
-            pDiscordPresence->setLargeImageKey(mLargeImages.value(pHost));
-
-            if (!pHost->mDiscordHideAddress) {
-                mLargeImageTexts[pHost] = QStringLiteral("%1:%2").arg(url, QString::number(port));
-                pDiscordPresence->setLargeImageText(mLargeImageTexts.value(pHost));
-            }
-        }
-
-        if (!pHost->mDiscordHideCurrentArea && !mAreas.value(pHost).isEmpty()) {
-            mStateTexts[pHost] = mAreas.value(pHost);
-            pDiscordPresence->setStateText(mAreas.value(pHost));
-        }
-
-        // list of known games - if the user sets an unknown game, have a heuristic
-        // still display their character icon
-        bool knownGame = mGamesNames.contains(pHost) && mKnownGames.contains(mGamesNames.value(pHost).toLower());
-
-        if (!pHost->mDiscordHideCharacterIcon && !mCharacterIcons.value(pHost).isEmpty()) {
-            //  the game is unknown, set the small image as the big one so at least something shows
-            if (knownGame) {
-                mSmallImages[pHost] = mCharacterIcons.value(pHost).toLower().trimmed();
-                pDiscordPresence->setSmallImageKey(mSmallImages.value(pHost));
-            } else {
-                mLargeImages[pHost] = mCharacterIcons.value(pHost).toLower().trimmed();
-                pDiscordPresence->setLargeImageKey(mLargeImages.value(pHost));
-            }
-        }
-
-        if (!pHost->mDiscordHideCharacterText && !mCharacters.value(pHost).isEmpty()) {
-            if (knownGame) {
-                mSmallImageTexts[pHost] = mCharacters.value(pHost);
-                pDiscordPresence->setSmallImageText(mCharacters.value(pHost));
-            } else {
-                if (!pHost->mDiscordHideAddress) {
-                    mLargeImageTexts[pHost] = QStringLiteral("%1:%2 | %3").arg(url, QString::number(port), mCharacters.value(pHost));
-                } else {
-                    mLargeImageTexts[pHost] = mCharacters.value(pHost);
-                }
-                pDiscordPresence->setLargeImageText(mLargeImageTexts.value(pHost));
-            }
-        }
+        pDiscordPresence->setPartySize(0);
+        pDiscordPresence->setPartyMax(0);
     }
 
-    // At present confine ourselves to showing an elapsed time since profile
-    // load - will change to be connected time once initial bugs ironed out
-    // and then allow both to be manipulated from lua...
-    pDiscordPresence->setStartTimeStamp(mStartTimes.value(pHost));
-    pDiscordPresence->setEndTimeStamp(0);
+    if (mEndTimes.value(pHost)) {
+        pDiscordPresence->setEndTimeStamp(mEndTimes.value(pHost));
+        pDiscordPresence->setStartTimeStamp(0);
+    } else {
+        pDiscordPresence->setEndTimeStamp(0);
+        pDiscordPresence->setStartTimeStamp(mStartTimes.value(pHost, 0));
+    }
 
     // Convert our stored presence into the format that the RPC library wants:
     qDebug() << "Discord::UpdatePresence() INFO - calling Discord_UpdatePresence(...) using:" << *pDiscordPresence;
@@ -517,18 +392,63 @@ void Discord::UpdatePresence()
     Discord_UpdatePresence(&convertedPresence);
 }
 
-bool Discord::gameIntegrationSupported(const QString& address)
+// TODO: This is likely to need development as more use cases come to light
+QString Discord::deduceGameName(const QString& address)
 {
     // Handle using localhost as an off-line testing case
     if (address == QLatin1String("localhost") || address == QLatin1String("127.0.0.1") || address == QLatin1String("::1")) {
 
-        return true;
+        return QLatin1String("localhost");
     }
 
     // Handle the cases where the server url contains the "well-known" Server
     // name - that being the key of the QHash mKnownGames:
     if (mKnownGames.contains(address)) {
-        return true;
+        return address;
+    }
+
+    // Do a bit of URL processing on the (potentially) host url:
+    QString otherName;
+    switch (address.count(QChar('.'))) {
+    default:
+        // Too complex - abandon
+        qDebug().noquote().noquote() << "Discord::deduceGameName(\"" << address << "\") WARN - Unable to deduce MUD name from given address.";
+        break;
+    case 2:
+    {
+            // three terms - assume last is a TLD so remove it but the first may be significant
+
+        QStringList fragments = address.split(QChar('.'));
+        fragments.removeLast();
+        otherName = fragments.join(QLatin1String("."));
+        if (otherName.startsWith(QLatin1String("game."))) {
+            // WoTMUD type case - so take remaing term in the middle of original
+            otherName = otherName.split(QChar('.')).last();
+            break;
+        } else if (otherName.startsWith(QLatin1String("www."))) {
+            // Error(?) in entering details so that a web-server name was give:
+            otherName = otherName.split(QChar('.')).last();
+            break;
+        }
+    }
+        qDebug().noquote().noquote() << "Discord::deduceGameName(\"" << address << "\") WARN - Unable to deduce MUD name from given address - even after discarding last element to consider just: \"" << otherName << "\".";
+        otherName.clear();
+        break;
+    case 1:
+        // two terms - assume last is a TLD so remove it
+        otherName = address.split(QChar('.')).first();
+        break;
+    case 0:
+        // single term no need to split it
+        otherName = address;
+        break;
+    }
+
+    if (address.endsWith(QStringLiteral(".com"))) {
+        otherName = address.left(address.length() - 4);
+    } else if (address.endsWith(QStringLiteral(".de"))) {
+        // Handle avalon.de case
+        otherName = address.left(address.length() - 4);
     }
 
     // Handle the remaining cases where the known URL is something else - like
@@ -540,13 +460,29 @@ bool Discord::gameIntegrationSupported(const QString& address)
         QVectorIterator<QString> itUrl(itServer.value());
         while (itUrl.hasNext()) {
             if (itUrl.next().contains(address)) {
-                return true;
+                return itServer.key();
             }
         }
     }
 
-    // Oh dear, the given address does not match anything we know about
-    return false;
+    // This may be an empty string but it is the best guess otherwise:
+    return otherName;
+}
+
+// Returns true in First if this is a MUD we know about (and have an Icon for in
+// on the Mudlet Discord Guild server!) and the deduced name in Second - if the
+// first is true.
+QPair<bool, QString> Discord::gameIntegrationSupported(const QString& address)
+{
+    QString deducedName = deduceGameName(address);
+
+    // Handle using localhost as an off-line testing case
+    if (deducedName == QLatin1String("localhost")) {
+
+        return qMakePair(true, deducedName);
+    } else {
+        return qMakePair((!deducedName.isEmpty() && mKnownGames.contains(deducedName)), deducedName);;
+    }
 }
 
 bool Discord::libraryLoaded()
@@ -554,21 +490,8 @@ bool Discord::libraryLoaded()
     return mLoaded;
 }
 
-void Discord::slot_handleGameConnection(Host* pHost)
-{
-    mStartTimes[pHost] = static_cast<int64_t>(std::time(nullptr));
-    UpdatePresence();
-}
-
-void Discord::slot_handleGameDisconnection(Host* pHost)
-{
-    mStartTimes[pHost] = 0;
-    UpdatePresence();
-}
-
 // AFAICT A Discord Application Id is an unsigned long long int (a.k.a. a
-// quint64, or qulonglong) but we won't assume anything here and stick to
-// treating it as a QString.
+// quint64, or qulonglong)
 bool Discord::setPresence(Host* pHost, const QString& text)
 {
     QString oldPresenceId = mHostPresenceIds.value(pHost);
@@ -602,6 +525,13 @@ bool Discord::setPresence(Host* pHost, const QString& text)
 
         return false;
     }
+}
+
+// Returns Host set presenceId or the default Mudlet one if none set for the
+// specific Host:
+QString Discord::getPresenceId(Host* pHost) const
+{
+    return mHostPresenceIds.value(pHost, mHostPresenceIds.value(nullptr));
 }
 
 DiscordRichPresence localDiscordPresence::convert() const
@@ -658,7 +588,6 @@ void localDiscordPresence::setSmallImageKey(const QString& text)
     strncpy(mSmallImageKey, text.toUtf8().constData(), 31);
 }
 
-
 void localDiscordPresence::setJoinSecret(const QString& text)
 {
     strncpy(mJoinSecret, text.toUtf8().constData(), 127);
@@ -677,4 +606,9 @@ void localDiscordPresence::setSpectateSecret(const QString& text)
 bool Discord::isUsingDefaultDiscordPresence(Host* pHost) const
 {
     return (! mHostPresenceIds.contains(pHost));
+}
+
+bool Discord::discordUserIdMatch(Host* pHost) const
+{
+    return pHost->discordUserIdMatch(Discord::smUserName, Discord::smDiscriminator);
 }

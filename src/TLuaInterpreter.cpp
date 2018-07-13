@@ -10299,141 +10299,22 @@ int TLuaInterpreter::openWebPage(lua_State* L)
     }
 }
 
-// Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordGame
-int TLuaInterpreter::setDiscordGame(lua_State* L)
-{
-    mudlet* pMudlet = mudlet::self();
-    if (!pMudlet->mDiscord.libraryLoaded()) {
-        lua_pushnil(L);
-        lua_pushstring(L, "Discord API is not available");
-        return 2;
-    }
-
-    auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
-        lua_pushnil(L);
-        lua_pushstring(L, "Discord API is disabled in settings for privacy");
-        return 2;
-    }
-
-    if (lua_isstring(L, 1)) {
-        auto result = pMudlet->mDiscord.setGame(&host, QString::fromUtf8(lua_tostring(L, 1)));
-        if (std::get<bool>(result)) {
-            lua_pushboolean(L, true);
-            return 1;
-        } else {
-            lua_pushnil(L);
-            lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
-            return 2;
-        }
-    } else {
-        lua_pushfstring(L, "setDiscordGame: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
-        return lua_error(L);
-    }
-}
-
-// Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordCharacterIcon
-int TLuaInterpreter::setDiscordCharacterIcon(lua_State* L)
-{
-    mudlet* pMudlet = mudlet::self();
-    if (!pMudlet->mDiscord.libraryLoaded()) {
-        lua_pushnil(L);
-        lua_pushstring(L, "Discord API is not available");
-        return 2;
-    }
-
-    auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
-        lua_pushnil(L);
-        lua_pushstring(L, "Discord API is disabled in settings for privacy");
-        return 2;
-    }
-
-    if (lua_isstring(L, 1)) {
-        auto result = pMudlet->mDiscord.setCharacterIcon(&host, QString::fromUtf8(lua_tostring(L, 1)));
-        if (std::get<bool>(result)) {
-            lua_pushboolean(L, true);
-            return 1;
-        } else {
-            lua_pushnil(L);
-            lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
-            return 2;
-        }
-    } else {
-        lua_pushfstring(L, "setDiscordCharacterIcon: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
-        return lua_error(L);
-    }
-}
-
-// Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordCharacter
-int TLuaInterpreter::setDiscordCharacter(lua_State* L)
-{
-    auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
-        lua_pushnil(L);
-        lua_pushstring(L, "Discord API is disabled in settings for privacy");
-        return 2;
-    }
-
-    if (lua_isstring(L, 1)) {
-        auto result = mudlet::self()->mDiscord.setCharacter(&host, QString::fromUtf8(lua_tostring(L, 1)));
-        if (std::get<bool>(result)) {
-            lua_pushboolean(L, true);
-            return 1;
-        } else {
-            lua_pushnil(L);
-            lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
-            return 2;
-        }
-    } else {
-        lua_pushfstring(L, "setDiscordCharacter: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
-        return lua_error(L);
-    }
-}
-
-// Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordArea
-int TLuaInterpreter::setDiscordArea(lua_State *L)
-{
-    auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
-        lua_pushnil(L);
-        lua_pushstring(L, "Discord API is disabled in settings for privacy");
-        return 2;
-    }
-
-    if (lua_isstring(L, 1)) {
-        auto result = mudlet::self()->mDiscord.setArea(&host, QString::fromUtf8(lua_tostring(L, 1)));
-        if (std::get<bool>(result)) {
-            lua_pushboolean(L, true);
-            return 1;
-        } else {
-            lua_pushnil(L);
-            lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
-            return 2;
-        }
-    } else {
-        lua_pushfstring(L, "setDiscordArea: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
-        return lua_error(L);
-    }
-}
-
-/* Overrides the Discord presence Id used for this profile
+/*
+ * Overrides the Discord presence Id used for this profile
  * By definition this stops the ability to use the Icon resources that have been
  * set up for the Mudlet client - so that ones specific to, say, a MUD Server
- * can be used INSTEAD - this thus disables:
- * * setDiscordArea
- * * setDiscordCharacter
- * * setDiscordCharacterIcon
- * * setDiscordGame
+ * can be used INSTEAD.
+ *
  * The Presence ID seems to be an 18 digit number at the moment.
  * Specifying an empty string or no argument resets to using the default Mudlet
- * one - and reenables the above functions...
+ * one...
  *
- * There is no getter for this value, if it is supplied via a GMCP or other OOB
- * from a Server they may not want to advertise it - though currently it should
- * be readable from the other entry place on the "Special options" tab of the
+ * There is no lua getter for this value, if it is supplied via a GMCP or other
+ * OOB from a Server they may not want to advertise it - though currently it
+ * should be readable from the "Special options" tab of the
  * "Profile preferences".
  */
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordPresenceId
 int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10444,9 +10325,15 @@ int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
         return 2;
     }
 
@@ -10497,8 +10384,10 @@ int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
 
 // Could be used to check for Discord availability in Lua, will return nil if
 // it is not available or true/false depending on whether it is using Mudlet's
-// own facilities and can safely use setDiscordArea(...), setDiscordGame(...)
-// and the other ones that rely on THAT presence being "in use":
+// own Discord Guild/Server and can safely use icon resources that we know
+// about - can also be used as a quick status check as it will return a nil if
+// Discord is NOT currently available with a reason:
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#isUsingDefaultDiscordPresenceId
 int TLuaInterpreter::isUsingDefaultDiscordPresenceId(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10509,9 +10398,15 @@ int TLuaInterpreter::isUsingDefaultDiscordPresenceId(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
         return 2;
     }
 
@@ -10519,6 +10414,7 @@ int TLuaInterpreter::isUsingDefaultDiscordPresenceId(lua_State* L)
     return 1;
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordLargeIcon
 int TLuaInterpreter::setDiscordLargeIcon(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10529,27 +10425,29 @@ int TLuaInterpreter::setDiscordLargeIcon(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
         return 2;
     }
 
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
+        return 2;
+    }
+
     if (lua_isstring(L, 1)) {
-        if (pMudlet->mDiscord.setLargeImage(&host, QString::fromUtf8(lua_tostring(L, 1)).toLower())) {
-            lua_pushboolean(L, true);
-            return 1;
-        } else {
-            lua_pushnil(L);
-            lua_pushstring(L, "Discord integration is not available");
-            return 2;
-        }
+        pMudlet->mDiscord.setLargeImage(&host, QString::fromUtf8(lua_tostring(L, 1)).toLower());
+        lua_pushboolean(L, true);
+        return 1;
     } else {
-        lua_pushfstring(L, "setLargeIcon: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
+        lua_pushfstring(L, "setDiscordLargeIcon: bad argument #%d type (key as string expected, got %s!)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordLargeIcon
 int TLuaInterpreter::getDiscordLargeIcon(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10560,25 +10458,19 @@ int TLuaInterpreter::getDiscordLargeIcon(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
         return 2;
     }
 
-    auto result = pMudlet->mDiscord.getLargeImage(&host);
-    if (std::get<bool>(result)) {
-        lua_pushfstring(L, std::get<QString>(result).toUtf8().constData());
-        return 1;
-    } else {
-        lua_pushnil(L);
-        lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
-        return 2;
-    }
+    lua_pushfstring(L, pMudlet->mDiscord.getLargeImage(&host).toUtf8().constData());
+    return 1;
 }
 
 // Discord calls the two pictures "LargeImage" and "SmallImage" but their
 // purpose are explained by being called "LargeIcon" and "SmallIcon"
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordLargeIconText
 int TLuaInterpreter::setDiscordLargeIconText(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10589,27 +10481,29 @@ int TLuaInterpreter::setDiscordLargeIconText(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
         return 2;
     }
 
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
+        return 2;
+    }
+
     if (lua_isstring(L, 1)) {
-        if (pMudlet->mDiscord.setLargeImageText(&host, QString::fromUtf8(lua_tostring(L, 1)))) {
-            lua_pushboolean(L, true);
-            return 1;
-        } else {
-            lua_pushnil(L);
-            lua_pushstring(L, "Discord integration is not available");
-            return 2;
-        }
+        pMudlet->mDiscord.setLargeImageText(&host, QString::fromUtf8(lua_tostring(L, 1)));
+        lua_pushboolean(L, true);
+        return 1;
     } else {
-        lua_pushfstring(L, "setLargeIconText: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
+        lua_pushfstring(L, "setDiscordLargeIconText: bad argument #%d type (text as string expected, got %s!)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordLargeIconText
 int TLuaInterpreter::getDiscordLargeIconText(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10620,23 +10514,17 @@ int TLuaInterpreter::getDiscordLargeIconText(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
         return 2;
     }
 
-    auto result = pMudlet->mDiscord.getLargeImageText(&host);
-    if (std::get<bool>(result)) {
-        lua_pushfstring(L, std::get<QString>(result).toUtf8().constData());
-        return 1;
-    } else {
-        lua_pushnil(L);
-        lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
-        return 2;
-    }
+    lua_pushfstring(L, pMudlet->mDiscord.getLargeImageText(&host).toUtf8().constData());
+    return 1;
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordSmallIcon
 int TLuaInterpreter::setDiscordSmallIcon(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10647,27 +10535,29 @@ int TLuaInterpreter::setDiscordSmallIcon(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
         return 2;
     }
 
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
+        return 2;
+    }
+
     if (lua_isstring(L, 1)) {
-        if (pMudlet->mDiscord.setSmallImage(&host, QString::fromUtf8(lua_tostring(L, 1)).toLower())) {
-            lua_pushboolean(L, true);
-            return 1;
-        } else {
-            lua_pushnil(L);
-            lua_pushstring(L, "Discord integration is not available");
-            return 2;
-        }
+        pMudlet->mDiscord.setSmallImage(&host, QString::fromUtf8(lua_tostring(L, 1)).toLower());
+        lua_pushboolean(L, true);
+        return 1;
     } else {
-        lua_pushfstring(L, "setSmallIcon: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
+        lua_pushfstring(L, "setDiscordSmallIcon: bad argument #%d type (key as string expected, got %s!)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordSmallIcon
 int TLuaInterpreter::getDiscordSmallIcon(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10678,47 +10568,50 @@ int TLuaInterpreter::getDiscordSmallIcon(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
         return 2;
     }
 
-    auto result = pMudlet->mDiscord.getSmallImage(&host);
-    if (std::get<bool>(result)) {
-        lua_pushfstring(L, std::get<QString>(result).toUtf8().constData());
-        return 1;
-    } else {
-        lua_pushnil(L);
-        lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
-        return 2;
-    }
+    lua_pushfstring(L, pMudlet->mDiscord.getSmallImage(&host).toUtf8().constData());
+    return 1;
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordSmallIconText
 int TLuaInterpreter::setDiscordSmallIconText(lua_State* L)
 {
+    mudlet* pMudlet = mudlet::self();
+    if (!pMudlet->mDiscord.libraryLoaded()) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is not available");
+        return 2;
+    }
+
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
         return 2;
     }
 
     if (lua_isstring(L, 1)) {
-        if (mudlet::self()->mDiscord.setSmallImageText(&host, QString::fromUtf8(lua_tostring(L, 1)))) {
-            lua_pushboolean(L, true);
-            return 1;
-        } else {
-            lua_pushnil(L);
-            lua_pushstring(L, "Discord integration is not available");
-            return 2;
-        }
+        pMudlet->mDiscord.setSmallImageText(&host, QString::fromUtf8(lua_tostring(L, 1)));
+        lua_pushboolean(L, true);
+        return 1;
     } else {
-        lua_pushfstring(L, "setSmallIconText: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
+        lua_pushfstring(L, "setDiscordSmallIconText: bad argument #%d type (text as string expected, got %s!)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordSmallIconText
 int TLuaInterpreter::getDiscordSmallIconText(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10729,23 +10622,17 @@ int TLuaInterpreter::getDiscordSmallIconText(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
         return 2;
     }
 
-    auto result = pMudlet->mDiscord.getSmallImageText(&host);
-    if (std::get<bool>(result)) {
-        lua_pushfstring(L, std::get<QString>(result).toUtf8().constData());
-        return 1;
-    } else {
-        lua_pushnil(L);
-        lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
-        return 2;
-    }
+    lua_pushfstring(L, pMudlet->mDiscord.getSmallImageText(&host).toUtf8().constData());
+    return 1;
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordDetailText
 int TLuaInterpreter::setDiscordDetailText(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10756,27 +10643,29 @@ int TLuaInterpreter::setDiscordDetailText(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
         return 2;
     }
 
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
+        return 2;
+    }
+
     if (lua_isstring(L, 1)) {
-        if (pMudlet->mDiscord.setDetailText(&host, QString::fromUtf8(lua_tostring(L, 1)))) {
-            lua_pushboolean(L, true);
-            return 1;
-        } else {
-            lua_pushnil(L);
-            lua_pushstring(L, "Discord integration is not available");
-            return 2;
-        }
+        pMudlet->mDiscord.setDetailText(&host, QString::fromUtf8(lua_tostring(L, 1)));
+        lua_pushboolean(L, true);
+        return 1;
     } else {
-        lua_pushfstring(L, "setDiscordDetailText: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
+        lua_pushfstring(L, "setDiscordDetailText: bad argument #%d type (text as string expected, got %s!)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordDetailText
 int TLuaInterpreter::getDiscordDetailText(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10787,47 +10676,50 @@ int TLuaInterpreter::getDiscordDetailText(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
         return 2;
     }
 
-    auto result = pMudlet->mDiscord.getDetailText(&host);
-    if (std::get<bool>(result)) {
-        lua_pushfstring(L, std::get<QString>(result).toUtf8().constData());
-        return 1;
-    } else {
-        lua_pushnil(L);
-        lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
-        return 2;
-    }
+    lua_pushfstring(L, pMudlet->mDiscord.getDetailText(&host).toUtf8().constData());
+    return 1;
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordStateText
 int TLuaInterpreter::setDiscordStateText(lua_State* L)
 {
+    mudlet* pMudlet = mudlet::self();
+    if (!pMudlet->mDiscord.libraryLoaded()) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is not available");
+        return 2;
+    }
+
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
         return 2;
     }
 
     if (lua_isstring(L, 1)) {
-        if (mudlet::self()->mDiscord.setStateText(&host, QString::fromUtf8(lua_tostring(L, 1)))) {
-            lua_pushboolean(L, true);
-            return 1;
-        } else {
-            lua_pushnil(L);
-            lua_pushstring(L, "Discord integration is not available");
-            return 2;
-        }
+        mudlet::self()->mDiscord.setStateText(&host, QString::fromUtf8(lua_tostring(L, 1)));
+        lua_pushboolean(L, true);
+        return 1;
     } else {
-        lua_pushfstring(L, "setStateDetailText: bad argument #%d type (string expected, got %s)", 1, luaL_typename(L, 1));
+        lua_pushfstring(L, "setDiscordStateText: bad argument #%d type (text as string expected, got %s!)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
 }
 
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordStateText
 int TLuaInterpreter::getDiscordStateText(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
@@ -10838,21 +10730,195 @@ int TLuaInterpreter::getDiscordStateText(lua_State* L)
     }
 
     auto& host = getHostFromLua(L);
-    if (host.mDiscordDisableLua) {
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
         lua_pushnil(L);
         lua_pushstring(L, "Discord API is disabled in settings for privacy");
         return 2;
     }
 
-    auto result = pMudlet->mDiscord.getStateText(&host);
-    if (std::get<bool>(result)) {
-        lua_pushfstring(L, std::get<QString>(result).toUtf8().constData());
-        return 1;
-    } else {
+    lua_pushfstring(L, pMudlet->mDiscord.getStateText(&host).toUtf8().constData());
+    return 1;
+}
+
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordElapsedStartTime
+int TLuaInterpreter::setDiscordElapsedStartTime(lua_State* L)
+{
+    mudlet* pMudlet = mudlet::self();
+    if (!pMudlet->mDiscord.libraryLoaded()) {
         lua_pushnil(L);
-        lua_pushstring(L, std::get<QString>(result).toUtf8().constData());
+        lua_pushstring(L, "Discord API is not available");
         return 2;
     }
+
+    auto& host = getHostFromLua(L);
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
+        return 2;
+    }
+
+    if (lua_isnumber(L, 1)) {
+        int64_t timeStamp = lua_tointeger(L, 1);
+        if (timeStamp >= 0) {
+            pMudlet->mDiscord.setStartTimeStamp(&host, timeStamp);
+            lua_pushboolean(L, true);
+            return 1;
+        } else {
+            lua_pushnil(L);
+            lua_pushstring(L, "the timestamp must be zero to clear the \"elapsed:\" time or an epoch time value from the recent past");
+            return 2;
+        }
+    } else {
+        lua_pushfstring(L, "setDiscordElapsedStartTime: bad argument #%d type (epoch time as number, got %s!)", 1, luaL_typename(L, 1));
+        return lua_error(L);
+    }
+}
+
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordRemainingEndTime
+int TLuaInterpreter::setDiscordRemainingEndTime(lua_State* L)
+{
+    mudlet* pMudlet = mudlet::self();
+    if (!pMudlet->mDiscord.libraryLoaded()) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is not available");
+        return 2;
+    }
+
+    auto& host = getHostFromLua(L);
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
+        return 2;
+    }
+
+    if (lua_isnumber(L, 1)) {
+        int64_t timeStamp = lua_tointeger(L, 1);
+        if (timeStamp >= 0) {
+            pMudlet->mDiscord.setEndTimeStamp(&host, timeStamp);
+            lua_pushboolean(L, true);
+            return 1;
+        } else {
+            lua_pushnil(L);
+            lua_pushstring(L, "the timestamp must be zero to clear the \"remaining:\" time or an epoch time value in the recent future");
+            return 2;
+        }
+    } else {
+        lua_pushfstring(L, "setDiscordRemainingEndTime: bad argument #%d type (epoch time as number, got %s!)", 1, luaL_typename(L, 1));
+        return lua_error(L);
+    }
+}
+
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordTimeStamps
+int TLuaInterpreter::getDiscordTimeStamps(lua_State* L)
+{
+    mudlet* pMudlet = mudlet::self();
+    if (!pMudlet->mDiscord.libraryLoaded()) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is not available");
+        return 2;
+    }
+
+    auto& host = getHostFromLua(L);
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    QPair<int64_t, int64_t> timeStamps = mudlet::self()->mDiscord.getTimeStamps(&host);
+    lua_pushnumber(L, timeStamps.first);
+    lua_pushnumber(L, timeStamps.second);
+    return 2;
+}
+
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordPartyValues
+int TLuaInterpreter::setDiscordPartyValues(lua_State* L)
+{
+    mudlet* pMudlet = mudlet::self();
+    if (!pMudlet->mDiscord.libraryLoaded()) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is not available");
+        return 2;
+    }
+
+    auto& host = getHostFromLua(L);
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is partially disabled (read-only) as user name or discriminator number is set in preferences but does not match those from local Discord application");
+        return 2;
+    }
+
+    int64_t partySize = -1;
+    int64_t partyMax = -1;
+    if (lua_isnumber(L, 1)) {
+        partySize = lua_tointeger(L, 1);
+        if (partySize < 0) {
+            lua_pushnil(L);
+            lua_pushstring(L, "the current party size must be zero or more");
+            return 2;
+        }
+    } else {
+        lua_pushfstring(L, "setDiscordPartyValues: bad argument #%d type (current party size as number expect, got %s!)", 1, luaL_typename(L, 1));
+        return lua_error(L);
+    }
+
+    if (lua_gettop(L) > 1) {
+        partyMax = lua_tointeger(L, 2);
+        if (partyMax < 0) {
+            lua_pushnil(L);
+            lua_pushstring(L, "the optional party maximum size must be zero (to remove the party details) or more (to set the maximum)");
+            return 2;
+        }
+
+        pMudlet->mDiscord.setParty(&host, static_cast<int>(qMin(static_cast<int64_t>(INT_MAX), partySize)),
+                                   static_cast<int>(qMin(static_cast<int64_t>(INT_MAX), partyMax)));
+    } else {
+        // Only got the partySize now
+        pMudlet->mDiscord.setParty(&host, static_cast<int>(qMin(static_cast<int64_t>(INT_MAX), partySize)));
+    }
+    lua_pushboolean(L, true);
+    return 1;
+}
+
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordPartyValues
+int TLuaInterpreter::getDiscordPartyValues(lua_State* L)
+{
+    mudlet* pMudlet = mudlet::self();
+    if (!pMudlet->mDiscord.libraryLoaded()) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is not available");
+        return 2;
+    }
+
+    auto& host = getHostFromLua(L);
+    if (!(host.mDiscordAccessFlags & Host::DiscordLuaAccessEnabled)) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Discord API is disabled in settings for privacy");
+        return 2;
+    }
+
+    QPair<int, int> partyValues = pMudlet->mDiscord.getParty(&host);
+    lua_pushnumber(L, partyValues.first);
+    lua_pushnumber(L, partyValues.second);
+    return 2;
 }
 
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getTime
@@ -12134,7 +12200,8 @@ void TLuaInterpreter::msdp2Lua(char* src, int srclen)
             }
         }
         //qDebug()<<"[END]<Token>"<<token<<"<JSON>"<<script;
-        mpHost->processDiscordMSDP(token, script);
+// Disabled until PR #1852 merged in as it will clash here:
+//        mpHost->processDiscordMSDP(token, script);
         setMSDPTable(token, script);
     }
 }
@@ -13085,10 +13152,6 @@ void TLuaInterpreter::initLuaGlobals()
     lua_register(pGlobalLua, "getRowCount", TLuaInterpreter::getRowCount);
     lua_register(pGlobalLua, "getOS", TLuaInterpreter::getOS);
     lua_register(pGlobalLua, "getAvailableFonts", TLuaInterpreter::getAvailableFonts);
-    lua_register(pGlobalLua, "setDiscordGame", TLuaInterpreter::setDiscordGame);
-    lua_register(pGlobalLua, "setDiscordCharacterIcon", TLuaInterpreter::setDiscordCharacterIcon);
-    lua_register(pGlobalLua, "setDiscordCharacter", TLuaInterpreter::setDiscordCharacter);
-    lua_register(pGlobalLua, "setDiscordArea", TLuaInterpreter::setDiscordArea);
     lua_register(pGlobalLua, "setDiscordPresenceId", TLuaInterpreter::setDiscordPresenceId);
     lua_register(pGlobalLua, "isUsingDefaultDiscordPresenceId", TLuaInterpreter::isUsingDefaultDiscordPresenceId);
     lua_register(pGlobalLua, "setDiscordStateText", TLuaInterpreter::setDiscordStateText);
@@ -13103,6 +13166,11 @@ void TLuaInterpreter::initLuaGlobals()
     lua_register(pGlobalLua, "getDiscordLargeIconText", TLuaInterpreter::getDiscordLargeIconText);
     lua_register(pGlobalLua, "getDiscordSmallIcon", TLuaInterpreter::getDiscordSmallIcon);
     lua_register(pGlobalLua, "getDiscordSmallIconText", TLuaInterpreter::getDiscordSmallIconText);
+    lua_register(pGlobalLua, "setDiscordRemainingEndTime", TLuaInterpreter::setDiscordRemainingEndTime);
+    lua_register(pGlobalLua, "setDiscordElapsedStartTime", TLuaInterpreter::setDiscordElapsedStartTime);
+    lua_register(pGlobalLua, "getDiscordTimeStamps", TLuaInterpreter::getDiscordTimeStamps);
+    lua_register(pGlobalLua, "setDiscordPartyValues", TLuaInterpreter::setDiscordPartyValues);
+    lua_register(pGlobalLua, "getDiscordPartyValues", TLuaInterpreter::getDiscordPartyValues);
     // PLACEMARKER: End of main Lua interpreter functions registration
 
 

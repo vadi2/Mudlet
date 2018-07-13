@@ -429,11 +429,7 @@ public:
     static int getRowCount(lua_State*);
     static int getOS(lua_State*);
     static int getAvailableFonts(lua_State* L);
-    static int setDiscordGame(lua_State* L);
-    static int setDiscordCharacterIcon(lua_State* L);
-    static int setDiscordCharacter(lua_State* L);
-    static int setDiscordArea(lua_State *L);
-    static int setDiscordPresenceId(lua_State*);
+    static int setDiscordPresenceId(lua_State* L);
     static int isUsingDefaultDiscordPresenceId(lua_State*);
     static int setDiscordStateText(lua_State*);
     static int setDiscordDetailText(lua_State*);
@@ -441,12 +437,17 @@ public:
     static int setDiscordLargeIconText(lua_State*);
     static int setDiscordSmallIcon(lua_State*);
     static int setDiscordSmallIconText(lua_State*);
+    static int setDiscordElapsedStartTime(lua_State*);
+    static int setDiscordRemainingEndTime(lua_State*);
+    static int setDiscordPartyValues(lua_State*);
     static int getDiscordStateText(lua_State*);
     static int getDiscordDetailText(lua_State*);
     static int getDiscordLargeIcon(lua_State*);
     static int getDiscordLargeIconText(lua_State*);
     static int getDiscordSmallIcon(lua_State*);
     static int getDiscordSmallIconText(lua_State*);
+    static int getDiscordTimeStamps(lua_State*);
+    static int getDiscordPartyValues(lua_State*);
     // PLACEMARKER: End of Lua functions declarations
 
 

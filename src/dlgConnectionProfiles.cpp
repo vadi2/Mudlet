@@ -280,6 +280,8 @@ void dlgConnectionProfiles::slot_update_autologin(int state)
     writeProfileData(profile, QStringLiteral("autologin"), QString::number(state));
 }
 
+// This gets called when the QCheckBox that it is connect-ed to gets it's
+// checked state set programatically AS WELL as when the user clicks on it:
 void dlgConnectionProfiles::slot_update_discord_optin(int state)
 {
     QListWidgetItem* pItem = profiles_tree_widget->currentItem();
@@ -1101,7 +1103,7 @@ void dlgConnectionProfiles::updateDiscordStatus()
                                                    "available for <b>this</b> platform or because it is not where "
                                                    "Mudlet expects to find it.</p>")));
     } else if (mDiscordPresenceId.isEmpty()
-               && !mudlet::self()->mDiscord.gameIntegrationSupported(host_name_entry->text().trimmed())) {
+               && !mudlet::self()->mDiscord.gameIntegrationSupported(host_name_entry->text().trimmed()).first) {
 
         // Disable discord support if it is not recognised by name and a
         // Presence Id has not been previously entered:
