@@ -201,6 +201,10 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
                                                                                    "Rich Presence.</p>")));
     checkBox_discordServerAccessToUserName->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can find out your Discord user name. This may be useful "
                                                                               "for it to know as it may enable authenticated communications or other features via Discord.</p>")));
+    checkBox_discordServerAccessToPartyInfo->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set additional '(X of Y)` party infomation at the "
+                                                                               "end of the the lower line of text in the Rich Presence.</p>")));
+    checkBox_discordServerAccessToTimerInfo->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set additional time elapsed or time remaining "
+                                                                               "infomation at the bottom of the Rich Presence.</p>")));
     checkBox_discordLuaAPI->setToolTip(mudlet::htmlWrapper(tr("<p>Needs to be checked to enable Lua API access to the Discord functions.</p>")));
     lineEdit_presenceIdOverride->setToolTip(mudlet::htmlWrapper(tr("<p>Entering the <tt>PresenceId</tt> (<tt>ApplicationId</tt>) of another "
                                                                    "Guild (a.k.a. Server or group of channels on Discord) for, say a MUD Server, "
