@@ -1096,12 +1096,7 @@ void dlgConnectionProfiles::updateDiscordStatus()
     if (!discordLoaded) {
         discord_optin_checkBox->setDisabled(true);
         discord_optin_checkBox->setChecked(false);
-        discord_optin_checkBox->setToolTip(QStringLiteral("<html><head/><body>%1</body></htmk>")
-                                           .arg(tr("<p>Discord integration not available on this platform.</p>"
-                                                   "<p><i>This option is disabled because the required Discord RPC "
-                                                   "library has not been found; that may be because it is <b>not</b> "
-                                                   "available for <b>this</b> platform or because it is not where "
-                                                   "Mudlet expects to find it.</p>")));
+        discord_optin_checkBox->setToolTip(tr("Discord integration not available on this platform"));
     } else if (mDiscordPresenceId.isEmpty()
                && !mudlet::self()->mDiscord.gameIntegrationSupported(host_name_entry->text().trimmed()).first) {
 
@@ -1109,18 +1104,10 @@ void dlgConnectionProfiles::updateDiscordStatus()
         // Presence Id has not been previously entered:
         discord_optin_checkBox->setDisabled(true);
         discord_optin_checkBox->setChecked(false);
-        discord_optin_checkBox->setToolTip(QStringLiteral("<html><head/><body>%1</body></htmk>")
-                                           .arg(tr("<p>Discord integration not supported by game.</p>"
-                                                   "<p><i>This option is disabled because the game is not one "
-                                                   "that Mudlet has an icon for to use as a Discord <i>Rich "
-                                                   "Presence</i> or there is no Presence Id number to identify "
-                                                   "an alternative set of icons that, say a MUD Server, has "
-                                                   "arranged to make available for Mudlet and other applications "
-                                                   "to utilise.</p>")));
+        discord_optin_checkBox->setToolTip(tr("Discord integration not supported by game"));
     } else {
         discord_optin_checkBox->setEnabled(true);
-        discord_optin_checkBox->setToolTip(QStringLiteral("<html><head/><body>%1</body></htmk>")
-                                           .arg(tr("<p>Check to enable Discord integration.</p>")));
+        discord_optin_checkBox->setToolTip(tr("Check to enable Discord integration"));
     }
 }
 
