@@ -10384,7 +10384,7 @@ int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
 
 // Could be used to check for Discord availability in Lua, will return nil if
 // it is not available or true/false depending on whether it is using Mudlet's
-// own Discord Guild/Server and can safely use icon resources that we know
+// own Discord Server and can safely use icon resources that we know
 // about - can also be used as a quick status check as it will return a nil if
 // Discord is NOT currently available with a reason:
 // TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#isUsingDefaultDiscordPresenceId

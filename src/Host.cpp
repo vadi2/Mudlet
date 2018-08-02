@@ -1306,7 +1306,7 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
             // * the Detail text with "Playing <Mudname>" if using Mudlet Discord Presence Id or "Using Mudlet Mud client" if not
             QPair<bool, QString> integrationTestResult = pMudlet->mDiscord.gameIntegrationSupported(getUrl());
             if (pMudlet->mDiscord.isUsingDefaultDiscordPresence(this)) {
-                // We are (still) on the Mudlet Guild so can use that one's
+                // We are (still) on the Mudlet Server so can use that one's
                 // assets - this also means that the RP will be saying
                 // "Playing Mudlet"
                 if (integrationTestResult.first) {
@@ -1323,7 +1323,7 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
                         }
                     } else {
                         // Off-line - using localhost - just display Mudlet icon
-                        // although at time of writing it wasn't up on Guild
+                        // although at time of writing it wasn't up on Server
                         if (mDiscordAccessFlags & DiscordServerAccessToDetail) {
                             pMudlet->mDiscord.setDetailText(this, tr("Off-line from any Mud"));
                         }
@@ -1361,7 +1361,7 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
 
                     } else {
                         // Off-line - using localhost - just display Mudlet icon
-                        // assuming Server's Guild is carrying the icon:
+                        // assuming Server is carrying the icon:
                         if (mDiscordAccessFlags & DiscordServerAccessToDetail) {
                             pMudlet->mDiscord.setDetailText(this, tr("Off-line from any Mud"));
                         }
@@ -1509,17 +1509,17 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
         if (hasInvite) {
             if (hasCustomPresence) {
                 okMsg = tr("[  OK  ]  - The Game server has sent you (via GMCP) an invite to it's Discord\n"
-                           "Guild at: %1"
+                           "Server at: %1"
                            "and it has told Mudlet that it will use a custom Presence id.",
                            "The parameter should be a URL to a Discord Channel").arg(inviteUrl.toString());
             } else if (hasPresenceId) {
                 okMsg = tr("[  OK  ]  - The Game server has sent you (via GMCP) an invite to it's Discord\n"
-                           "Guild at: %1"
+                           "Server at: %1"
                            "and it has told Mudlet that it will use Mudlet's own Presence id.",
                            "The parameter should be a URL to a Discord Channel").arg(inviteUrl.toString());
             } else {
                 okMsg = tr("[  OK  ]  - The Game server has sent you (via GMCP) an invite to it's Discord\n"
-                           "Guild at: %1",
+                           "Server at: %1",
                            "The parameter should be a URL to a Discord Channel").arg(inviteUrl.toString());
             }
         } else {
@@ -1534,7 +1534,7 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
             }
         }
         // May also want some means to obtain from the Server the names {a.k.a. "keys"}
-        // that they provide from their Discord Guild/Server - though this will not be
+        // that they provide from their Discord Server - though this will not be
         // necessary if they provide their own module/package to support using their
         // resources using the direct access that has been implimented in the Lua
         // sub-system.

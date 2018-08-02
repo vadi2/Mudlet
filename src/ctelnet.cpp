@@ -713,10 +713,10 @@ void cTelnet::processTelnetCommand(const string& command)
 
                     if (mpHost->mDiscordAccessFlags & Host::DiscordServerCanSetPresenceId) {
                         infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Username and Rich "
-                                                     "Presence Guild, Server is allowed to modify Guild to match Game.");
+                                                     "Presence Server is allowed to modify Server to match Game.");
                     } else {
                         infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Username and Rich "
-                                                     "Presence Guild, Server is prohibited from modifying Guild.");
+                                                     "Presence Server is prohibited from modifying Server.");
                     }
                 } else {
                     _h += QStringLiteral(" [ presenceidinuse: \"%1\", canchangepresenceid: %2 ]")
