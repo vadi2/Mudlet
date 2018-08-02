@@ -82,7 +82,7 @@ public:
         DiscordServerAccessToUserName = 0x40,
         DiscordServerAccessToPartyInfo = 0x80,
         DiscordServerAccessToTimeInfo = 0x100,
-        DiscordServerCanSetPresenceId = 0x20,
+        DiscordServerCanSetPresenceId = 0x200,
         DiscordServerAccessSubMask = 0x3ff,
         DiscordServerAccessEnabled = 0x400, // This one enables consideration of above bits
         DiscordLuaAccessEnabled = 0x800
