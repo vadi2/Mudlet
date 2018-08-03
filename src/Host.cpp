@@ -1313,7 +1313,7 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
                     if (integrationTestResult.second != QLatin1String("localhost")) {
                         // This seems to be the name of a Server that we know of
                         if (mDiscordAccessFlags & DiscordServerAccessToDetail) {
-                            pMudlet->mDiscord.setDetailText(this, tr("Connected to: %1").arg(integrationTestResult.second));
+                            pMudlet->mDiscord.setDetailText(this, tr("Playing %1").arg(integrationTestResult.second));
                         }
                         if (mDiscordAccessFlags & DiscordServerAccessToLargeIcon) {
                             pMudlet->mDiscord.setLargeImage(this, integrationTestResult.second);
