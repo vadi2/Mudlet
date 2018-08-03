@@ -362,27 +362,38 @@ void Discord::UpdatePresence()
         mCurrentPresenceId = presenceId;
     }
 
-    pDiscordPresence->setDetailText(mDetailTexts.value(pHost));
+    if (pHost->mDiscordAccessFlags & Host::DiscordSetDetail) {
+        pDiscordPresence->setDetailText(mDetailTexts.value(pHost));
+    }
+    if (pHost->mDiscordAccessFlags & Host::DiscordSetState) {
     pDiscordPresence->setStateText(mStateTexts.value(pHost));
+    }
+    if (pHost->mDiscordAccessFlags & Host::DiscordSetLargeIcon) {
     pDiscordPresence->setLargeImageKey(mLargeImages.value(pHost));
+    }
+    if (pHost->mDiscordAccessFlags & Host::DiscordSetLargeIconText) {
     pDiscordPresence->setLargeImageText(mLargeImageTexts.value(pHost));
+    }
+    if (pHost->mDiscordAccessFlags & Host::DiscordSetSmallIcon) {
     pDiscordPresence->setSmallImageKey(mSmallImages.value(pHost));
+    }
+    if (pHost->mDiscordAccessFlags & Host::DiscordSetSmallIconText) {
     pDiscordPresence->setSmallImageText(mSmallImageTexts.value(pHost));
-
-    if (mPartyMax.value(pHost)) {
-        pDiscordPresence->setPartySize(mPartySize.value(pHost));
-        pDiscordPresence->setPartyMax(mPartyMax.value(pHost));
-    } else {
-        pDiscordPresence->setPartySize(0);
-        pDiscordPresence->setPartyMax(0);
     }
 
-    if (mEndTimes.value(pHost)) {
-        pDiscordPresence->setEndTimeStamp(mEndTimes.value(pHost));
-        pDiscordPresence->setStartTimeStamp(0);
-    } else {
-        pDiscordPresence->setEndTimeStamp(0);
-        pDiscordPresence->setStartTimeStamp(mStartTimes.value(pHost, 0));
+    if (mPartyMax.value(pHost) && (pHost->mDiscordAccessFlags & Host::DiscordSetPartyInfo)) {
+        pDiscordPresence->setPartySize(mPartySize.value(pHost));
+        pDiscordPresence->setPartyMax(mPartyMax.value(pHost));
+    }
+
+    if (pHost->mDiscordAccessFlags & Host::DiscordSetTimeInfo) {
+        if (mEndTimes.value(pHost)) {
+            pDiscordPresence->setEndTimeStamp(mEndTimes.value(pHost));
+            pDiscordPresence->setStartTimeStamp(0);
+        } else {
+            pDiscordPresence->setEndTimeStamp(0);
+            pDiscordPresence->setStartTimeStamp(mStartTimes.value(pHost, 0));
+        }
     }
 
     // Convert our stored presence into the format that the RPC library wants:

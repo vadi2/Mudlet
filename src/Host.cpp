@@ -134,7 +134,7 @@ Host::Host(int port, const QString& hostname, const QString& login, const QStrin
 , mLogStatus(false)
 , mEnableSpellCheck(true)
 , mDiscordDisableServerSide(true)
-, mDiscordAccessFlags(DiscordLuaAccessEnabled | DiscordServerAccessSubMask)
+, mDiscordAccessFlags(DiscordLuaAccessEnabled | DiscordSetSubMask)
 , mLineSize(10.0)
 , mRoomSize(0.5)
 , mShowInfo(true)
@@ -1312,27 +1312,16 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
                 if (integrationTestResult.first) {
                     if (integrationTestResult.second != QLatin1String("localhost")) {
                         // This seems to be the name of a Server that we know of
-                        if (mDiscordAccessFlags & DiscordServerAccessToDetail) {
                             pMudlet->mDiscord.setDetailText(this, tr("Playing %1").arg(integrationTestResult.second));
-                        }
-                        if (mDiscordAccessFlags & DiscordServerAccessToLargeIcon) {
                             pMudlet->mDiscord.setLargeImage(this, integrationTestResult.second);
-                        }
-                        if (mDiscordAccessFlags & DiscordServerAccessToLargeIconText) {
                             pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
-                        }
                     } else {
                         // Off-line - using localhost - just display Mudlet icon
                         // although at time of writing it wasn't up on Server
-                        if (mDiscordAccessFlags & DiscordServerAccessToDetail) {
                             pMudlet->mDiscord.setDetailText(this, tr("Off-line from any Mud"));
-                        }
-                        if (mDiscordAccessFlags & DiscordServerAccessToLargeIcon) {
                             pMudlet->mDiscord.setLargeImage(this, QLatin1String("mudlet"));
-                        }
-                        if (mDiscordAccessFlags & DiscordServerAccessToLargeIconText) {
                             pMudlet->mDiscord.setLargeImageText(this, tr("Not connected"));
-                        }
+
                     }
                 }
                 // else We have no idea what the Mud is...
@@ -1345,32 +1334,22 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
                 if (integrationTestResult.first) {
                     if (integrationTestResult.second != QLatin1String("localhost")) {
 
-                        if (mDiscordAccessFlags & DiscordServerAccessToDetail) {
                             // The top fixed line of the RP will be saying
                             // "Playing Mudname" already....
                             pMudlet->mDiscord.setDetailText(this, tr("Using Mudlet MUD client"));
-                        }
 
-                        if (mDiscordAccessFlags & DiscordServerAccessToLargeIconText) {
                             pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
-                        }
 
-                        if (mDiscordAccessFlags & DiscordServerAccessToLargeIcon) {
                             pMudlet->mDiscord.setLargeImage(this, QLatin1String("server-icon"));
-                        }
 
                     } else {
                         // Off-line - using localhost - just display Mudlet icon
                         // assuming Server is carrying the icon:
-                        if (mDiscordAccessFlags & DiscordServerAccessToDetail) {
+                        if (mDiscordAccessFlags & DiscordSetDetail) {
                             pMudlet->mDiscord.setDetailText(this, tr("Off-line from any Mud"));
                         }
-                        if (mDiscordAccessFlags & DiscordServerAccessToLargeIcon) {
                             pMudlet->mDiscord.setLargeImage(this, QLatin1String("mudlet"));
-                        }
-                        if (mDiscordAccessFlags & DiscordServerAccessToLargeIconText) {
                             pMudlet->mDiscord.setLargeImageText(this, tr("Not connected"));
-                        }
                     }
                 }
                 // else We have no idea what the Mud is...
@@ -1380,17 +1359,17 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
 
         // It is more straightforward to set the elements directly:
         auto details = json.value(QStringLiteral("details"));
-        if ((details != QJsonValue::Undefined) && (mDiscordAccessFlags & DiscordServerAccessToDetail)) {
+        if (details != QJsonValue::Undefined) {
             pMudlet->mDiscord.setDetailText(this, details.toString());
         }
 
         auto state = json.value(QStringLiteral("state"));
-        if ((state != QJsonValue::Undefined) && (mDiscordAccessFlags & DiscordServerAccessToState)) {
+        if (state != QJsonValue::Undefined) {
             pMudlet->mDiscord.setStateText(this, state.toString());
         }
 
         auto largeImages = json.value(QStringLiteral("largeimage"));
-        if ((largeImages != QJsonValue::Undefined) && (mDiscordAccessFlags & DiscordServerAccessToLargeIcon)) {
+        if (largeImages != QJsonValue::Undefined) {
             auto largeImage = largeImages.toArray().first();
             if (largeImage != QJsonValue::Undefined) {
                 pMudlet->mDiscord.setSmallImage(this, largeImage.toString());
@@ -1398,12 +1377,12 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
         }
 
         auto largeImageText = json.value(QStringLiteral("largeimagetext"));
-        if ((largeImageText != QJsonValue::Undefined) && (mDiscordAccessFlags & DiscordServerAccessToLargeIconText)) {
+        if (largeImageText != QJsonValue::Undefined) {
             pMudlet->mDiscord.setSmallImageText(this, largeImageText.toString());
         }
 
         auto smallImages = json.value(QStringLiteral("smallimage"));
-        if ((smallImages != QJsonValue::Undefined) && (mDiscordAccessFlags & DiscordServerAccessToSmallIcon)) {
+        if (smallImages != QJsonValue::Undefined) {
             auto smallImage = smallImages.toArray().first();
             if (smallImage != QJsonValue::Undefined) {
                 pMudlet->mDiscord.setSmallImage(this, smallImage.toString());
@@ -1411,11 +1390,10 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
         }
 
         auto smallImageText = json.value(QStringLiteral("smallimagetext"));
-        if ((smallImageText != QJsonValue::Undefined) && (mDiscordAccessFlags & DiscordServerAccessToSmallIconText)) {
+        if ((smallImageText != QJsonValue::Undefined)) {
             pMudlet->mDiscord.setSmallImageText(this, smallImageText.toString());
         }
 
-        if (mDiscordAccessFlags & DiscordServerAccessToTimeInfo) {
             // Use -1 so we can detect (at least during debugging) that a ZERO
             // value has been seen:
             int64_t timeStamp = -1;
@@ -1444,9 +1422,7 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
                 }
                 // Else neither timestamps were supplied
             }
-        } // End of if GMCP server can set a time stamp
 
-        if (mDiscordAccessFlags & DiscordServerAccessToPartyInfo) {
             // Use -1 so we can detect (at least during debugging) that a ZERO
             // value has been seen:
             int partySizeValue = -1;
@@ -1477,7 +1453,7 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
                     pMudlet->mDiscord.setParty(this, 0, 0);
                 }
             }
-        }
+
 
     } else if (packageMessage == QLatin1String("External.Discord.Info")) {
         bool hasInvite = false;
@@ -1490,7 +1466,7 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
         bool hasPresenceId = false;
         bool hasCustomPresence = false;
         auto presenceId = json.value(QStringLiteral("presenceid"));
-        if ((presenceId != QJsonValue::Undefined) && (mDiscordAccessFlags & DiscordServerCanSetPresenceId)) {
+        if ((presenceId != QJsonValue::Undefined) && (mDiscordAccessFlags & DiscordSetPresenceId)) {
             hasPresenceId = true;
             if (presenceId.toString() == Discord::csmMudletPresenceId) {
                 pMudlet->mDiscord.setPresence(this, QString());

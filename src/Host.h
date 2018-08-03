@@ -73,17 +73,17 @@ public:
 
     enum DiscordOptionFlag {
         DiscordNoOption = 0x0,
-        DiscordServerAccessToDetail = 0x01,
-        DiscordServerAccessToState = 0x02,
-        DiscordServerAccessToLargeIcon = 0x04,
-        DiscordServerAccessToLargeIconText = 0x08,
-        DiscordServerAccessToSmallIcon = 0x10,
-        DiscordServerAccessToSmallIconText = 0x20,
-        DiscordServerAccessToUserName = 0x40,
-        DiscordServerAccessToPartyInfo = 0x80,
-        DiscordServerAccessToTimeInfo = 0x100,
-        DiscordServerCanSetPresenceId = 0x200,
-        DiscordServerAccessSubMask = 0x3ff,
+        DiscordSetDetail = 0x01,
+        DiscordSetState = 0x02,
+        DiscordSetLargeIcon = 0x04,
+        DiscordSetLargeIconText = 0x08,
+        DiscordSetSmallIcon = 0x10,
+        DiscordSetSmallIconText = 0x20,
+        DiscordSetUserName = 0x40,
+        DiscordSetPartyInfo = 0x80,
+        DiscordSetTimeInfo = 0x100,
+        DiscordSetPresenceId = 0x200,
+        DiscordSetSubMask = 0x3ff,
         DiscordServerAccessEnabled = 0x400, // This one enables consideration of above bits
         DiscordLuaAccessEnabled = 0x800
     };

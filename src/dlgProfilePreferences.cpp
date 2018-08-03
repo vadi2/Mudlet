@@ -494,14 +494,14 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         groupBox_discordPrivacy->show();
         checkBox_discordLuaAPI->setChecked(discordFlags & Host::DiscordLuaAccessEnabled);
         groupBox_discordServerAccess->setChecked(discordFlags & Host::DiscordServerAccessEnabled);
-        checkBox_discordServerAccessToLargeIcon->setChecked(discordFlags & Host::DiscordServerAccessToLargeIcon);
-        checkBox_discordServerAccessToLargeIconText->setChecked(discordFlags & Host::DiscordServerAccessToLargeIconText);
-        checkBox_discordServerAccessToSmallIcon->setChecked(discordFlags & Host::DiscordServerAccessToSmallIcon);
-        checkBox_discordServerAccessToSmallIconText->setChecked(discordFlags & Host::DiscordServerAccessToSmallIconText);
-        checkBox_discordServerAccessToUserName->setChecked(discordFlags & Host::DiscordServerAccessToUserName);
-        checkBox_discordServerAccessToDetail->setChecked(discordFlags & Host::DiscordServerAccessToDetail);
-        checkBox_discordServerAccessToState->setChecked(discordFlags & Host::DiscordServerAccessToState);
-        checkBox_discordPresenceIsServerSettable->setChecked(discordFlags & Host::DiscordServerCanSetPresenceId);
+        checkBox_discordServerAccessToLargeIcon->setChecked(discordFlags & Host::DiscordSetLargeIcon);
+        checkBox_discordServerAccessToLargeIconText->setChecked(discordFlags & Host::DiscordSetLargeIconText);
+        checkBox_discordServerAccessToSmallIcon->setChecked(discordFlags & Host::DiscordSetSmallIcon);
+        checkBox_discordServerAccessToSmallIconText->setChecked(discordFlags & Host::DiscordSetSmallIconText);
+        checkBox_discordServerAccessToUserName->setChecked(discordFlags & Host::DiscordSetUserName);
+        checkBox_discordServerAccessToDetail->setChecked(discordFlags & Host::DiscordSetDetail);
+        checkBox_discordServerAccessToState->setChecked(discordFlags & Host::DiscordSetState);
+        checkBox_discordPresenceIsServerSettable->setChecked(discordFlags & Host::DiscordSetPresenceId);
         lineEdit_discordUserName->setText(pHost->mRequiredDiscordUserName);
         lineEdit_discordUserDiscriminator->setText(pHost->mRequiredDiscordUserDiscriminator);
         lineEdit_presenceIdOverride->setText(pHost->getDiscordPresenceId());
@@ -2111,15 +2111,15 @@ void dlgProfilePreferences::slot_save_and_exit()
         pHost->mSearchEngineName = search_engine_combobox->currentText();
 
         pHost->mDiscordAccessFlags = static_cast<Host::DiscordOptionFlags>(
-                                         (checkBox_discordServerAccessToLargeIcon->isChecked() ? Host::DiscordServerAccessToLargeIcon : Host::DiscordNoOption)
-                                         | (checkBox_discordServerAccessToLargeIconText->isChecked() ? Host::DiscordServerAccessToLargeIconText : Host::DiscordNoOption)
-                                         | (checkBox_discordServerAccessToSmallIcon->isChecked() ? Host::DiscordServerAccessToSmallIcon : Host::DiscordNoOption)
-                                         | (checkBox_discordServerAccessToSmallIconText->isChecked() ? Host::DiscordServerAccessToSmallIconText : Host::DiscordNoOption)
-                                         | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordServerAccessToDetail : Host::DiscordNoOption)
-                                         | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordServerAccessToState : Host::DiscordNoOption)
+                                         (checkBox_discordServerAccessToLargeIcon->isChecked() ? Host::DiscordSetLargeIcon : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToLargeIconText->isChecked() ? Host::DiscordSetLargeIconText : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToSmallIcon->isChecked() ? Host::DiscordSetSmallIcon : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToSmallIconText->isChecked() ? Host::DiscordSetSmallIconText : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordSetDetail : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordSetState : Host::DiscordNoOption)
                                          | (groupBox_discordServerAccess->isChecked() ? Host::DiscordServerAccessEnabled : Host::DiscordNoOption)
-                                         | (checkBox_discordPresenceIsServerSettable->isChecked() ? Host::DiscordServerCanSetPresenceId : Host::DiscordNoOption)
-                                         | (checkBox_discordServerAccessToUserName->isChecked() ? Host::DiscordServerAccessToUserName : Host::DiscordNoOption)
+                                         | (checkBox_discordPresenceIsServerSettable->isChecked() ? Host::DiscordSetPresenceId : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccessToUserName->isChecked() ? Host::DiscordSetUserName : Host::DiscordNoOption)
                                          | (checkBox_discordLuaAPI->isChecked() ? Host::DiscordLuaAccessEnabled : Host::DiscordNoOption));
 
         pHost->setDiscordPresenceId(lineEdit_presenceIdOverride->text().trimmed());

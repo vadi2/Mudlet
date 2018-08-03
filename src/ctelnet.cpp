@@ -702,16 +702,16 @@ void cTelnet::processTelnetCommand(const string& command)
                 _h += "External.Discord.Hello";
                 QStringList discordUserDetails = mudlet::self()->mDiscord.getDiscordUserDetails();
                 QString infoMessage;
-                if (!discordUserDetails.isEmpty() && (mpHost->mDiscordAccessFlags & Host::DiscordServerAccessToUserName)) {
+                if (!discordUserDetails.isEmpty() && (mpHost->mDiscordAccessFlags & Host::DiscordSetUserName)) {
 
                     _h += QStringLiteral(" [ user: \"%1#%2\", private: true, presenceidinuse: \"%3\", canchangepresenceid: %4 ]")
                           .arg(discordUserDetails.at(0),
                                discordUserDetails.at(2),
                                mudlet::self()->mDiscord.getPresenceId(mpHost),
-                               (mpHost->mDiscordAccessFlags & Host::DiscordServerCanSetPresenceId) ? QLatin1String("true") : QLatin1String("false"))
+                               (mpHost->mDiscordAccessFlags & Host::DiscordSetPresenceId) ? QLatin1String("true") : QLatin1String("false"))
                           .toUtf8().constData();
 
-                    if (mpHost->mDiscordAccessFlags & Host::DiscordServerCanSetPresenceId) {
+                    if (mpHost->mDiscordAccessFlags & Host::DiscordSetPresenceId) {
                         infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Username and Rich "
                                                      "Presence Server is allowed to modify Server to match Game.");
                     } else {
@@ -721,10 +721,10 @@ void cTelnet::processTelnetCommand(const string& command)
                 } else {
                     _h += QStringLiteral(" [ presenceidinuse: \"%1\", canchangepresenceid: %2 ]")
                           .arg(mudlet::self()->mDiscord.getPresenceId(mpHost),
-                               (mpHost->mDiscordAccessFlags & Host::DiscordServerCanSetPresenceId) ? QLatin1String("true") : QLatin1String("false"))
+                               (mpHost->mDiscordAccessFlags & Host::DiscordSetPresenceId) ? QLatin1String("true") : QLatin1String("false"))
                           .toUtf8().constData();
 
-                    if (mpHost->mDiscordAccessFlags & Host::DiscordServerCanSetPresenceId) {
+                    if (mpHost->mDiscordAccessFlags & Host::DiscordSetPresenceId) {
                         infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Rich Presence Guild,"
                                                      "Server is allowed to modify Guild to match Game.");
                     } else {
