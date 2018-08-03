@@ -10333,7 +10333,7 @@ int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
@@ -10406,7 +10406,7 @@ int TLuaInterpreter::isUsingDefaultDiscordPresenceId(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
@@ -10433,7 +10433,7 @@ int TLuaInterpreter::setDiscordLargeIcon(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
@@ -10489,7 +10489,7 @@ int TLuaInterpreter::setDiscordLargeIconText(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
@@ -10543,7 +10543,7 @@ int TLuaInterpreter::setDiscordSmallIcon(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
@@ -10597,7 +10597,7 @@ int TLuaInterpreter::setDiscordSmallIconText(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
@@ -10651,7 +10651,7 @@ int TLuaInterpreter::setDiscordDetailText(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
@@ -10705,7 +10705,7 @@ int TLuaInterpreter::setDiscordStateText(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
@@ -10759,7 +10759,7 @@ int TLuaInterpreter::setDiscordElapsedStartTime(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
@@ -10799,7 +10799,7 @@ int TLuaInterpreter::setDiscordRemainingEndTime(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
@@ -10862,7 +10862,7 @@ int TLuaInterpreter::setDiscordPartyValues(lua_State* L)
 
     if (!pMudlet->mDiscord.discordUserIdMatch(&host)) {
         lua_pushnil(L);
-        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered in Mudlet");
+        lua_pushstring(L, "Discord API is read-only as you're logged in with a different account in Discord compared to the one you entered for this profile");
         return 2;
     }
 
