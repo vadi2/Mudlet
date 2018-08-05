@@ -184,11 +184,7 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
                                                                                 "Server from using ones that it does not know about.</p>")));
     checkBox_discordServerAccessToDetail->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the upper line of text in the Rich Presence.</p>")));
     checkBox_discordServerAccessToState->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the lower line of text in the Rich Presence.</p>")));
-    checkBox_discordServerAccessToLargeIcon->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the large icon in the Rich Presence. If this "
-                                                                               "is cleared and no icon is set to be displayed via local (Lua API) code then the small icon cannot "
-                                                                               "be shown and neither can either of the tooltips.</p>")));
-    checkBox_discordServerAccessToLargeIconText->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the tooltip for the large icon in the "
-                                                                                   "Rich Presence.</p>")));
+
     checkBox_discordServerAccessToUserName->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can find out your Discord user name. This may be useful "
                                                                               "for it to know as it may enable authenticated communications or other features via Discord.</p>")));
     checkBox_discordServerAccessToPartyInfo->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set additional '(X of Y)` party infomation at the "
@@ -484,8 +480,14 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         groupBox_discordPrivacy->show();
         checkBox_discordLuaAPI->setChecked(discordFlags & Host::DiscordLuaAccessEnabled);
         checkBox_discordServerAccess->setChecked(discordFlags & Host::DiscordServerAccessEnabled);
-        checkBox_discordServerAccessToLargeIcon->setChecked(discordFlags & Host::DiscordSetLargeIcon);
-        checkBox_discordServerAccessToLargeIconText->setChecked(discordFlags & Host::DiscordSetLargeIconText);
+
+        if (!(discordFlags & Host::DiscordSetLargeIcon) && !(discordFlags & Host::DiscordSetLargeIconText)) {
+            comboBox_discordLargeIconPrivacy->setCurrentIndex(0);
+        } else if (!(discordFlags & Host::DiscordSetLargeIcon) && (discordFlags & Host::DiscordSetLargeIconText)) {
+            comboBox_discordLargeIconPrivacy->setCurrentIndex(1);
+        } else {
+            comboBox_discordLargeIconPrivacy->setCurrentIndex(2);
+        }
 
         if (!(discordFlags & Host::DiscordSetSmallIcon) && !(discordFlags & Host::DiscordSetSmallIconText)) {
             comboBox_discordSmallIconPrivacy->setCurrentIndex(0);
@@ -912,8 +914,7 @@ void dlgProfilePreferences::clearHostDetails()
 
     checkBox_discordLuaAPI->setChecked(false);
     checkBox_discordServerAccess->setChecked(false);
-    checkBox_discordServerAccessToLargeIcon->setChecked(false);
-    checkBox_discordServerAccessToLargeIconText->setChecked(false);
+    comboBox_discordLargeIconPrivacy->setCurrentIndex(0);
     comboBox_discordSmallIconPrivacy->setCurrentIndex(0);
     checkBox_discordServerAccessToUserName->setChecked(false);
     checkBox_discordServerAccessToDetail->setChecked(false);
@@ -2118,10 +2119,21 @@ void dlgProfilePreferences::slot_save_and_exit()
             smallIconText = true;
         }
 
+        auto largeIcon = false, largeIconText = false;
+        if (comboBox_discordLargeIconPrivacy->currentIndex() == 0) {
+            largeIcon = false;
+            largeIconText = false;
+        } else if (comboBox_discordLargeIconPrivacy->currentIndex() == 1) {
+            largeIcon = false;
+            largeIconText = true;
+        } else {
+            largeIcon = true;
+            largeIconText = true;
+        }
 
         pHost->mDiscordAccessFlags = static_cast<Host::DiscordOptionFlags>(
-                                         (checkBox_discordServerAccessToLargeIcon->isChecked() ? Host::DiscordSetLargeIcon : Host::DiscordNoOption)
-                                         | (checkBox_discordServerAccessToLargeIconText->isChecked() ? Host::DiscordSetLargeIconText : Host::DiscordNoOption)
+                                         (largeIcon ? Host::DiscordSetLargeIcon : Host::DiscordNoOption)
+                                         | (largeIconText ? Host::DiscordSetLargeIconText : Host::DiscordNoOption)
                                          | (smallIcon ? Host::DiscordSetSmallIcon : Host::DiscordNoOption)
                                          | (smallIconText ? Host::DiscordSetSmallIconText : Host::DiscordNoOption)
                                          | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordSetDetail : Host::DiscordNoOption)
