@@ -192,11 +192,7 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
     checkBox_discordServerAccessToTimerInfo->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set additional time elapsed or time remaining "
                                                                                "infomation at the bottom of the Rich Presence.</p>")));
     checkBox_discordLuaAPI->setToolTip(mudlet::htmlWrapper(tr("<p>Needs to be checked to enable Lua API access to the Discord functions.</p>")));
-    lineEdit_presenceIdOverride->setToolTip(mudlet::htmlWrapper(tr("<p>Entering the <tt>PresenceId</tt> (<tt>ApplicationId</tt>) of another "
-                                                                   "Guild (a.k.a. Server or group of channels on Discord) for, say a MUD Server, "
-                                                                   "will enable the use of icons on your Discord Rich Presence supplied by that "
-                                                                   "Guild.  This may enable the use of a wide range of icons <i>specific to that Guild</i> "
-                                                                   "instead of a standard set that Mudlet provides to be shared amongst all its users.</p>")));
+
     lineEdit_discordUserName->setToolTip(mudlet::htmlWrapper(tr("<p>When Mudlet connects to the locally running Discord application the latter will report "
                                                                 "the identity which you have logged into it with.  If you have multiple accounts, for instance for "
                                                                 "Mud character separation or other reasons, and if there is a user name entered here or a number to "
@@ -503,7 +499,6 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         checkBox_discordPresenceIsServerSettable->setChecked(discordFlags & Host::DiscordSetPresenceId);
         lineEdit_discordUserName->setText(pHost->mRequiredDiscordUserName);
         lineEdit_discordUserDiscriminator->setText(pHost->mRequiredDiscordUserDiscriminator);
-        lineEdit_presenceIdOverride->setText(pHost->getDiscordPresenceId());
     }
 
     checkBox_runAllKeyBindings->setChecked(pHost->getKeyUnit()->mRunAllKeyMatches);
@@ -920,7 +915,6 @@ void dlgProfilePreferences::clearHostDetails()
     checkBox_discordServerAccessToDetail->setChecked(false);
     checkBox_discordServerAccessToState->setChecked(false);
     checkBox_discordPresenceIsServerSettable->setChecked(false);
-    lineEdit_presenceIdOverride->clear();
     lineEdit_discordUserName->clear();
     lineEdit_discordUserDiscriminator->clear();
 }
@@ -2143,7 +2137,6 @@ void dlgProfilePreferences::slot_save_and_exit()
                                          | (checkBox_discordServerAccessToUserName->isChecked() ? Host::DiscordSetUserName : Host::DiscordNoOption)
                                          | (checkBox_discordLuaAPI->isChecked() ? Host::DiscordLuaAccessEnabled : Host::DiscordNoOption));
 
-        pHost->setDiscordPresenceId(lineEdit_presenceIdOverride->text().trimmed());
         pHost->mRequiredDiscordUserName = lineEdit_discordUserName->text().trimmed();
         if (lineEdit_discordUserDiscriminator->hasAcceptableInput()) {
             // The input mask specifies 4 digits [0-9]
