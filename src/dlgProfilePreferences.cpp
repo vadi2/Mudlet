@@ -177,11 +177,6 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
                                                                                 "<p><i>This is a temporary arrangement and will likely to change when Mudlet gains "
                                                                                 "full support for languages other than English.</i></p>")));
 
-    groupBox_discordServerAccess->setToolTip(mudlet::htmlWrapper(tr("<p>When checked allows the Game Server to use Out-of-Band protocols (currently only GMCP) to "
-                                                                    "control your Discord Rich Presence automatically. Fine grain control of individual aspects can be made using "
-                                                                    "the checkboxes within this group, the Mudlet Makers recommend that you should only uncheck those if you "
-                                                                    "understand what the effects will be as otherwise it may break whatever system that individual Game Servers "
-                                                                    "have arranged to use the system to enhance your Mudding...</p>")));
     checkBox_discordPresenceIsServerSettable->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked to enable the Game Server to supply its own Discord <tt>PresenceId</tt> which "
                                                                                 "will be needed to access Icons that have been uploaded to its Discord Guild (Server) to be used for "
                                                                                 "your Rich Presence. If this option is unchecked then either Mudlet's own set of Icons (or those of "
@@ -193,11 +188,6 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
                                                                                "is cleared and no icon is set to be displayed via local (Lua API) code then the small icon cannot "
                                                                                "be shown and neither can either of the tooltips.</p>")));
     checkBox_discordServerAccessToLargeIconText->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the tooltip for the large icon in the "
-                                                                                   "Rich Presence.</p>")));
-    checkBox_discordServerAccessToSmallIcon->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the small icon in the Rich Presence. If this "
-                                                                               "is cleared and no icon is set to be displayed via local (Lua API) code then the tooltip for it will "
-                                                                               "not be able to be shown either.</p>")));
-    checkBox_discordServerAccessToSmallIconText->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the tooltip for the small icon in the "
                                                                                    "Rich Presence.</p>")));
     checkBox_discordServerAccessToUserName->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can find out your Discord user name. This may be useful "
                                                                               "for it to know as it may enable authenticated communications or other features via Discord.</p>")));
@@ -493,11 +483,18 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         Host::DiscordOptionFlags discordFlags = pHost->mDiscordAccessFlags;
         groupBox_discordPrivacy->show();
         checkBox_discordLuaAPI->setChecked(discordFlags & Host::DiscordLuaAccessEnabled);
-        groupBox_discordServerAccess->setChecked(discordFlags & Host::DiscordServerAccessEnabled);
+        checkBox_discordServerAccess->setChecked(discordFlags & Host::DiscordServerAccessEnabled);
         checkBox_discordServerAccessToLargeIcon->setChecked(discordFlags & Host::DiscordSetLargeIcon);
         checkBox_discordServerAccessToLargeIconText->setChecked(discordFlags & Host::DiscordSetLargeIconText);
-        checkBox_discordServerAccessToSmallIcon->setChecked(discordFlags & Host::DiscordSetSmallIcon);
-        checkBox_discordServerAccessToSmallIconText->setChecked(discordFlags & Host::DiscordSetSmallIconText);
+
+        if (!(discordFlags & Host::DiscordSetSmallIcon) && !(discordFlags & Host::DiscordSetSmallIconText)) {
+            comboBox_discordSmallIconPrivacy->setCurrentIndex(0);
+        } else if (!(discordFlags & Host::DiscordSetSmallIcon) && (discordFlags & Host::DiscordSetSmallIconText)) {
+            comboBox_discordSmallIconPrivacy->setCurrentIndex(1);
+        } else {
+            comboBox_discordSmallIconPrivacy->setCurrentIndex(2);
+        }
+
         checkBox_discordServerAccessToUserName->setChecked(discordFlags & Host::DiscordSetUserName);
         checkBox_discordServerAccessToDetail->setChecked(discordFlags & Host::DiscordSetDetail);
         checkBox_discordServerAccessToState->setChecked(discordFlags & Host::DiscordSetState);
@@ -914,11 +911,10 @@ void dlgProfilePreferences::clearHostDetails()
     search_engine_combobox->clear();
 
     checkBox_discordLuaAPI->setChecked(false);
-    groupBox_discordServerAccess->setChecked(false);
+    checkBox_discordServerAccess->setChecked(false);
     checkBox_discordServerAccessToLargeIcon->setChecked(false);
     checkBox_discordServerAccessToLargeIconText->setChecked(false);
-    checkBox_discordServerAccessToSmallIcon->setChecked(false);
-    checkBox_discordServerAccessToSmallIconText->setChecked(false);
+    comboBox_discordSmallIconPrivacy->setCurrentIndex(0);
     checkBox_discordServerAccessToUserName->setChecked(false);
     checkBox_discordServerAccessToDetail->setChecked(false);
     checkBox_discordServerAccessToState->setChecked(false);
@@ -2110,14 +2106,27 @@ void dlgProfilePreferences::slot_save_and_exit()
 
         pHost->mSearchEngineName = search_engine_combobox->currentText();
 
+        auto smallIcon = false, smallIconText = false;
+        if (comboBox_discordSmallIconPrivacy->currentIndex() == 0) {
+            smallIcon = false;
+            smallIconText = false;
+        } else if (comboBox_discordSmallIconPrivacy->currentIndex() == 1) {
+            smallIcon = false;
+            smallIconText = true;
+        } else {
+            smallIcon = true;
+            smallIconText = true;
+        }
+
+
         pHost->mDiscordAccessFlags = static_cast<Host::DiscordOptionFlags>(
                                          (checkBox_discordServerAccessToLargeIcon->isChecked() ? Host::DiscordSetLargeIcon : Host::DiscordNoOption)
                                          | (checkBox_discordServerAccessToLargeIconText->isChecked() ? Host::DiscordSetLargeIconText : Host::DiscordNoOption)
-                                         | (checkBox_discordServerAccessToSmallIcon->isChecked() ? Host::DiscordSetSmallIcon : Host::DiscordNoOption)
-                                         | (checkBox_discordServerAccessToSmallIconText->isChecked() ? Host::DiscordSetSmallIconText : Host::DiscordNoOption)
+                                         | (smallIcon ? Host::DiscordSetSmallIcon : Host::DiscordNoOption)
+                                         | (smallIconText ? Host::DiscordSetSmallIconText : Host::DiscordNoOption)
                                          | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordSetDetail : Host::DiscordNoOption)
                                          | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordSetState : Host::DiscordNoOption)
-                                         | (groupBox_discordServerAccess->isChecked() ? Host::DiscordServerAccessEnabled : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccess->isChecked() ? Host::DiscordServerAccessEnabled : Host::DiscordNoOption)
                                          | (checkBox_discordPresenceIsServerSettable->isChecked() ? Host::DiscordSetPresenceId : Host::DiscordNoOption)
                                          | (checkBox_discordServerAccessToUserName->isChecked() ? Host::DiscordSetUserName : Host::DiscordNoOption)
                                          | (checkBox_discordLuaAPI->isChecked() ? Host::DiscordLuaAccessEnabled : Host::DiscordNoOption));
