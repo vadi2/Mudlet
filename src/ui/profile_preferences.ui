@@ -2476,7 +2476,7 @@
           </item>
           <item>
            <property name="text">
-            <string>Hide small icon</string>
+            <string>Hide small icon tooltip</string>
            </property>
           </item>
           <item>
@@ -2544,17 +2544,17 @@
           </property>
           <item>
            <property name="text">
-            <string>Don't hide small icon or tooltip</string>
+            <string>Don't hide large icon or tooltip</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>Hide small icon</string>
+            <string>Hide large icon tooltip</string>
            </property>
           </item>
           <item>
            <property name="text">
-            <string>Hide small icon and tooltip</string>
+            <string>Hide large icon and tooltip</string>
            </property>
           </item>
          </widget>
