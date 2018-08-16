@@ -177,11 +177,6 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
                                                                                 "<p><i>This is a temporary arrangement and will likely to change when Mudlet gains "
                                                                                 "full support for languages other than English.</i></p>")));
 
-    checkBox_discordPresenceIsServerSettable->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked to enable the Game Server to supply its own Discord <tt>PresenceId</tt> which "
-                                                                                "will be needed to access Icons that have been uploaded to its Discord Guild (Server) to be used for "
-                                                                                "your Rich Presence. If this option is unchecked then either Mudlet's own set of Icons (or those of "
-                                                                                "the override presence set below) specify what icons can be accessed which will prevent the Game "
-                                                                                "Server from using ones that it does not know about.</p>")));
     checkBox_discordServerAccessToDetail->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the upper line of text in the Rich Presence.</p>")));
     checkBox_discordServerAccessToState->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the lower line of text in the Rich Presence.</p>")));
 
@@ -496,7 +491,6 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         checkBox_discordServerAccessToUserName->setChecked(discordFlags & Host::DiscordSetUserName);
         checkBox_discordServerAccessToDetail->setChecked(discordFlags & Host::DiscordSetDetail);
         checkBox_discordServerAccessToState->setChecked(discordFlags & Host::DiscordSetState);
-        checkBox_discordPresenceIsServerSettable->setChecked(discordFlags & Host::DiscordSetPresenceId);
         lineEdit_discordUserName->setText(pHost->mRequiredDiscordUserName);
         lineEdit_discordUserDiscriminator->setText(pHost->mRequiredDiscordUserDiscriminator);
     }
@@ -914,7 +908,6 @@ void dlgProfilePreferences::clearHostDetails()
     checkBox_discordServerAccessToUserName->setChecked(false);
     checkBox_discordServerAccessToDetail->setChecked(false);
     checkBox_discordServerAccessToState->setChecked(false);
-    checkBox_discordPresenceIsServerSettable->setChecked(false);
     lineEdit_discordUserName->clear();
     lineEdit_discordUserDiscriminator->clear();
 }
@@ -2133,7 +2126,6 @@ void dlgProfilePreferences::slot_save_and_exit()
                                          | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordSetDetail : Host::DiscordNoOption)
                                          | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordSetState : Host::DiscordNoOption)
                                          | (checkBox_discordServerAccess->isChecked() ? Host::DiscordServerAccessEnabled : Host::DiscordNoOption)
-                                         | (checkBox_discordPresenceIsServerSettable->isChecked() ? Host::DiscordSetPresenceId : Host::DiscordNoOption)
                                          | (checkBox_discordServerAccessToUserName->isChecked() ? Host::DiscordSetUserName : Host::DiscordNoOption)
                                          | (checkBox_discordLuaAPI->isChecked() ? Host::DiscordLuaAccessEnabled : Host::DiscordNoOption));
 

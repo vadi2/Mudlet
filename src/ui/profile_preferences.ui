@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>755</width>
-    <height>865</height>
+    <height>746</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -2335,13 +2335,6 @@
             </property>
            </widget>
           </item>
-          <item row="5" column="1">
-           <widget class="QCheckBox" name="checkBox_discordServerAccess">
-            <property name="text">
-             <string>Allow Game to set Discord info</string>
-            </property>
-           </widget>
-          </item>
           <item row="4" column="1">
            <widget class="QCheckBox" name="checkBox_discordServerAccessToTimerInfo">
             <property name="text">
@@ -2379,16 +2372,6 @@
               <string>Hide small icon and tooltip</string>
              </property>
             </item>
-           </widget>
-          </item>
-          <item row="5" column="0">
-           <widget class="QCheckBox" name="checkBox_discordPresenceIsServerSettable">
-            <property name="text">
-             <string>Set PresenceId</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
            </widget>
           </item>
           <item row="4" column="0">
@@ -2437,6 +2420,13 @@
             </property>
             <property name="checked">
              <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QCheckBox" name="checkBox_discordServerAccess">
+            <property name="text">
+             <string>Allow Game to set Discord info</string>
             </property>
            </widget>
           </item>

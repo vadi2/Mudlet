@@ -702,35 +702,11 @@ void cTelnet::processTelnetCommand(const string& command)
                 _h += "External.Discord.Hello";
                 QStringList discordUserDetails = mudlet::self()->mDiscord.getDiscordUserDetails();
                 QString infoMessage;
-                if (!discordUserDetails.isEmpty() && (mpHost->mDiscordAccessFlags & Host::DiscordSetUserName)) {
-
-                    _h += QStringLiteral(" [ user: \"%1#%2\", private: true, presenceidinuse: \"%3\", canchangepresenceid: %4 ]")
+                if (!discordUserDetails.isEmpty()) {
+                    _h += QStringLiteral(" [ user: \"%1#%2\" ]")
                           .arg(discordUserDetails.at(0),
-                               discordUserDetails.at(2),
-                               mudlet::self()->mDiscord.getPresenceId(mpHost),
-                               (mpHost->mDiscordAccessFlags & Host::DiscordSetPresenceId) ? QLatin1String("true") : QLatin1String("false"))
+                               discordUserDetails.at(2))
                           .toUtf8().constData();
-
-                    if (mpHost->mDiscordAccessFlags & Host::DiscordSetPresenceId) {
-                        infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Username and Rich "
-                                                     "Presence Server is allowed to modify Server to match Game.");
-                    } else {
-                        infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Username and Rich "
-                                                     "Presence Server is prohibited from modifying Server.");
-                    }
-                } else {
-                    _h += QStringLiteral(" [ presenceidinuse: \"%1\", canchangepresenceid: %2 ]")
-                          .arg(mudlet::self()->mDiscord.getPresenceId(mpHost),
-                               (mpHost->mDiscordAccessFlags & Host::DiscordSetPresenceId) ? QLatin1String("true") : QLatin1String("false"))
-                          .toUtf8().constData();
-
-                    if (mpHost->mDiscordAccessFlags & Host::DiscordSetPresenceId) {
-                        infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Rich Presence Guild,"
-                                                     "Server is allowed to modify Guild to match Game.");
-                    } else {
-                        infoMessage = tr("[ INFO ]  - Informing Game Server (via GMCP) of Discord Rich Presence Guild,"
-                                                     "Server is prohibited from modifying Guild.");
-                    }
                 }
                 _h += TN_IAC;
                 _h += TN_SE;

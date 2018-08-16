@@ -1466,7 +1466,7 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
         bool hasPresenceId = false;
         bool hasCustomPresence = false;
         auto presenceId = json.value(QStringLiteral("presenceid"));
-        if ((presenceId != QJsonValue::Undefined) && (mDiscordAccessFlags & DiscordSetPresenceId)) {
+        if (presenceId != QJsonValue::Undefined) {
             hasPresenceId = true;
             if (presenceId.toString() == Discord::csmMudletPresenceId) {
                 pMudlet->mDiscord.setPresence(this, QString());

@@ -82,7 +82,6 @@ public:
         DiscordSetUserName = 0x40,
         DiscordSetPartyInfo = 0x80,
         DiscordSetTimeInfo = 0x100,
-        DiscordSetPresenceId = 0x200,
         DiscordSetSubMask = 0x3ff,
         DiscordServerAccessEnabled = 0x400, // This one enables consideration of above bits
         DiscordLuaAccessEnabled = 0x800
