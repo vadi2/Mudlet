@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>718</width>
-    <height>726</height>
+    <width>755</width>
+    <height>745</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -2258,7 +2258,7 @@
           <item row="3" column="0">
            <widget class="QCheckBox" name="checkBox_discordServerAccessToPartyInfo">
             <property name="text">
-             <string>Show party details</string>
+             <string>Hide party details</string>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -2384,7 +2384,7 @@
           <item row="3" column="1">
            <widget class="QCheckBox" name="checkBox_discordServerAccessToTimerInfo">
             <property name="text">
-             <string>Set timer details</string>
+             <string>Hide timer</string>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -2426,7 +2426,7 @@
           <item row="2" column="0">
            <widget class="QCheckBox" name="checkBox_discordServerAccessToState">
             <property name="text">
-             <string>Show state</string>
+             <string>Hide state</string>
             </property>
             <property name="checked">
              <bool>true</bool>
