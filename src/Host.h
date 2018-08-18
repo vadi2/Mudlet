@@ -79,7 +79,6 @@ public:
         DiscordSetLargeIconText = 0x08,
         DiscordSetSmallIcon = 0x10,
         DiscordSetSmallIconText = 0x20,
-        DiscordSetUserName = 0x40,
         DiscordSetPartyInfo = 0x80,
         DiscordSetTimeInfo = 0x100,
         DiscordSetSubMask = 0x3ff,

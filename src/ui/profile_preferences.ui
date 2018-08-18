@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>755</width>
-    <height>745</height>
+    <height>747</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -2255,34 +2255,33 @@
           <string>Discord privacy</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
-          <item row="3" column="0">
-           <widget class="QCheckBox" name="checkBox_discordServerAccessToPartyInfo">
-            <property name="text">
-             <string>Hide party details</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QCheckBox" name="checkBox_discordServerAccessToDetail">
-            <property name="text">
-             <string>Hide detail</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="0">
+          <item row="0" column="0" colspan="2">
            <widget class="QCheckBox" name="checkBox_discordServerAccess">
             <property name="text">
-             <string>Allow Game to set Discord info</string>
+             <string>Disable game Discord info</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="1">
+          <item row="1" column="0" colspan="2">
+           <widget class="QComboBox" name="comboBox_discordLargeIconPrivacy">
+            <item>
+             <property name="text">
+              <string>Don't hide large icon or tooltip</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Hide large icon tooltip</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Hide large icon and tooltip</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="2">
            <widget class="QComboBox" name="comboBox_discordSmallIconPrivacy">
             <item>
              <property name="text">
@@ -2301,7 +2300,14 @@
             </item>
            </widget>
           </item>
-          <item row="5" column="0">
+          <item row="3" column="0" colspan="2">
+           <widget class="QCheckBox" name="checkBox_discordServerAccessToPartyInfo">
+            <property name="text">
+             <string>Hide party details</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0" rowspan="2" colspan="3">
            <widget class="QWidget" name="widget_discordUser" native="true">
             <property name="enabled">
              <bool>true</bool>
@@ -2326,52 +2332,59 @@
                </property>
               </widget>
              </item>
-             <item>
-              <widget class="QLineEdit" name="lineEdit_discordUserName">
-               <property name="alignment">
-                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-               </property>
-               <property name="placeholderText">
-                <string>specific Discord username</string>
-               </property>
-               <property name="clearButtonEnabled">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_discordUserDiscriminator">
-               <property name="text">
-                <string> # </string>
-               </property>
-              </widget>
-             </item>
-             <item alignment="Qt::AlignLeft">
-              <widget class="QLineEdit" name="lineEdit_discordUserDiscriminator">
-               <property name="maximumSize">
-                <size>
-                 <width>75</width>
-                 <height>16777215</height>
-                </size>
-               </property>
-               <property name="inputMethodHints">
-                <set>Qt::ImhDigitsOnly</set>
-               </property>
-               <property name="inputMask">
-                <string>9999;#</string>
-               </property>
-               <property name="maxLength">
-                <number>4</number>
-               </property>
-               <property name="clearButtonEnabled">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
             </layout>
            </widget>
           </item>
-          <item row="0" column="1">
+          <item row="5" column="1" colspan="3">
+           <layout class="QHBoxLayout" name="horizontalLayout_4">
+            <property name="spacing">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QLineEdit" name="lineEdit_discordUserName">
+              <property name="alignment">
+               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+              </property>
+              <property name="placeholderText">
+               <string>specific Discord username</string>
+              </property>
+              <property name="clearButtonEnabled">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_discordUserDiscriminator">
+              <property name="text">
+               <string> # </string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="lineEdit_discordUserDiscriminator">
+              <property name="maximumSize">
+               <size>
+                <width>75</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="inputMethodHints">
+               <set>Qt::ImhDigitsOnly</set>
+              </property>
+              <property name="inputMask">
+               <string>9999;#</string>
+              </property>
+              <property name="maxLength">
+               <number>4</number>
+              </property>
+              <property name="clearButtonEnabled">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="0" column="2" colspan="2">
            <widget class="QCheckBox" name="checkBox_discordLuaAPI">
             <property name="text">
              <string>Enable Lua API</string>
@@ -2381,55 +2394,24 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="1">
-           <widget class="QCheckBox" name="checkBox_discordServerAccessToTimerInfo">
+          <item row="1" column="2" colspan="2">
+           <widget class="QCheckBox" name="checkBox_discordServerAccessToDetail">
             <property name="text">
-             <string>Hide timer</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
+             <string>Hide detail</string>
             </property>
            </widget>
           </item>
-          <item row="4" column="1" rowspan="2">
-           <widget class="QCheckBox" name="checkBox_discordServerAccessToUserName">
-            <property name="toolTip">
-             <string>Hide Discord username from the game</string>
-            </property>
-            <property name="text">
-             <string>Hide username from game</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="1">
-           <widget class="QComboBox" name="comboBox_discordLargeIconPrivacy">
-            <item>
-             <property name="text">
-              <string>Don't hide large icon or tooltip</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide large icon tooltip</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide large icon and tooltip</string>
-             </property>
-            </item>
-           </widget>
-          </item>
-          <item row="2" column="0">
+          <item row="2" column="2" colspan="2">
            <widget class="QCheckBox" name="checkBox_discordServerAccessToState">
             <property name="text">
              <string>Hide state</string>
             </property>
-            <property name="checked">
-             <bool>true</bool>
+           </widget>
+          </item>
+          <item row="3" column="2" colspan="2">
+           <widget class="QCheckBox" name="checkBox_discordServerAccessToTimerInfo">
+            <property name="text">
+             <string>Hide timer</string>
             </property>
            </widget>
           </item>

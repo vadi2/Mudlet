@@ -180,8 +180,6 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
     checkBox_discordServerAccessToDetail->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the upper line of text in the Rich Presence.</p>")));
     checkBox_discordServerAccessToState->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set the lower line of text in the Rich Presence.</p>")));
 
-    checkBox_discordServerAccessToUserName->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can find out your Discord user name. This may be useful "
-                                                                              "for it to know as it may enable authenticated communications or other features via Discord.</p>")));
     checkBox_discordServerAccessToPartyInfo->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set additional '(X of Y)` party infomation at the "
                                                                                "end of the the lower line of text in the Rich Presence.</p>")));
     checkBox_discordServerAccessToTimerInfo->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set additional time elapsed or time remaining "
@@ -470,7 +468,7 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         Host::DiscordOptionFlags discordFlags = pHost->mDiscordAccessFlags;
         groupBox_discordPrivacy->show();
         checkBox_discordLuaAPI->setChecked(discordFlags & Host::DiscordLuaAccessEnabled);
-        checkBox_discordServerAccess->setChecked(discordFlags & Host::DiscordServerAccessEnabled);
+        checkBox_discordServerAccess->setChecked(!(discordFlags & Host::DiscordServerAccessEnabled));
 
         if (!(discordFlags & Host::DiscordSetLargeIcon) && !(discordFlags & Host::DiscordSetLargeIconText)) {
             comboBox_discordLargeIconPrivacy->setCurrentIndex(0);
@@ -488,7 +486,6 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
             comboBox_discordSmallIconPrivacy->setCurrentIndex(2);
         }
 
-        checkBox_discordServerAccessToUserName->setChecked(discordFlags & Host::DiscordSetUserName);
         checkBox_discordServerAccessToDetail->setChecked(!(discordFlags & Host::DiscordSetDetail));
         checkBox_discordServerAccessToState->setChecked(!(discordFlags & Host::DiscordSetState);
         lineEdit_discordUserName->setText(pHost->mRequiredDiscordUserName);
@@ -905,7 +902,6 @@ void dlgProfilePreferences::clearHostDetails()
     checkBox_discordServerAccess->setChecked(false);
     comboBox_discordLargeIconPrivacy->setCurrentIndex(0);
     comboBox_discordSmallIconPrivacy->setCurrentIndex(0);
-    checkBox_discordServerAccessToUserName->setChecked(false);
     checkBox_discordServerAccessToDetail->setChecked(false);
     checkBox_discordServerAccessToState->setChecked(false);
     lineEdit_discordUserName->clear();
@@ -2125,8 +2121,7 @@ void dlgProfilePreferences::slot_save_and_exit()
                                          | (smallIconText ? Host::DiscordSetSmallIconText : Host::DiscordNoOption)
                                          | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordNoOption : Host::DiscordSetDetail)
                                          | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordNoOption : Host::DiscordSetState)
-                                         | (checkBox_discordServerAccess->isChecked() ? Host::DiscordServerAccessEnabled : Host::DiscordNoOption)
-                                         | (checkBox_discordServerAccessToUserName->isChecked() ? Host::DiscordSetUserName : Host::DiscordNoOption)
+                                         | (checkBox_discordServerAccess->isChecked() ? Host::DiscordNoOption : Host::DiscordServerAccessEnabled)
                                          | (checkBox_discordLuaAPI->isChecked() ? Host::DiscordLuaAccessEnabled : Host::DiscordNoOption));
 
         pHost->mRequiredDiscordUserName = lineEdit_discordUserName->text().trimmed();
