@@ -167,7 +167,7 @@ public:
     ~Discord() override;
 
     bool libraryLoaded();
-    bool isUsingDefaultDiscordPresence(Host*) const;
+    bool usingMudletsDiscordID(Host*) const;
 
     void UpdatePresence();
 

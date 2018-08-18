@@ -1305,7 +1305,7 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
             // * the LargeImageText (with MUD name and also with the server URL if given permission)
             // * the Detail text with "Playing <Mudname>" if using Mudlet Discord Presence Id or "Using Mudlet Mud client" if not
             QPair<bool, QString> integrationTestResult = pMudlet->mDiscord.gameIntegrationSupported(getUrl());
-            if (pMudlet->mDiscord.isUsingDefaultDiscordPresence(this)) {
+            if (pMudlet->mDiscord.usingMudletsDiscordID(this)) {
                 // We are (still) on the Mudlet Server so can use that one's
                 // assets - this also means that the RP will be saying
                 // "Playing Mudlet"

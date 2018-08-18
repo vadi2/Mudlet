@@ -10410,7 +10410,7 @@ int TLuaInterpreter::isUsingDefaultDiscordPresenceId(lua_State* L)
         return 2;
     }
 
-    lua_pushboolean(L, pMudlet->mDiscord.isUsingDefaultDiscordPresence(&host));
+    lua_pushboolean(L, pMudlet->mDiscord.usingMudletsDiscordID(&host));
     return 1;
 }
 

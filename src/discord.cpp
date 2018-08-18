@@ -614,7 +614,7 @@ void localDiscordPresence::setSpectateSecret(const QString& text)
     strncpy(mSpectateSecret, text.toUtf8().constData(), 127);
 }
 
-bool Discord::isUsingDefaultDiscordPresence(Host* pHost) const
+bool Discord::usingMudletsDiscordID(Host* pHost) const
 {
     return (! mHostPresenceIds.contains(pHost));
 }
