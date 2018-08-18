@@ -487,7 +487,7 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         }
 
         checkBox_discordServerAccessToDetail->setChecked(!(discordFlags & Host::DiscordSetDetail));
-        checkBox_discordServerAccessToState->setChecked(!(discordFlags & Host::DiscordSetState);
+        checkBox_discordServerAccessToState->setChecked(!(discordFlags & Host::DiscordSetState));
         lineEdit_discordUserName->setText(pHost->mRequiredDiscordUserName);
         lineEdit_discordUserDiscriminator->setText(pHost->mRequiredDiscordUserDiscriminator);
     }
