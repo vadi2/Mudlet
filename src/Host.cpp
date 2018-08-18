@@ -1306,15 +1306,12 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
             // * the Detail text with "Playing <Mudname>" if using Mudlet Discord Presence Id or "Using Mudlet Mud client" if not
             QPair<bool, QString> integrationTestResult = pMudlet->mDiscord.gameIntegrationSupported(getUrl());
             if (pMudlet->mDiscord.usingMudletsDiscordID(this)) {
-                // We are (still) on the Mudlet Server so can use that one's
-                // assets - this also means that the RP will be saying
-                // "Playing Mudlet"
                 if (integrationTestResult.first) {
                     if (integrationTestResult.second != QLatin1String("localhost")) {
                         // This seems to be the name of a Server that we know of
-                            pMudlet->mDiscord.setDetailText(this, tr("Playing %1").arg(integrationTestResult.second));
-                            pMudlet->mDiscord.setLargeImage(this, integrationTestResult.second);
-                            pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
+                        pMudlet->mDiscord.setDetailText(this, tr("Playing %1").arg(integrationTestResult.second));
+                        pMudlet->mDiscord.setLargeImage(this, integrationTestResult.second);
+                        pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
                     } else {
                         // Off-line - using localhost - just display Mudlet icon
                         // although at time of writing it wasn't up on Server
