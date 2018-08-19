@@ -1297,23 +1297,13 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
 
     mudlet* pMudlet = mudlet::self();
     if (packageMessage == QLatin1String("External.Discord.Status")) {
-        // Perhaps this should be deprecated in favour of setting the elements directly:
         auto gameName = json.value(QStringLiteral("game"));
         if (gameName != QJsonValue::Undefined) {
-            // This could set:
-            // * the LargeImage (if using the Mudlet presence id and it is a known game) - or a standard Server provided one if it has the same name as the
-            // * the LargeImageText (with MUD name and also with the server URL if given permission)
-            // * the Detail text with "Playing <Mudname>" if using Mudlet Discord Presence Id or "Using Mudlet Mud client" if not
             QPair<bool, QString> integrationTestResult = pMudlet->mDiscord.gameIntegrationSupported(getUrl());
             if (integrationTestResult.first && pMudlet->mDiscord.usingMudletsDiscordID(this)) {
-                if (integrationTestResult.first) {
-                    // This seems to be the name of a Server that we know of
-                    pMudlet->mDiscord.setDetailText(this, tr("Playing %1").arg(integrationTestResult.second));
-                    pMudlet->mDiscord.setLargeImage(this, integrationTestResult.second);
-                    pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
-                }
-                // else We have no idea what the Mud is...
-
+                pMudlet->mDiscord.setDetailText(this, tr("Playing %1").arg(integrationTestResult.second));
+                pMudlet->mDiscord.setLargeImage(this, integrationTestResult.second);
+                pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
             } else {
                 // We are using a different Presence Id, so the top line is
                 // likely to be saying "Playing MudName", and we have no ideal
