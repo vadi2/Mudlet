@@ -35,7 +35,7 @@ QString Discord::smUserName;
 QString Discord::smUserId;
 QString Discord::smDiscriminator;
 QString Discord::smAvatar;
-const QString Discord::csmMudletPresenceId = QLatin1String("450571881909583884");
+const QString Discord::mMudletPresenceId = QLatin1String("450571881909583884");
 
 Discord::Discord(QObject* parent)
 : QObject(parent)
@@ -46,7 +46,7 @@ Discord::Discord(QObject* parent)
 // "midmud"  is "460618737712889858", has "server-icon", "exventure" and "mudlet" icons
 // "carinus" is "438335628942376960", has "server-icon" and "mudlet" icons
 // "wotmud"  is "464945517156106240", has "mudlet", "ajar_(red|green|yellow|blue|white|grey|brown)"
-, mHostPresenceIds{{nullptr, csmMudletPresenceId}}
+, mHostPresenceIds{{nullptr, mMudletPresenceId}}
 // lowercase list of known games
 // {game name, {game addresses}}
 // The values are not currently used!

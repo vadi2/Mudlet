@@ -204,7 +204,7 @@ public:
     bool discordUserIdMatch(Host* pHost) const;
 
 
-    const static QString csmMudletPresenceId;
+    const static QString mMudletPresenceId;
 
 
 private:

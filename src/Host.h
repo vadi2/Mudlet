@@ -451,8 +451,6 @@ private:
     // keeps track of all of the array writers we're currently operating with
     QHash<QString, XMLexport*> writers;
 
-    void installPackageFonts(const QString &packageName);
-
     // Will be null/empty if is to use Mudlet's default/own presence
     QString mDiscordPresenceId;
 
@@ -463,6 +461,10 @@ private:
     // we won't use Discord functions.
     QString mRequiredDiscordUserName;
     QString mRequiredDiscordUserDiscriminator;
+
+    void processGMCPDiscordStatus(const QJsonObject& discordInfo);
+    void processGMCPDiscordInfo(const QJsonObject& discordInfo);
+    void installPackageFonts(const QString &packageName);
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(Host::DiscordOptionFlags)

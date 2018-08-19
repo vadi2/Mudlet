@@ -1295,203 +1295,162 @@ void Host::processDiscordGMCP(const QString& packageMessage, const QString& data
         return;
     }
 
-    mudlet* pMudlet = mudlet::self();
     if (packageMessage == QLatin1String("External.Discord.Status")) {
-        auto gameName = json.value(QStringLiteral("game"));
-        if (gameName != QJsonValue::Undefined) {
-            QPair<bool, QString> integrationTestResult = pMudlet->mDiscord.gameIntegrationSupported(getUrl());
-            if (integrationTestResult.first && pMudlet->mDiscord.usingMudletsDiscordID(this)) {
-                pMudlet->mDiscord.setDetailText(this, tr("Playing %1").arg(integrationTestResult.second));
-                pMudlet->mDiscord.setLargeImage(this, integrationTestResult.second);
-                pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
-            } else {
-                // We are using a different Presence Id, so the top line is
-                // likely to be saying "Playing MudName", and we have no ideal
-                // as to the icon keys to use, try "server-icon" for the large
-                // icon:
-                if (integrationTestResult.first) {
-                    if (integrationTestResult.second != QLatin1String("localhost")) {
-
-                            // The top fixed line of the RP will be saying
-                            // "Playing Mudname" already....
-                            pMudlet->mDiscord.setDetailText(this, tr("Using Mudlet MUD client"));
-
-                            pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
-
-                            pMudlet->mDiscord.setLargeImage(this, QLatin1String("server-icon"));
-
-                    } else {
-                        // Off-line - using localhost - just display Mudlet icon
-                        // assuming Server is carrying the icon:
-                        if (mDiscordAccessFlags & DiscordSetDetail) {
-                            pMudlet->mDiscord.setDetailText(this, tr("Off-line from any Mud"));
-                        }
-                            pMudlet->mDiscord.setLargeImage(this, QLatin1String("mudlet"));
-                            pMudlet->mDiscord.setLargeImageText(this, tr("Not connected"));
-                    }
-                }
-                // else We have no idea what the Mud is...
-
-            } // End of else we are using a different presenceId
-        } // End of if gamename defined
-
-        // It is more straightforward to set the elements directly:
-        auto details = json.value(QStringLiteral("details"));
-        if (details != QJsonValue::Undefined) {
-            pMudlet->mDiscord.setDetailText(this, details.toString());
-        }
-
-        auto state = json.value(QStringLiteral("state"));
-        if (state != QJsonValue::Undefined) {
-            pMudlet->mDiscord.setStateText(this, state.toString());
-        }
-
-        auto largeImages = json.value(QStringLiteral("largeimage"));
-        if (largeImages != QJsonValue::Undefined) {
-            auto largeImage = largeImages.toArray().first();
-            if (largeImage != QJsonValue::Undefined) {
-                pMudlet->mDiscord.setSmallImage(this, largeImage.toString());
-            }
-        }
-
-        auto largeImageText = json.value(QStringLiteral("largeimagetext"));
-        if (largeImageText != QJsonValue::Undefined) {
-            pMudlet->mDiscord.setSmallImageText(this, largeImageText.toString());
-        }
-
-        auto smallImages = json.value(QStringLiteral("smallimage"));
-        if (smallImages != QJsonValue::Undefined) {
-            auto smallImage = smallImages.toArray().first();
-            if (smallImage != QJsonValue::Undefined) {
-                pMudlet->mDiscord.setSmallImage(this, smallImage.toString());
-            }
-        }
-
-        auto smallImageText = json.value(QStringLiteral("smallimagetext"));
-        if ((smallImageText != QJsonValue::Undefined)) {
-            pMudlet->mDiscord.setSmallImageText(this, smallImageText.toString());
-        }
-
-            // Use -1 so we can detect (at least during debugging) that a ZERO
-            // value has been seen:
-            int64_t timeStamp = -1;
-            auto endTimeStamp = json.value(QStringLiteral("endtime"));
-            if (endTimeStamp.isDouble()) {
-                // It is not entirely clear from the proposed specification
-                // whether the integral seconds since epoch is a string or a
-                // double, so handle both:
-                // This only works properly when the value is less than
-                // 9007199254740992 but since when I last checked it was
-                //       1533042027 second since beginning of 1970 it should be
-                // good enough!
-                timeStamp = static_cast<int64_t>(endTimeStamp.toDouble());
-                pMudlet->mDiscord.setEndTimeStamp(this, timeStamp);
-            } else if (endTimeStamp.isString()) {
-                timeStamp = endTimeStamp.toString().toLongLong();
-                pMudlet->mDiscord.setEndTimeStamp(this, timeStamp);
-            } else {
-                auto startTimeStamp = json.value(QStringLiteral("starttime"));
-                if (startTimeStamp.isDouble()) {
-                    timeStamp = static_cast<int64_t>(startTimeStamp.toDouble());
-                    pMudlet->mDiscord.setStartTimeStamp(this, timeStamp);
-                } else if (endTimeStamp.isString()) {
-                    timeStamp = endTimeStamp.toString().toLongLong();
-                    pMudlet->mDiscord.setStartTimeStamp(this, timeStamp);
-                }
-                // Else neither timestamps were supplied
-            }
-
-            // Use -1 so we can detect (at least during debugging) that a ZERO
-            // value has been seen:
-            int partySizeValue = -1;
-            int partyMaxValue = -1;
-            auto partyMax = json.value(QStringLiteral("partymax"));
-            auto partySize = json.value(QStringLiteral("partysize"));
-            if (partyMax.isDouble()) {
-                partyMaxValue = static_cast<int>(partyMax.toDouble());
-                if (partyMaxValue > 0) {
-                    if (partySize.isDouble()) {
-                        partySizeValue = static_cast<int>(partySize.toDouble());
-                        pMudlet->mDiscord.setParty(this, partySizeValue, partyMaxValue);
-                    } else {
-                        // Unfortunately this won't work - even after I asked if
-                        // it could be made to:
-                        // https://github.com/discordapp/discord-rpc/issues/212
-                        pMudlet->mDiscord.setParty(this, 0, partyMaxValue);
-                    }
-                } else {
-                    // Switches off the party detail from the RP
-                    pMudlet->mDiscord.setParty(this, 0, 0);
-                }
-            } else {
-                if (partySize.isDouble()) {
-                    partySizeValue = static_cast<int>(partySize.toDouble());
-                    pMudlet->mDiscord.setParty(this, partySizeValue);
-                } else {
-                    pMudlet->mDiscord.setParty(this, 0, 0);
-                }
-            }
-
-
+        processGMCPDiscordStatus(json);
     } else if (packageMessage == QLatin1String("External.Discord.Info")) {
-        bool hasInvite = false;
-        auto inviteUrl = json.value(QStringLiteral("inviteurl"));
-        // Will be of form: "https://discord.gg/#####"
-        if (inviteUrl != QJsonValue::Undefined) {
-            hasInvite = true;
-        }
+        processGMCPDiscordInfo(json);
+    }
+}
 
-        bool hasPresenceId = false;
-        bool hasCustomPresence = false;
-        auto presenceId = json.value(QStringLiteral("presenceid"));
-        if (presenceId != QJsonValue::Undefined) {
-            hasPresenceId = true;
-            if (presenceId.toString() == Discord::csmMudletPresenceId) {
-                pMudlet->mDiscord.setPresence(this, QString());
-            } else {
-                hasCustomPresence = true;
-                if (presenceId.toString() != pMudlet->mDiscord.getPresenceId(this)) {
-                    pMudlet->mDiscord.setPresence(this, presenceId.toString());
-                }
-            }
-        }
+void Host::processGMCPDiscordInfo(const QJsonObject& discordInfo)
+{
+    mudlet* pMudlet = mudlet::self();
+    bool hasInvite = false;
+    auto inviteUrl = discordInfo.value(QStringLiteral("inviteurl"));
+    // Will be of form: "https://discord.gg/#####"
+    if (inviteUrl != QJsonValue::Undefined) {
+        hasInvite = true;
+    }
 
-        // This message is the conclusion to a previous [ INFO ] one letting the
-        // user know that Mudlet is trying to connect their Discord RP to the
-        // Game Server...
-        QString okMsg;
-        if (hasInvite) {
-            if (hasCustomPresence) {
-                okMsg = tr("[  OK  ]  - The Game server has sent you (via GMCP) an invite to it's Discord\n"
-                           "Server at: %1"
-                           "and it has told Mudlet that it will use a custom Presence id.",
-                           "The parameter should be a URL to a Discord Channel").arg(inviteUrl.toString());
-            } else if (hasPresenceId) {
-                okMsg = tr("[  OK  ]  - The Game server has sent you (via GMCP) an invite to it's Discord\n"
-                           "Server at: %1"
-                           "and it has told Mudlet that it will use Mudlet's own Presence id.",
-                           "The parameter should be a URL to a Discord Channel").arg(inviteUrl.toString());
-            } else {
-                okMsg = tr("[  OK  ]  - The Game server has sent you (via GMCP) an invite to it's Discord\n"
-                           "Server at: %1",
-                           "The parameter should be a URL to a Discord Channel").arg(inviteUrl.toString());
-            }
+    bool hasPresenceId = false;
+    bool hasCustomPresence = false;
+    auto presenceId = discordInfo.value(QStringLiteral("presenceid"));
+    if (presenceId != QJsonValue::Undefined) {
+        hasPresenceId = true;
+        if (presenceId.toString() == Discord::mMudletPresenceId) {
+            pMudlet->mDiscord.setPresence(this, QString());
         } else {
-            if (hasCustomPresence) {
-                okMsg = tr("[  OK  ]  - The Game server has told Mudlet (via GMCP) that it will use a\n"
-                           "custom Discord Presence id ...");
-            } else if (hasPresenceId) {
-                okMsg = tr("[  OK  ]  - The Game server has told Mudlet (via GMCP) that it will use\n"
-                           "Mudlet's own Discord Presence id ...");
-            } else {
-                okMsg = tr("[  OK  ]  - The Game server has acknowledged (via GMCP) the Discord details.");
+            hasCustomPresence = true;
+            pMudlet->mDiscord.setPresence(this, presenceId.toString());
+        }
+    }
+
+    if (hasInvite) {
+        if (hasCustomPresence) {
+            qDebug() << "Game using a custom Discord server. Invite URL: " << inviteUrl.toString();
+        } else if (hasPresenceId) {
+            qDebug() << "Game using Mudlets Discord server. Invite URL: " << inviteUrl.toString();
+        } else {
+            qDebug() << "Discord invite URL: " << inviteUrl.toString();
+        }
+    } else {
+        if (hasCustomPresence) {
+            qDebug() << "Game is using custom server Discord PresenceID";
+        } else if (hasPresenceId) {
+            qDebug() << "Game is using Mudlets Discord PresenceID";
+        }
+    }
+}
+
+void Host::processGMCPDiscordStatus(const QJsonObject& discordInfo)
+{
+    auto pMudlet = mudlet::self();
+    auto gameName = discordInfo.value(QStringLiteral("game"));
+    if (gameName != QJsonValue::Undefined) {
+        QPair<bool, QString> integrationTestResult = pMudlet->mDiscord.gameIntegrationSupported(getUrl());
+        if (integrationTestResult.first && pMudlet->mDiscord.usingMudletsDiscordID(this)) {
+            pMudlet->mDiscord.setDetailText(this, tr("Playing %1").arg(integrationTestResult.second));
+            pMudlet->mDiscord.setLargeImage(this, integrationTestResult.second);
+            pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
+        } else {
+            // We are using a different Presence Id, so the top line is
+            // likely to be saying "Playing MudName", and we have no ideal
+            // as to the icon keys to use, try "server-icon" for the large
+            // icon:
+            if (integrationTestResult.first) {
+                pMudlet->mDiscord.setDetailText(this, tr("Using Mudlet"));
+                pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
+                pMudlet->mDiscord.setLargeImage(this, QLatin1String("server-icon"));
             }
         }
-        // May also want some means to obtain from the Server the names {a.k.a. "keys"}
-        // that they provide from their Discord Server - though this will not be
-        // necessary if they provide their own module/package to support using their
-        // resources using the direct access that has been implimented in the Lua
-        // sub-system.
+    }
+
+    auto details = discordInfo.value(QStringLiteral("details"));
+    if (details != QJsonValue::Undefined) {
+        pMudlet->mDiscord.setDetailText(this, details.toString());
+    }
+
+    auto state = discordInfo.value(QStringLiteral("state"));
+    if (state != QJsonValue::Undefined) {
+        pMudlet->mDiscord.setStateText(this, state.toString());
+    }
+
+    auto largeImages = discordInfo.value(QStringLiteral("largeimage"));
+    if (largeImages != QJsonValue::Undefined) {
+        auto largeImage = largeImages.toArray().first();
+        if (largeImage != QJsonValue::Undefined) {
+            pMudlet->mDiscord.setSmallImage(this, largeImage.toString());
+        }
+    }
+
+    auto largeImageText = discordInfo.value(QStringLiteral("largeimagetext"));
+    if (largeImageText != QJsonValue::Undefined) {
+        pMudlet->mDiscord.setSmallImageText(this, largeImageText.toString());
+    }
+
+    auto smallImages = discordInfo.value(QStringLiteral("smallimage"));
+    if (smallImages != QJsonValue::Undefined) {
+        auto smallImage = smallImages.toArray().first();
+        if (smallImage != QJsonValue::Undefined) {
+            pMudlet->mDiscord.setSmallImage(this, smallImage.toString());
+        }
+    }
+
+    auto smallImageText = discordInfo.value(QStringLiteral("smallimagetext"));
+    if ((smallImageText != QJsonValue::Undefined)) {
+        pMudlet->mDiscord.setSmallImageText(this, smallImageText.toString());
+    }
+
+    // Use -1 so we can detect (at least during debugging) that a value of 0
+    // has been seen:
+    int64_t timeStamp = -1;
+    auto endTimeStamp = discordInfo.value(QStringLiteral("endtime"));
+    if (endTimeStamp.isDouble()) {
+        // It is not entirely clear from the proposed specification
+        // whether the integral seconds since epoch is a string or a
+        // double, so handle both:
+        // This only works properly when the value is less than
+        // 9007199254740992 but since when I last checked it was
+        //       1533042027 second since beginning of 1970 it should be
+        // good enough!
+        timeStamp = static_cast<int64_t>(endTimeStamp.toDouble());
+        pMudlet->mDiscord.setEndTimeStamp(this, timeStamp);
+    } else if (endTimeStamp.isString()) {
+        timeStamp = endTimeStamp.toString().toLongLong();
+        pMudlet->mDiscord.setEndTimeStamp(this, timeStamp);
+    } else {
+        auto startTimeStamp = discordInfo.value(QStringLiteral("starttime"));
+        if (startTimeStamp.isDouble()) {
+            timeStamp = static_cast<int64_t>(startTimeStamp.toDouble());
+            pMudlet->mDiscord.setStartTimeStamp(this, timeStamp);
+        } else if (endTimeStamp.isString()) {
+            timeStamp = endTimeStamp.toString().toLongLong();
+            pMudlet->mDiscord.setStartTimeStamp(this, timeStamp);
+        }
+    }
+
+    // Use -1 so we can detect (at least during debugging) that a value of 0
+    // has been seen:
+    int partySizeValue = -1;
+    int partyMaxValue = -1;
+    auto partyMax = discordInfo.value(QStringLiteral("partymax"));
+    auto partySize = discordInfo.value(QStringLiteral("partysize"));
+    if (partyMax.isDouble()) {
+        partyMaxValue = static_cast<int>(partyMax.toDouble());
+        if (partyMaxValue > 0 && partySize.isDouble()) {
+            partySizeValue = static_cast<int>(partySize.toDouble());
+            pMudlet->mDiscord.setParty(this, partySizeValue, partyMaxValue);
+        } else {
+            // Switches off the party detail from the RP
+            pMudlet->mDiscord.setParty(this, 0, 0);
+        }
+    } else {
+        if (partySize.isDouble()) {
+            partySizeValue = static_cast<int>(partySize.toDouble());
+            pMudlet->mDiscord.setParty(this, partySizeValue);
+        } else {
+            pMudlet->mDiscord.setParty(this, 0, 0);
+        }
     }
 }
 
