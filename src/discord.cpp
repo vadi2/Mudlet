@@ -59,10 +59,6 @@ Discord::Discord(QObject* parent)
               {"lusternia", {"lusternia.com", "iron-lus.ironrealms.com"}},
               {"starmourn", {"starmourn.com"}}}
 {
-    qDebug() << "Will search for Discord RPC library file in:";
-    for (QString libraryPath : qApp->libraryPaths()) {
-        qDebug() << "    " << libraryPath;
-    }
     mpLibrary.reset(new QLibrary(QStringLiteral("discord-rpc")));
 
     using Discord_InitializePrototype = void (*)(const char*, DiscordEventHandlers*, int);
@@ -76,7 +72,10 @@ Discord::Discord(QObject* parent)
     Discord_Shutdown = reinterpret_cast<Discord_ShutdownPrototype>(mpLibrary->resolve("Discord_Shutdown"));
 
     if (!Discord_Initialize || !Discord_UpdatePresence || !Discord_RunCallbacks || !Discord_Shutdown) {
-        qDebug() << "Discord integration failure, failed to load functions from library dynamically.";
+        qDebug() << "Could not find Discord library - searched in:";
+        for (auto& libraryPath : qApp->libraryPaths()) {
+            qDebug() << "    " << libraryPath;
+        }
         return;
     }
 
@@ -199,7 +198,7 @@ void Discord::setEndTimeStamp(Host* pHost, int64_t epochTimeStamp)
 void Discord::setParty(Host* pHost, int partySize)
 {
     int validPartySize = qMax(0, partySize);
-    if ( validPartySize ) {
+    if (validPartySize) {
         // Is more than zero:
         if (mPartyMax.value(pHost) < validPartySize) {
             mPartyMax[pHost] = validPartySize;
@@ -366,19 +365,19 @@ void Discord::UpdatePresence()
         pDiscordPresence->setDetailText(mDetailTexts.value(pHost));
     }
     if (pHost->mDiscordAccessFlags & Host::DiscordSetState) {
-    pDiscordPresence->setStateText(mStateTexts.value(pHost));
+        pDiscordPresence->setStateText(mStateTexts.value(pHost));
     }
     if (pHost->mDiscordAccessFlags & Host::DiscordSetLargeIcon) {
-    pDiscordPresence->setLargeImageKey(mLargeImages.value(pHost));
+        pDiscordPresence->setLargeImageKey(mLargeImages.value(pHost));
     }
     if (pHost->mDiscordAccessFlags & Host::DiscordSetLargeIconText) {
-    pDiscordPresence->setLargeImageText(mLargeImageTexts.value(pHost));
+        pDiscordPresence->setLargeImageText(mLargeImageTexts.value(pHost));
     }
     if (pHost->mDiscordAccessFlags & Host::DiscordSetSmallIcon) {
-    pDiscordPresence->setSmallImageKey(mSmallImages.value(pHost));
+        pDiscordPresence->setSmallImageKey(mSmallImages.value(pHost));
     }
     if (pHost->mDiscordAccessFlags & Host::DiscordSetSmallIconText) {
-    pDiscordPresence->setSmallImageText(mSmallImageTexts.value(pHost));
+        pDiscordPresence->setSmallImageText(mSmallImageTexts.value(pHost));
     }
 
     if (mPartyMax.value(pHost) && (pHost->mDiscordAccessFlags & Host::DiscordSetPartyInfo)) {
