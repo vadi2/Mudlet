@@ -252,8 +252,6 @@ QPair<bool, QString> cTelnet::setEncoding(const QString& newEncoding, const bool
     return qMakePair(true, QString());
 }
 
-// Only called from dlgConnectionPreferences when Discord opt-in checkbox state
-// is changed (either by user action or programmatically)
 void cTelnet::requestDiscordInfo()
 {
     mudlet* pMudlet = mudlet::self();
