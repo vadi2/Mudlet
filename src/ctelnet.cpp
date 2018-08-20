@@ -699,16 +699,8 @@ void cTelnet::processTelnetCommand(const string& command)
                 _h += GMCP;
                 _h += "External.Discord.Hello";
                 QStringList discordUserDetails = mudlet::self()->mDiscord.getDiscordUserDetails();
-                QString infoMessage;
-                if (!discordUserDetails.isEmpty()) {
-                    _h += QStringLiteral(" [ user: \"%1#%2\" ]")
-                          .arg(discordUserDetails.at(0),
-                               discordUserDetails.at(2))
-                          .toUtf8().constData();
-                }
                 _h += TN_IAC;
                 _h += TN_SE;
-                postMessage(infoMessage);
 
                 socketOutRaw(_h);
             }
