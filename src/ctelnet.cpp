@@ -1247,7 +1247,6 @@ void cTelnet::setGMCPVariables(const QString& msg)
 
     if (packageMessage.startsWith(QStringLiteral("External.Discord.Status"))
         || packageMessage.startsWith(QStringLiteral("External.Discord.Info"))) {
-
         mpHost->processDiscordGMCP(packageMessage, data);
     }
 
