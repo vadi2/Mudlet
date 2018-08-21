@@ -615,7 +615,7 @@ void localDiscordPresence::setSpectateSecret(const QString& text)
 
 bool Discord::usingMudletsDiscordID(Host* pHost) const
 {
-    return (! mHostPresenceIds.contains(pHost));
+    return (!mHostPresenceIds.contains(pHost));
 }
 
 bool Discord::discordUserIdMatch(Host* pHost) const
