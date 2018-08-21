@@ -430,7 +430,7 @@ public:
     static int getOS(lua_State*);
     static int getAvailableFonts(lua_State* L);
     static int setDiscordPresenceId(lua_State* L);
-    static int isUsingDefaultDiscordPresenceId(lua_State*);
+    static int usingMudletsDiscordID(lua_State*);
     static int setDiscordStateText(lua_State*);
     static int setDiscordDetailText(lua_State*);
     static int setDiscordLargeIcon(lua_State*);

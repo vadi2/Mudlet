@@ -10383,12 +10383,12 @@ int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
 }
 
 // Could be used to check for Discord availability in Lua, will return nil if
-// it is not available or true/false depending on whether it is using Mudlet's
+// it is not available or true/false depending on whether it is using Mudlets
 // own Discord Server and can safely use icon resources that we know
 // about - can also be used as a quick status check as it will return a nil if
 // Discord is NOT currently available with a reason:
-// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#isUsingDefaultDiscordPresenceId
-int TLuaInterpreter::isUsingDefaultDiscordPresenceId(lua_State* L)
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#usingMudletsDiscordID
+int TLuaInterpreter::usingMudletsDiscordID(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
     if (!pMudlet->mDiscord.libraryLoaded()) {
@@ -13153,7 +13153,7 @@ void TLuaInterpreter::initLuaGlobals()
     lua_register(pGlobalLua, "getOS", TLuaInterpreter::getOS);
     lua_register(pGlobalLua, "getAvailableFonts", TLuaInterpreter::getAvailableFonts);
     lua_register(pGlobalLua, "setDiscordPresenceId", TLuaInterpreter::setDiscordPresenceId);
-    lua_register(pGlobalLua, "isUsingDefaultDiscordPresenceId", TLuaInterpreter::isUsingDefaultDiscordPresenceId);
+    lua_register(pGlobalLua, "isUsingDefaultDiscordPresenceId", TLuaInterpreter::usingMudletsDiscordID);
     lua_register(pGlobalLua, "setDiscordStateText", TLuaInterpreter::setDiscordStateText);
     lua_register(pGlobalLua, "setDiscordDetailText", TLuaInterpreter::setDiscordDetailText);
     lua_register(pGlobalLua, "setDiscordLargeIcon", TLuaInterpreter::setDiscordLargeIcon);
