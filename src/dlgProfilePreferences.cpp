@@ -184,7 +184,7 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
                                                                                "end of the the lower line of text in the Rich Presence.</p>")));
     checkBox_discordServerAccessToTimerInfo->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set additional time elapsed or time remaining "
                                                                                "infomation at the bottom of the Rich Presence.</p>")));
-    checkBox_discordLuaAPI->setToolTip(mudlet::htmlWrapper(tr("<p>Needs to be checked to enable Lua API access to the Discord functions.</p>")));
+    checkBox_discordLuaAPI->setToolTip(mudlet::htmlWrapper(tr("<p>Enable Lua API access to the Discord functionality.</p>")));
 
     lineEdit_discordUserName->setToolTip(mudlet::htmlWrapper(tr("<p>When Mudlet connects to the locally running Discord application the latter will report "
                                                                 "the identity which you have logged into it with.  If you have multiple accounts, for instance for "
