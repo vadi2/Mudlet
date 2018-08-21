@@ -186,20 +186,8 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
                                                                                "infomation at the bottom of the Rich Presence.</p>")));
     checkBox_discordLuaAPI->setToolTip(mudlet::htmlWrapper(tr("<p>Enable Lua API access to the Discord functionality.</p>")));
 
-    lineEdit_discordUserName->setToolTip(mudlet::htmlWrapper(tr("<p>When Mudlet connects to the locally running Discord application the latter will report "
-                                                                "the identity which you have logged into it with.  If you have multiple accounts, for instance for "
-                                                                "Mud character separation or other reasons, and if there is a user name entered here or a number to "
-                                                                "the right, and if they do not match the reported details, then Mudlet will refuse to provided a "
-                                                                "Rich Presence for this profile. Changing the entry here will take effect when this dialog is "
-                                                                "saved and closed but it is recommended to restart the profile to ensure that "
-                                                                "activation/deactivation proceeds completely.</p>")));
-    lineEdit_discordUserDiscriminator->setToolTip(mudlet::htmlWrapper(tr("<p>When Mudlet connects to the locally running Discord application the latter will report "
-                                                                         "the identity which you have logged into it with.  If you have multiple accounts, for instance for "
-                                                                         "Mud character separation or other reasons, and if there is a (4 digit) user number entered here or "
-                                                                         "a name to the left, and if they do not match the reported details, then Mudlet will refuse to provided a "
-                                                                         "Rich Presence for this profile. Changing the entry here will take effect when this dialog is "
-                                                                         "saved and closed but it is recommended to restart the profile to ensure that "
-                                                                         "activation/deactivation proceeds completely.</p>")));
+    lineEdit_discordUserName->setToolTip(mudlet::htmlWrapper(tr("<p>Mudlet will only show Rich Presence information while you use this Discord username (useful if you have multiple Discord accounts). Leave empty to show it for any Discord account you log in to.</p>")));
+    lineEdit_discordUserDiscriminator->setToolTip(mudlet::htmlWrapper(tr("<p>Mudlet will only show Rich Presence information while you use this Discord username (useful if you have multiple Discord accounts). Leave empty to show it for any Discord account you log in to.</p>")));
 
 
     connect(checkBox_showSpacesAndTabs, &QAbstractButton::clicked, this, &dlgProfilePreferences::slot_changeShowSpacesAndTabs);
