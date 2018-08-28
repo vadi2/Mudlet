@@ -1313,20 +1313,20 @@ void Host::processGMCPDiscordInfo(const QJsonObject& discordInfo)
     }
 
     bool hasApplicationId = false;
-    bool hasCustomPresence = false;
+    bool hasCustomAppID = false;
     auto appID = discordInfo.value(QStringLiteral("applicationid"));
     if (appID != QJsonValue::Undefined) {
         hasApplicationId = true;
         if (appID.toString() == Discord::mMudletApplicationId) {
             pMudlet->mDiscord.setApplicationID(this, QString());
         } else {
-            hasCustomPresence = true;
+            hasCustomAppID = true;
             pMudlet->mDiscord.setApplicationID(this, appID.toString());
         }
     }
 
     if (hasInvite) {
-        if (hasCustomPresence) {
+        if (hasCustomAppID) {
             qDebug() << "Game using a custom Discord server. Invite URL: " << inviteUrl.toString();
         } else if (hasApplicationId) {
             qDebug() << "Game using Mudlets Discord server. Invite URL: " << inviteUrl.toString();
@@ -1334,7 +1334,7 @@ void Host::processGMCPDiscordInfo(const QJsonObject& discordInfo)
             qDebug() << "Discord invite URL: " << inviteUrl.toString();
         }
     } else {
-        if (hasCustomPresence) {
+        if (hasCustomAppID) {
             qDebug() << "Game is using custom server Discord application ID";
         } else if (hasApplicationId) {
             qDebug() << "Game is using Mudlets Discord application ID";
@@ -1347,19 +1347,17 @@ void Host::processGMCPDiscordStatus(const QJsonObject& discordInfo)
     auto pMudlet = mudlet::self();
     auto gameName = discordInfo.value(QStringLiteral("game"));
     if (gameName != QJsonValue::Undefined) {
-        QPair<bool, QString> integrationTestResult = pMudlet->mDiscord.gameIntegrationSupported(getUrl());
-        if (integrationTestResult.first && pMudlet->mDiscord.usingMudletsDiscordID(this)) {
-            pMudlet->mDiscord.setDetailText(this, tr("Playing %1").arg(integrationTestResult.second));
-            pMudlet->mDiscord.setLargeImage(this, integrationTestResult.second);
-            pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
+        QPair<bool, QString> richPresenceSupported = pMudlet->mDiscord.gameIntegrationSupported(getUrl());
+        if (richPresenceSupported.first && pMudlet->mDiscord.usingMudletsDiscordID(this)) {
+            pMudlet->mDiscord.setDetailText(this, tr("Playing %1").arg(richPresenceSupported.second));
+            pMudlet->mDiscord.setLargeImage(this, richPresenceSupported.second);
+            pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(richPresenceSupported.second, getUrl(), QString::number(getPort())));
         } else {
-            // We are using a different application id, so the top line is
-            // likely to be saying "Playing MudName", and we have no ideal
-            // as to the icon keys to use, try "server-icon" for the large
-            // icon:
-            if (integrationTestResult.first) {
+            // We are using a custom application id, so the top line is
+            // likely to be saying "Playing MudName"
+            if (richPresenceSupported.first) {
                 pMudlet->mDiscord.setDetailText(this, tr("Using Mudlet"));
-                pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
+                pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(richPresenceSupported.second, getUrl(), QString::number(getPort())));
                 pMudlet->mDiscord.setLargeImage(this, QLatin1String("server-icon"));
             }
         }
