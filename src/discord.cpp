@@ -408,6 +408,9 @@ void Discord::UpdatePresence()
             pDiscordPresence->setEndTimeStamp(0);
             pDiscordPresence->setStartTimeStamp(mStartTimes.value(pHost, 0));
         }
+    } else {
+        pDiscordPresence->setEndTimeStamp(0);
+        pDiscordPresence->setStartTimeStamp(0);
     }
 
     // Convert our stored presence into the format that the RPC library wants:

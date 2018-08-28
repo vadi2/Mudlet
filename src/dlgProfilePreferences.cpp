@@ -476,6 +476,7 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         checkBox_discordServerAccessToDetail->setChecked(!(discordFlags & Host::DiscordSetDetail));
         checkBox_discordServerAccessToState->setChecked(!(discordFlags & Host::DiscordSetState));
         checkBox_discordServerAccessToPartyInfo->setChecked(!(discordFlags & Host::DiscordSetPartyInfo));
+        checkBox_discordServerAccessToTimerInfo->setChecked(!(discordFlags & Host::DiscordSetTimeInfo));
         lineEdit_discordUserName->setText(pHost->mRequiredDiscordUserName);
         lineEdit_discordUserDiscriminator->setText(pHost->mRequiredDiscordUserDiscriminator);
     }
@@ -892,6 +893,7 @@ void dlgProfilePreferences::clearHostDetails()
     checkBox_discordServerAccessToDetail->setChecked(false);
     checkBox_discordServerAccessToState->setChecked(false);
     checkBox_discordServerAccessToPartyInfo->setChecked(false);
+    checkBox_discordServerAccessToTimerInfo->setChecked(false);
     lineEdit_discordUserName->clear();
     lineEdit_discordUserDiscriminator->clear();
 }
@@ -2110,6 +2112,7 @@ void dlgProfilePreferences::slot_save_and_exit()
                                          | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordNoOption : Host::DiscordSetDetail)
                                          | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordNoOption : Host::DiscordSetState)
                                          | (checkBox_discordServerAccessToPartyInfo->isChecked() ? Host::DiscordNoOption : Host::DiscordSetPartyInfo)
+                                         | (checkBox_discordServerAccessToTimerInfo->isChecked() ? Host::DiscordNoOption : Host::DiscordSetTimeInfo)
                                          | (checkBox_discordLuaAPI->isChecked() ? Host::DiscordLuaAccessEnabled : Host::DiscordNoOption));
 
         pHost->mRequiredDiscordUserName = lineEdit_discordUserName->text().trimmed();
