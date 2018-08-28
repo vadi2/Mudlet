@@ -1508,14 +1508,8 @@ void Host::setDiscordPresenceId(const QString& s)
     writeProfileData(QStringLiteral("discordPresenceId"), s);
 }
 
-// Returns true if the user details are non-null and match the supplied argument
-// if they are non-null - if either of the supplied argument or its matching
-// detail from the Discord RPC library are empty/null then that argument is NOT
-// considered as being necessary to return a true result.  This is intended to
-// protect against the currently active logged in local Discord user being used
-// for the Rich Presence if there is a descripancy between them but to allow
-// things to work if not set by the user or not (yet) available from the Discord
-// RPC library:
+// Compares the current discord username and discriminator against the non-empty
+// arguments. Returns true if neither match, otherwise false.
 bool Host::discordUserIdMatch(const QString& userName, const QString& userDiscriminator) const
 {
     if (!userName.isEmpty() && !mRequiredDiscordUserName.isEmpty()
