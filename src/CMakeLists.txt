@@ -369,6 +369,7 @@ else()
   message(STATUS "The Updater code is excluded as on-line updating is not available on this platform")
 endif()
 
+
 if(WIN32)
   set(mudlet_RC_ICONS = icons/mudlet_main_512x512_6XS_icon.ico)
   QT5_ADD_RESOURCES(RC_ICONS ${mudlet_RC_ICONS})
@@ -395,18 +396,7 @@ else()
   find_package(HUNSPELL REQUIRED)
 endif()
 
-if(WIN32)
-  if(BOOST_INCLUDEDIR)
-  else()
-    SET(BOOST_INCLUDEDIR "C:/Libraries/boost_1_67_0")
-  endif()
-# We must not specify components as that breaks the header-only way that we use
-# the boost libraries:
-  find_package(Boost 1.44)
-else()
-  find_package(Boost 1.44 COMPONENTS graph)
-endif()
-
+find_package(Boost 1.44 COMPONENTS graph)
 
 add_definitions(-DAPP_VERSION="${APP_VERSION}" -DAPP_BUILD="${APP_BUILD}" -DAPP_TARGET="${APP_TARGET}")
 
