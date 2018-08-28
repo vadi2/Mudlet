@@ -111,8 +111,8 @@ public:
                                                                        return mAutoAmbigousWidthGlyphsSetting
                                                                                ? Qt::PartiallyChecked
                                                                                : (mWideAmbigousWidthGlyphs ? Qt::Checked : Qt::Unchecked); }
-    void               setDiscordPresenceId(const QString& s);
-    const QString&     getDiscordPresenceId() { QMutexLocker locker(& mLock); return mDiscordPresenceId; }
+    void               setDiscordServerId(const QString& s);
+    const QString&     getDiscordServerId() { QMutexLocker locker(& mLock); return mDiscordServerId; }
 
     void closingDown();
     bool isClosingDown();
@@ -450,8 +450,8 @@ private:
     // keeps track of all of the array writers we're currently operating with
     QHash<QString, XMLexport*> writers;
 
-    // Will be null/empty if is to use Mudlet's default/own presence
-    QString mDiscordPresenceId;
+    // Will be null/empty if is to use Mudlet's server
+    QString mDiscordServerId;
 
     // Will be null/empty if we are not concerned to check the use of Discord
     // Rich Presence against the local user currently logged into Discord -
