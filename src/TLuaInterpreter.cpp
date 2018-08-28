@@ -10300,12 +10300,12 @@ int TLuaInterpreter::openWebPage(lua_State* L)
 }
 
 /*
- * Overrides the Discord presence Id used for this profile
+ * Overrides the Discord application id used for this profile
  * By definition this stops the ability to use the Icon resources that have been
  * set up for the Mudlet client - so that ones specific to, say, a MUD Server
  * can be used INSTEAD.
  *
- * The Presence ID seems to be an 18 digit number at the moment.
+ * The Application ID seems to be an 18 digit number at the moment.
  * Specifying an empty string or no argument resets to using the default Mudlet
  * one...
  *
@@ -10314,8 +10314,8 @@ int TLuaInterpreter::openWebPage(lua_State* L)
  * should be readable from the "Special options" tab of the
  * "Profile preferences".
  */
-// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordPresenceId
-int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordApplicationID
+int TLuaInterpreter::setDiscordApplicationID(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
     if (!pMudlet->mDiscord.libraryLoaded()) {
@@ -10347,35 +10347,35 @@ int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
                 bool isOk = false;
                 quint64 numericEquivalent = inputText.toULongLong(&isOk);
                 if (numericEquivalent && isOk) {
-                    QString presenceId = QString::number(numericEquivalent);
-                    if (pMudlet->mDiscord.setPresence(&host, presenceId)) {
+                    QString appID = QString::number(numericEquivalent);
+                    if (pMudlet->mDiscord.setApplicationID(&host, appID)) {
                         lua_pushboolean(L, true);
                         return 1;
                     } else {
                         lua_pushnil(L);
-                        lua_pushfstring(L, "%s does not appear to be a valid Discord application/presence id", inputText.toUtf8().constData());
+                        lua_pushfstring(L, "%s does not appear to be a valid Discord application id", inputText.toUtf8().constData());
                         return 2;
                     }
                 } else {
                     lua_pushnil(L);
-                    lua_pushfstring(L, "%s can not be converted to the expected numeric Discord application/presence id", inputText.toUtf8().constData());
+                    lua_pushfstring(L, "%s can not be converted to the expected numeric Discord application id", inputText.toUtf8().constData());
                     return 2;
                 }
             } else {
                 // Empty string input - to reset to default the same as the no
                 // argument case:
-                pMudlet->mDiscord.setPresence(&host, QString());
+                pMudlet->mDiscord.setApplicationID(&host, QString());
                 // This must always succeed
                 lua_pushboolean(L, true);
                 return 1;
             }
         } else {
-            lua_pushfstring(L, "setDiscordPresenceId: bad #1 type (presence id as string is optional {may be omitted to reset to Mudlet's own as a default}, got %s!)",
+            lua_pushfstring(L, "setDiscordApplicationID: bad argument #1 type (id as string expected, got %s!)",
                            luaL_typename(L,1));
             return lua_error(L);
         }
     } else {
-        pMudlet->mDiscord.setPresence(&host, QString());
+        pMudlet->mDiscord.setApplicationID(&host, QString());
         // This must always succeed
         lua_pushboolean(L, true);
         return 1;
@@ -13152,8 +13152,8 @@ void TLuaInterpreter::initLuaGlobals()
     lua_register(pGlobalLua, "getRowCount", TLuaInterpreter::getRowCount);
     lua_register(pGlobalLua, "getOS", TLuaInterpreter::getOS);
     lua_register(pGlobalLua, "getAvailableFonts", TLuaInterpreter::getAvailableFonts);
-    lua_register(pGlobalLua, "setDiscordPresenceId", TLuaInterpreter::setDiscordPresenceId);
-    lua_register(pGlobalLua, "isUsingDefaultDiscordPresenceId", TLuaInterpreter::usingMudletsDiscordID);
+    lua_register(pGlobalLua, "setDiscordApplicationID", TLuaInterpreter::setDiscordApplicationID);
+    lua_register(pGlobalLua, "usingMudletsDiscordID", TLuaInterpreter::usingMudletsDiscordID);
     lua_register(pGlobalLua, "setDiscordStateText", TLuaInterpreter::setDiscordStateText);
     lua_register(pGlobalLua, "setDiscordDetailText", TLuaInterpreter::setDiscordDetailText);
     lua_register(pGlobalLua, "setDiscordLargeIcon", TLuaInterpreter::setDiscordLargeIcon);

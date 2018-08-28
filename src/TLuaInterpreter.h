@@ -429,7 +429,7 @@ public:
     static int getRowCount(lua_State*);
     static int getOS(lua_State*);
     static int getAvailableFonts(lua_State* L);
-    static int setDiscordPresenceId(lua_State* L);
+    static int setDiscordApplicationID(lua_State* L);
     static int usingMudletsDiscordID(lua_State*);
     static int setDiscordStateText(lua_State*);
     static int setDiscordDetailText(lua_State*);

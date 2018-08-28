@@ -333,7 +333,7 @@ void cTelnet::handle_socket_signal_connected()
 
 // put out this signal (which affects the start time used for elapsed time
 // before raising the Lua sysConnectionEvent - so that a non-default Discord
-// Presence Id can be activated before any user/package/module code that might
+// Application Id can be activated before any user/package/module code that might
 // be called from a lua event handler for that event is run.
     emit signal_connected(mpHost);
 

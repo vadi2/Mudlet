@@ -1312,32 +1312,32 @@ void Host::processGMCPDiscordInfo(const QJsonObject& discordInfo)
         hasInvite = true;
     }
 
-    bool hasPresenceId = false;
+    bool hasApplicationId = false;
     bool hasCustomPresence = false;
-    auto presenceId = discordInfo.value(QStringLiteral("presenceid"));
-    if (presenceId != QJsonValue::Undefined) {
-        hasPresenceId = true;
-        if (presenceId.toString() == Discord::mMudletPresenceId) {
-            pMudlet->mDiscord.setPresence(this, QString());
+    auto appID = discordInfo.value(QStringLiteral("applicationid"));
+    if (appID != QJsonValue::Undefined) {
+        hasApplicationId = true;
+        if (appID.toString() == Discord::mMudletApplicationId) {
+            pMudlet->mDiscord.setApplicationID(this, QString());
         } else {
             hasCustomPresence = true;
-            pMudlet->mDiscord.setPresence(this, presenceId.toString());
+            pMudlet->mDiscord.setApplicationID(this, appID.toString());
         }
     }
 
     if (hasInvite) {
         if (hasCustomPresence) {
             qDebug() << "Game using a custom Discord server. Invite URL: " << inviteUrl.toString();
-        } else if (hasPresenceId) {
+        } else if (hasApplicationId) {
             qDebug() << "Game using Mudlets Discord server. Invite URL: " << inviteUrl.toString();
         } else {
             qDebug() << "Discord invite URL: " << inviteUrl.toString();
         }
     } else {
         if (hasCustomPresence) {
-            qDebug() << "Game is using custom server Discord PresenceID";
-        } else if (hasPresenceId) {
-            qDebug() << "Game is using Mudlets Discord PresenceID";
+            qDebug() << "Game is using custom server Discord application ID";
+        } else if (hasApplicationId) {
+            qDebug() << "Game is using Mudlets Discord application ID";
         }
     }
 }
@@ -1353,7 +1353,7 @@ void Host::processGMCPDiscordStatus(const QJsonObject& discordInfo)
             pMudlet->mDiscord.setLargeImage(this, integrationTestResult.second);
             pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(integrationTestResult.second, getUrl(), QString::number(getPort())));
         } else {
-            // We are using a different Presence Id, so the top line is
+            // We are using a different application id, so the top line is
             // likely to be saying "Playing MudName", and we have no ideal
             // as to the icon keys to use, try "server-icon" for the large
             // icon:
@@ -1499,13 +1499,13 @@ void Host::processDiscordMSDP(const QString& variable, QString value)
 //    }
 }
 
-void Host::setDiscordPresenceId(const QString& s)
+void Host::setDiscordApplicationID(const QString& s)
 {
     QMutexLocker locker(& mLock);
-    mDiscordPresenceId = s;
+    mDiscordApplicationID = s;
     locker.unlock();
 
-    writeProfileData(QStringLiteral("discordPresenceId"), s);
+    writeProfileData(QStringLiteral("discordApplicationId"), s);
 }
 
 // Compares the current discord username and discriminator against the non-empty
