@@ -81,7 +81,7 @@ private:
     QPushButton* connect_button;
     QLineEdit* delete_profile_lineedit;
     QPushButton* delete_button;
-    QString mDiscordServerId;
+    QString mDiscordPresenceId;
 };
 
 #endif // MUDLET_DLGCONNECTIONPROFILES_H

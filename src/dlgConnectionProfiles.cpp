@@ -922,7 +922,7 @@ void dlgConnectionProfiles::slot_item_clicked(QListWidgetItem* pItem)
         autologin_checkBox->setChecked(false);
     }
 
-    mDiscordServerId = readProfileData(profile, QStringLiteral("discordServerId"));
+    mDiscordPresenceId = readProfileData(profile, QStringLiteral("discordPresenceId"));
 
     // val will be null if this is the first time the profile has been read
     // since an update to a Mudlet version supporting Discord - so a toint()
@@ -1097,11 +1097,11 @@ void dlgConnectionProfiles::updateDiscordStatus()
         discord_optin_checkBox->setDisabled(true);
         discord_optin_checkBox->setChecked(false);
         discord_optin_checkBox->setToolTip(tr("Discord integration not available on this platform"));
-    } else if (mDiscordServerId.isEmpty()
+    } else if (mDiscordPresenceId.isEmpty()
                && !mudlet::self()->mDiscord.gameIntegrationSupported(host_name_entry->text().trimmed()).first) {
 
         // Disable discord support if it is not recognised by name and a
-        // Server id has not been previously entered:
+        // Presence Id has not been previously entered:
         discord_optin_checkBox->setDisabled(true);
         discord_optin_checkBox->setChecked(false);
         discord_optin_checkBox->setToolTip(tr("Discord integration not supported by game"));
@@ -1687,7 +1687,7 @@ void dlgConnectionProfiles::slot_connectToServer()
         pHost->setWideAmbiguousEAsianGlyphs(pHost->getWideAmbiguousEAsianGlyphsControlState());
 
         // This also writes the value out to the profile's base directory:
-        mudlet::self()->mDiscord.setServerID(pHost, mDiscordServerId);
+        mudlet::self()->mDiscord.setPresence(pHost, mDiscordPresenceId);
     }
 
     if (needsGenericPackagesInstall) {

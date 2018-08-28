@@ -10300,12 +10300,22 @@ int TLuaInterpreter::openWebPage(lua_State* L)
 }
 
 /*
- * Overrides the Discord Server Id used for this profile
+ * Overrides the Discord presence Id used for this profile
+ * By definition this stops the ability to use the Icon resources that have been
+ * set up for the Mudlet client - so that ones specific to, say, a MUD Server
+ * can be used INSTEAD.
+ *
+ * The Presence ID seems to be an 18 digit number at the moment.
  * Specifying an empty string or no argument resets to using the default Mudlet
- * one.
+ * one...
+ *
+ * There is no lua getter for this value, if it is supplied via a GMCP or other
+ * OOB from a Server they may not want to advertise it - though currently it
+ * should be readable from the "Special options" tab of the
+ * "Profile preferences".
  */
-// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordServerID
-int TLuaInterpreter::setDiscordServerID(lua_State* L)
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordPresenceId
+int TLuaInterpreter::setDiscordPresenceId(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
     if (!pMudlet->mDiscord.libraryLoaded()) {
@@ -10337,8 +10347,8 @@ int TLuaInterpreter::setDiscordServerID(lua_State* L)
                 bool isOk = false;
                 quint64 numericEquivalent = inputText.toULongLong(&isOk);
                 if (numericEquivalent && isOk) {
-                    QString serverID = QString::number(numericEquivalent);
-                    if (pMudlet->mDiscord.setServerID(&host, serverID)) {
+                    QString presenceId = QString::number(numericEquivalent);
+                    if (pMudlet->mDiscord.setPresence(&host, presenceId)) {
                         lua_pushboolean(L, true);
                         return 1;
                     } else {
@@ -10354,18 +10364,18 @@ int TLuaInterpreter::setDiscordServerID(lua_State* L)
             } else {
                 // Empty string input - to reset to default the same as the no
                 // argument case:
-                pMudlet->mDiscord.setServerID(&host, QString());
+                pMudlet->mDiscord.setPresence(&host, QString());
                 // This must always succeed
                 lua_pushboolean(L, true);
                 return 1;
             }
         } else {
-            lua_pushfstring(L, "setDiscordServerID: bad argument #1 type (id expected as string, got %s!)",
+            lua_pushfstring(L, "setDiscordPresenceId: bad #1 type (presence id as string is optional {may be omitted to reset to Mudlet's own as a default}, got %s!)",
                            luaL_typename(L,1));
             return lua_error(L);
         }
     } else {
-        pMudlet->mDiscord.setServerID(&host, QString());
+        pMudlet->mDiscord.setPresence(&host, QString());
         // This must always succeed
         lua_pushboolean(L, true);
         return 1;
@@ -13142,8 +13152,8 @@ void TLuaInterpreter::initLuaGlobals()
     lua_register(pGlobalLua, "getRowCount", TLuaInterpreter::getRowCount);
     lua_register(pGlobalLua, "getOS", TLuaInterpreter::getOS);
     lua_register(pGlobalLua, "getAvailableFonts", TLuaInterpreter::getAvailableFonts);
-    lua_register(pGlobalLua, "setDiscordServerID", TLuaInterpreter::setDiscordServerID);
-    lua_register(pGlobalLua, "usingMudletsDiscordID", TLuaInterpreter::usingMudletsDiscordID);
+    lua_register(pGlobalLua, "setDiscordPresenceId", TLuaInterpreter::setDiscordPresenceId);
+    lua_register(pGlobalLua, "isUsingDefaultDiscordPresenceId", TLuaInterpreter::usingMudletsDiscordID);
     lua_register(pGlobalLua, "setDiscordStateText", TLuaInterpreter::setDiscordStateText);
     lua_register(pGlobalLua, "setDiscordDetailText", TLuaInterpreter::setDiscordDetailText);
     lua_register(pGlobalLua, "setDiscordLargeIcon", TLuaInterpreter::setDiscordLargeIcon);

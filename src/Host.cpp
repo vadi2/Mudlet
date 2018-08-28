@@ -1312,32 +1312,32 @@ void Host::processGMCPDiscordInfo(const QJsonObject& discordInfo)
         hasInvite = true;
     }
 
-    bool hasServerID = false;
+    bool hasPresenceId = false;
     bool hasCustomPresence = false;
-    auto serverID = discordInfo.value(QStringLiteral("serverid"));
-    if (serverID != QJsonValue::Undefined) {
-        hasServerID = true;
-        if (serverID.toString() == Discord::mMudletServerID) {
-            pMudlet->mDiscord.setServerID(this, QString());
+    auto presenceId = discordInfo.value(QStringLiteral("presenceid"));
+    if (presenceId != QJsonValue::Undefined) {
+        hasPresenceId = true;
+        if (presenceId.toString() == Discord::mMudletPresenceId) {
+            pMudlet->mDiscord.setPresence(this, QString());
         } else {
             hasCustomPresence = true;
-            pMudlet->mDiscord.setServerID(this, serverID.toString());
+            pMudlet->mDiscord.setPresence(this, presenceId.toString());
         }
     }
 
     if (hasInvite) {
         if (hasCustomPresence) {
             qDebug() << "Game using a custom Discord server. Invite URL: " << inviteUrl.toString();
-        } else if (hasServerID) {
+        } else if (hasPresenceId) {
             qDebug() << "Game using Mudlets Discord server. Invite URL: " << inviteUrl.toString();
         } else {
             qDebug() << "Discord invite URL: " << inviteUrl.toString();
         }
     } else {
         if (hasCustomPresence) {
-            qDebug() << "Game is using custom server Discord server ID";
-        } else if (hasServerID) {
-            qDebug() << "Game is using Mudlets Discord server ID";
+            qDebug() << "Game is using custom server Discord PresenceID";
+        } else if (hasPresenceId) {
+            qDebug() << "Game is using Mudlets Discord PresenceID";
         }
     }
 }
@@ -1499,13 +1499,13 @@ void Host::processDiscordMSDP(const QString& variable, QString value)
 //    }
 }
 
-void Host::setDiscordServerId(const QString& s)
+void Host::setDiscordPresenceId(const QString& s)
 {
     QMutexLocker locker(& mLock);
-    mDiscordServerId = s;
+    mDiscordPresenceId = s;
     locker.unlock();
 
-    writeProfileData(QStringLiteral("discordServerId"), s);
+    writeProfileData(QStringLiteral("discordPresenceId"), s);
 }
 
 // Compares the current discord username and discriminator against the non-empty

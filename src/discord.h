@@ -184,8 +184,8 @@ public:
     void setEndTimeStamp(Host*, int64_t);
     void setParty(Host*, int);
     void setParty(Host*, int, int);
-    bool setServerID(Host*, const QString&);
-    QString getServerId(Host* pHost) const;
+    bool setPresence(Host*, const QString&);
+    QString getPresenceId(Host* pHost) const;
 
     // These retrieve the cached data:
     QString getDetailText(Host* pHost) const { return mDetailTexts.value(pHost); }
@@ -204,7 +204,7 @@ public:
     bool discordUserIdMatch(Host* pHost) const;
 
 
-    const static QString mMudletServerID;
+    const static QString mMudletPresenceId;
 
 
 private:
@@ -229,16 +229,16 @@ private:
 
     // Key is a Presence Id, Value is a pointer to a local copy of the data
     // currently held for that presence:
-    QMap<QString, localDiscordPresence*> mServerPtrs;
+    QMap<QString, localDiscordPresence*> mPresencePtrs;
 
-    // Used to tie a profile to a particular Discord server - multiple
+    // Used to tie a profile to a particular Discord presence - multiple
     // profiles can have the same presence but defaults to the nullptr one for
     // Mudlet:
-    QMap<Host*, QString>mHostServerIDs;
+    QMap<Host*, QString>mHostPresenceIds;
 
     QScopedPointer<QLibrary> mpLibrary;
 
-    // Used to hold the per profile data independently of whichever server ID
+    // Used to hold the per profile data independently of whichever presenceId
     // it will be used with:
     QMap<Host*, int64_t>mStartTimes;
     QMap<Host*, int64_t>mEndTimes;
@@ -255,11 +255,11 @@ private:
     // it as values:
     QHash<QString, QVector<QString>> mKnownGames;
 
-    // The serverId that is currently the one that the Discord RPC library
+    // The presenceId that is currently the one that the Discord RPC library
     // has been set to use - only ONE can be active at a time currently,
     // though an Issue does exist to revise that at Discord:
     // https://github.com/discordapp/discord-rpc/issues/202
-    QString mCurrentServerID;
+    QString mCurrentPresenceId;
 
     // Protect the four values after this one from async processes:
     static QReadWriteLock smReadWriteLock;

@@ -35,7 +35,7 @@ QString Discord::smUserName;
 QString Discord::smUserId;
 QString Discord::smDiscriminator;
 QString Discord::smAvatar;
-const QString Discord::mMudletServerID = QLatin1String("450571881909583884");
+const QString Discord::mMudletPresenceId = QLatin1String("450571881909583884");
 
 Discord::Discord(QObject* parent)
 : QObject(parent)
@@ -46,7 +46,7 @@ Discord::Discord(QObject* parent)
 // "midmud"  is "460618737712889858", has "server-icon", "exventure" and "mudlet" icons
 // "carinus" is "438335628942376960", has "server-icon" and "mudlet" icons
 // "wotmud"  is "464945517156106240", has "mudlet", "ajar_(red|green|yellow|blue|white|grey|brown)"
-, mHostServerIDs{{nullptr, mMudletServerID}}
+, mHostPresenceIds{{nullptr, mMudletPresenceId}}
 // lowercase list of known games
 // {game name, {game addresses}}
 // The values are not currently used!
@@ -93,8 +93,8 @@ Discord::Discord(QObject* parent)
 
     // Initialise the default Mudlet presence - we are not registering an
     // application protocol to start a game on the player's computer from Discord:
-    qDebug().nospace().noquote() << "Discord::Discord(...) INFO - calling Discord_Initialize(\"" << mHostServerIDs.value(nullptr) << "\", mpHandlers, 0)";
-    Discord_Initialize(mHostServerIDs.value(nullptr).toUtf8().constData(), mpHandlers, 0);
+    qDebug().nospace().noquote() << "Discord::Discord(...) INFO - calling Discord_Initialize(\"" << mHostPresenceIds.value(nullptr) << "\", mpHandlers, 0)";
+    Discord_Initialize(mHostPresenceIds.value(nullptr).toUtf8().constData(), mpHandlers, 0);
     // A new localDiscordPresence instance (with an empty key) will be generated
     // on the first call to UpdatePresence()
 
@@ -118,7 +118,7 @@ Discord::~Discord()
         // need to as it happens automagically on the application shutdown...
 
         // Clear out the localDiscordPresence collection:
-        QMutableMapIterator<QString, localDiscordPresence*> itPresencePtrs(mServerPtrs);
+        QMutableMapIterator<QString, localDiscordPresence*> itPresencePtrs(mPresencePtrs);
         while (itPresencePtrs.hasNext()) {
             itPresencePtrs.next();
             delete itPresencePtrs.value();
@@ -321,44 +321,44 @@ void Discord::UpdatePresence()
     }
 
     // Need to establish which presence to use - will be null if it has not been overridden:
-    QString serverID = mHostServerIDs.value(pHost);
+    QString presenceId = mHostPresenceIds.value(pHost);
 
-    if (mServerPtrs.isEmpty()) {
+    if (mPresencePtrs.isEmpty()) {
         // First time only - with no localDiscordPresence in collection,
         // must just create the default one:
         localDiscordPresence* pTempPresence = new localDiscordPresence;
-        mServerPtrs.insert(QString(), pTempPresence);
+        mPresencePtrs.insert(QString(), pTempPresence);
     }
 
-    // If the localDiscordPresence serverID is NOT present in the existing
+    // If the localDiscordPresence presenceId is NOT present in the existing
     // QMap then this will return a nullptr:
     localDiscordPresence* pDiscordPresence = nullptr;
-    if (serverID.isEmpty()) {
-        pDiscordPresence = mServerPtrs.value(nullptr);
-        // Reset the empty serverID to the one that belongs to Mudlet:
-        serverID = mHostServerIDs.value(nullptr);
+    if (presenceId.isEmpty()) {
+        pDiscordPresence = mPresencePtrs.value(nullptr);
+        // Reset the empty presenceId to the one that belongs to Mudlet:
+        presenceId = mHostPresenceIds.value(nullptr);
     } else {
-        pDiscordPresence = mServerPtrs.value(serverID);
+        pDiscordPresence = mPresencePtrs.value(presenceId);
 
         if (!pDiscordPresence) {
             // So insert a non-default one
 
             pDiscordPresence = new localDiscordPresence;
-            mServerPtrs.insert(serverID, pDiscordPresence);
+            mPresencePtrs.insert(presenceId, pDiscordPresence);
         }
     }
 
-    if (mCurrentServerID != serverID) {
+    if (mCurrentPresenceId != presenceId) {
         // It has changed - must shutdown and reopen the library instance with
         // the alternate presence Id:
         qDebug() << "Discord::UpdatePresence() INFO - calling Discord_Shutdown()";
         Discord_Shutdown();
 
-        qDebug().nospace().noquote() << "Discord::UpdatePresence() INFO - calling Discord_Initialize(\"" << serverID << "\", mpHandlers, 0)";
+        qDebug().nospace().noquote() << "Discord::UpdatePresence() INFO - calling Discord_Initialize(\"" << presenceId << "\", mpHandlers, 0)";
         // Using toUtf8() but only for paranoic reasons - toLatin1() would
         // probably work:
-        Discord_Initialize(serverID.toUtf8().constData(), mpHandlers, 0);
-        mCurrentServerID = serverID;
+        Discord_Initialize(presenceId.toUtf8().constData(), mpHandlers, 0);
+        mCurrentPresenceId = presenceId;
     }
 
     if (pHost->mDiscordAccessFlags & Host::DiscordSetDetail) {
@@ -488,6 +488,7 @@ QPair<bool, QString> Discord::gameIntegrationSupported(const QString& address)
 
     // Handle using localhost as an off-line testing case
     if (deducedName == QLatin1String("localhost")) {
+
         return qMakePair(true, deducedName);
     } else {
         return qMakePair((!deducedName.isEmpty() && mKnownGames.contains(deducedName)), deducedName);;
@@ -499,23 +500,23 @@ bool Discord::libraryLoaded()
     return mLoaded;
 }
 
-// AFAICT A Discord Server Id is an unsigned long long int (a.k.a. a
+// AFAICT A Discord Application Id is an unsigned long long int (a.k.a. a
 // quint64, or qulonglong)
-bool Discord::setServerID(Host* pHost, const QString& text)
+bool Discord::setPresence(Host* pHost, const QString& text)
 {
-    QString oldID = mHostServerIDs.value(pHost);
-    if (oldID == text) {
-        // No change so do nothing
+    QString oldPresenceId = mHostPresenceIds.value(pHost);
+    if (oldPresenceId == text) {
+        // No change so do nothing, sucessfully
         return true;
     }
 
-    // Note what the current serverID is for the given Host - will be an empty
+    // Note what the current presenceId is for the given Host - will be an empty
     // string if not overridden from the default Mudlet one:
     if (text.isEmpty()) {
         // An empty or null string is the signal to switch back to default
         // "Mudlet" presence - and always succeeds
-        mHostServerIDs.remove(pHost);
-        pHost->setDiscordServerId(QString());
+        mHostPresenceIds.remove(pHost);
+        pHost->setDiscordPresenceId(QString());
         UpdatePresence();
 
         return true;
@@ -524,21 +525,23 @@ bool Discord::setServerID(Host* pHost, const QString& text)
     bool ok = false;
     if (text.toLongLong(&ok) && ok) {
         // Got something that makes a non-zero number - so assume it is ok
-        mHostServerIDs[pHost] = text;
-        pHost->setDiscordServerId(text);
+        mHostPresenceIds[pHost] = text;
+        pHost->setDiscordPresenceId(text);
         UpdatePresence();
 
         return true;
+
     } else {
+
         return false;
     }
 }
 
-// Returns Host set serverID or the default Mudlet one if none set for the
+// Returns Host set presenceId or the default Mudlet one if none set for the
 // specific Host:
-QString Discord::getServerId(Host* pHost) const
+QString Discord::getPresenceId(Host* pHost) const
 {
-    return mHostServerIDs.value(pHost, mHostServerIDs.value(nullptr));
+    return mHostPresenceIds.value(pHost, mHostPresenceIds.value(nullptr));
 }
 
 DiscordRichPresence localDiscordPresence::convert() const
@@ -612,7 +615,7 @@ void localDiscordPresence::setSpectateSecret(const QString& text)
 
 bool Discord::usingMudletsDiscordID(Host* pHost) const
 {
-    return (!mHostServerIDs.contains(pHost));
+    return (!mHostPresenceIds.contains(pHost));
 }
 
 bool Discord::discordUserIdMatch(Host* pHost) const
