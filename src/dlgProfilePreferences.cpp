@@ -184,7 +184,7 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
                                                                                "end of the the lower line of text in the Rich Presence.</p>")));
     checkBox_discordServerAccessToTimerInfo->setToolTip(mudlet::htmlWrapper(tr("<p>Leave this checked so that the Game Server can set additional time elapsed or time remaining "
                                                                                "infomation at the bottom of the Rich Presence.</p>")));
-    checkBox_discordLuaAPI->setToolTip(mudlet::htmlWrapper(tr("<p>Enable Lua API access to the Discord functionality.</p>")));
+    checkBox_discordLuaAPI->setToolTip(mudlet::htmlWrapper(tr("<p>Allow Lua to set Discord status</p>")));
 
     lineEdit_discordUserName->setToolTip(mudlet::htmlWrapper(tr("<p>Mudlet will only show Rich Presence information while you use this Discord username (useful if you have multiple Discord accounts). Leave empty to show it for any Discord account you log in to.</p>")));
     lineEdit_discordUserDiscriminator->setToolTip(mudlet::htmlWrapper(tr("<p>Mudlet will only show Rich Presence information while you use this Discord username (useful if you have multiple Discord accounts). Leave empty to show it for any Discord account you log in to.</p>")));
@@ -456,7 +456,6 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         Host::DiscordOptionFlags discordFlags = pHost->mDiscordAccessFlags;
         groupBox_discordPrivacy->show();
         checkBox_discordLuaAPI->setChecked(discordFlags & Host::DiscordLuaAccessEnabled);
-        checkBox_discordServerAccess->setChecked(!(discordFlags & Host::DiscordServerAccessEnabled));
 
         if (!(discordFlags & Host::DiscordSetLargeIcon) && !(discordFlags & Host::DiscordSetLargeIconText)) {
             comboBox_discordLargeIconPrivacy->setCurrentIndex(0);
@@ -887,7 +886,6 @@ void dlgProfilePreferences::clearHostDetails()
     search_engine_combobox->clear();
 
     checkBox_discordLuaAPI->setChecked(false);
-    checkBox_discordServerAccess->setChecked(false);
     comboBox_discordLargeIconPrivacy->setCurrentIndex(0);
     comboBox_discordSmallIconPrivacy->setCurrentIndex(0);
     checkBox_discordServerAccessToDetail->setChecked(false);
@@ -2109,7 +2107,6 @@ void dlgProfilePreferences::slot_save_and_exit()
                                          | (smallIconText ? Host::DiscordSetSmallIconText : Host::DiscordNoOption)
                                          | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordNoOption : Host::DiscordSetDetail)
                                          | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordNoOption : Host::DiscordSetState)
-                                         | (checkBox_discordServerAccess->isChecked() ? Host::DiscordNoOption : Host::DiscordServerAccessEnabled)
                                          | (checkBox_discordLuaAPI->isChecked() ? Host::DiscordLuaAccessEnabled : Host::DiscordNoOption));
 
         pHost->mRequiredDiscordUserName = lineEdit_discordUserName->text().trimmed();

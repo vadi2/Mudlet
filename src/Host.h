@@ -82,7 +82,6 @@ public:
         DiscordSetPartyInfo = 0x80,
         DiscordSetTimeInfo = 0x100,
         DiscordSetSubMask = 0x3ff,
-        DiscordServerAccessEnabled = 0x400, // This one enables consideration of above bits
         DiscordLuaAccessEnabled = 0x800
     };
     Q_DECLARE_FLAGS(DiscordOptionFlags, DiscordOptionFlag)

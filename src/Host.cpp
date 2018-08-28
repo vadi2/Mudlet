@@ -208,7 +208,7 @@ Host::Host(int port, const QString& hostname, const QString& login, const QStrin
                     {"Google",     "https://www.google.com/search?q="}
     });
 
-    auto optin = readProfileData(QStringLiteral("discordoptin"));
+    auto optin = readProfileData(QStringLiteral("discordserveroptin"));
     if (!optin.isEmpty()) {
         mDiscordDisableServerSide = optin.toInt() == Qt::Unchecked ? true : false;
     }
@@ -1281,7 +1281,7 @@ void Host::setWideAmbiguousEAsianGlyphs(const Qt::CheckState state)
 // Telnet sub-option comes in and starts with "External.Discord.(Status|Info)"
 void Host::processDiscordGMCP(const QString& packageMessage, const QString& data)
 {
-    if (mDiscordDisableServerSide || !(mDiscordAccessFlags & DiscordServerAccessEnabled)) {
+    if (mDiscordDisableServerSide) {
         return;
     }
 

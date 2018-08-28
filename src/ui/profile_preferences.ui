@@ -2255,13 +2255,6 @@
           <string>Discord privacy</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
-          <item row="0" column="0" colspan="2">
-           <widget class="QCheckBox" name="checkBox_discordServerAccess">
-            <property name="text">
-             <string>Disable game Discord info</string>
-            </property>
-           </widget>
-          </item>
           <item row="1" column="0" colspan="2">
            <widget class="QComboBox" name="comboBox_discordLargeIconPrivacy">
             <item>

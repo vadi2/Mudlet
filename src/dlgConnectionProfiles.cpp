@@ -289,7 +289,7 @@ void dlgConnectionProfiles::slot_update_discord_optin(int state)
         return;
     }
     QString profile = pItem->text();
-    writeProfileData(profile, QStringLiteral("discordoptin"), QString::number(state));
+    writeProfileData(profile, QStringLiteral("discordserveroptin"), QString::number(state));
 
     // in case the user is already connected, pull up stored GMCP data
     auto& hostManager = mudlet::self()->getHostManager();
@@ -928,7 +928,7 @@ void dlgConnectionProfiles::slot_item_clicked(QListWidgetItem* pItem)
     // since an update to a Mudlet version supporting Discord - so a toint()
     // will return 0 - which just happens to be Qt::Unchecked() but lets not
     // rely on that...
-    val = readProfileData(profile, QStringLiteral("discordoptin"));
+    val = readProfileData(profile, QStringLiteral("discordserveroptin"));
     if ((!val.isEmpty()) && val.toInt() == Qt::Checked) {
         discord_optin_checkBox->setChecked(true);
     } else {
