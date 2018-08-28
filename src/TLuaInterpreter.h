@@ -439,7 +439,7 @@ public:
     static int setDiscordSmallIconText(lua_State*);
     static int setDiscordElapsedStartTime(lua_State*);
     static int setDiscordRemainingEndTime(lua_State*);
-    static int setDiscordPartyValues(lua_State*);
+    static int setDiscordParty(lua_State*);
     static int getDiscordState(lua_State*);
     static int getDiscordDetail(lua_State*);
     static int getDiscordLargeIcon(lua_State*);
@@ -447,7 +447,7 @@ public:
     static int getDiscordSmallIcon(lua_State*);
     static int getDiscordSmallIconText(lua_State*);
     static int getDiscordTimeStamps(lua_State*);
-    static int getDiscordPartyValues(lua_State*);
+    static int getDiscordParty(lua_State*);
     // PLACEMARKER: End of Lua functions declarations
 
 

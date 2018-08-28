@@ -10869,8 +10869,8 @@ int TLuaInterpreter::getDiscordTimeStamps(lua_State* L)
     return 2;
 }
 
-// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordPartyValues
-int TLuaInterpreter::setDiscordPartyValues(lua_State* L)
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordParty
+int TLuaInterpreter::setDiscordParty(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
     if (!pMudlet->mDiscord.libraryLoaded()) {
@@ -10902,7 +10902,7 @@ int TLuaInterpreter::setDiscordPartyValues(lua_State* L)
             return 2;
         }
     } else {
-        lua_pushfstring(L, "setDiscordPartyValues: bad argument #%d type (current party size as number expect, got %s!)", 1, luaL_typename(L, 1));
+        lua_pushfstring(L, "setDiscordParty: bad argument #%d type (current party size as number expect, got %s!)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
 
@@ -10923,8 +10923,8 @@ int TLuaInterpreter::setDiscordPartyValues(lua_State* L)
     return 1;
 }
 
-// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordPartyValues
-int TLuaInterpreter::getDiscordPartyValues(lua_State* L)
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordParty
+int TLuaInterpreter::getDiscordParty(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
     if (!pMudlet->mDiscord.libraryLoaded()) {
@@ -13194,8 +13194,8 @@ void TLuaInterpreter::initLuaGlobals()
     lua_register(pGlobalLua, "setDiscordRemainingEndTime", TLuaInterpreter::setDiscordRemainingEndTime);
     lua_register(pGlobalLua, "setDiscordElapsedStartTime", TLuaInterpreter::setDiscordElapsedStartTime);
     lua_register(pGlobalLua, "getDiscordTimeStamps", TLuaInterpreter::getDiscordTimeStamps);
-    lua_register(pGlobalLua, "setDiscordPartyValues", TLuaInterpreter::setDiscordPartyValues);
-    lua_register(pGlobalLua, "getDiscordPartyValues", TLuaInterpreter::getDiscordPartyValues);
+    lua_register(pGlobalLua, "setDiscordParty", TLuaInterpreter::setDiscordParty);
+    lua_register(pGlobalLua, "getDiscordParty", TLuaInterpreter::getDiscordParty);
     // PLACEMARKER: End of main Lua interpreter functions registration
 
 
