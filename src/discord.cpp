@@ -395,6 +395,9 @@ void Discord::UpdatePresence()
     if (mPartyMax.value(pHost) && (pHost->mDiscordAccessFlags & Host::DiscordSetPartyInfo)) {
         pDiscordPresence->setPartySize(mPartySize.value(pHost));
         pDiscordPresence->setPartyMax(mPartyMax.value(pHost));
+    } else {
+        pDiscordPresence->setPartySize(0);
+        pDiscordPresence->setPartyMax(0);
     }
 
     if (pHost->mDiscordAccessFlags & Host::DiscordSetTimeInfo) {

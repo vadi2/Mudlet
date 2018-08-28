@@ -10914,8 +10914,7 @@ int TLuaInterpreter::setDiscordPartyValues(lua_State* L)
             return 2;
         }
 
-        pMudlet->mDiscord.setParty(&host, static_cast<int>(qMin(static_cast<int64_t>(INT_MAX), partySize)),
-                                   static_cast<int>(qMin(static_cast<int64_t>(INT_MAX), partyMax)));
+        pMudlet->mDiscord.setParty(&host, static_cast<int>(qMin(static_cast<int64_t>(INT_MAX), partySize)), static_cast<int>(qMin(static_cast<int64_t>(INT_MAX), partyMax)));
     } else {
         // Only got the partySize now
         pMudlet->mDiscord.setParty(&host, static_cast<int>(qMin(static_cast<int64_t>(INT_MAX), partySize)));
