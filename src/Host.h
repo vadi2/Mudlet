@@ -198,9 +198,9 @@ public:
     bool removeDir(const QString&, const QString&);
     void readPackageConfig(const QString&, QString&);
     void postMessage(const QString message) { mTelnet.postMessage(message); }
-    QPair<bool, QString> writeProfileData(const QString &, const QString &);
-    QString readProfileData(const QString &);
-    void xmlSaved(const QString &xmlName);
+    QPair<bool, QString> writeProfileData(const QString&, const QString&);
+    QString readProfileData(const QString&);
+    void xmlSaved(const QString& xmlName);
     bool currentlySavingProfile();
     void waitForProfileSave();
     void processDiscordGMCP(const QString& packageMessage, const QString& data);
@@ -354,8 +354,7 @@ public:
     QMap<QString, QStringList> modulesToWrite;
     QMap<QString, QMap<QString, QString>> moduleHelp;
 
-    // Set/Cleared from the Connection Preferences - master control to
-    // enable/disable Discord:
+    // Privacy option to allow the game to set Discord Rich Presence information
     bool mDiscordDisableServerSide;
 
     // Discord privacy options to give the user control over what data a Server

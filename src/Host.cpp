@@ -1358,7 +1358,7 @@ void Host::processGMCPDiscordStatus(const QJsonObject& discordInfo)
             if (richPresenceSupported.first) {
                 pMudlet->mDiscord.setDetailText(this, tr("Using Mudlet"));
                 pMudlet->mDiscord.setLargeImageText(this, tr("%1 at %2:%3").arg(richPresenceSupported.second, getUrl(), QString::number(getPort())));
-                pMudlet->mDiscord.setLargeImage(this, QLatin1String("server-icon"));
+                pMudlet->mDiscord.setLargeImage(this, QStringLiteral("server-icon"));
             }
         }
     }
