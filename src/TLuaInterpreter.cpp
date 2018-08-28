@@ -10632,8 +10632,8 @@ int TLuaInterpreter::getDiscordSmallIconText(lua_State* L)
     return 1;
 }
 
-// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordDetailText
-int TLuaInterpreter::setDiscordDetailText(lua_State* L)
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordDetail
+int TLuaInterpreter::setDiscordDetail(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
     if (!pMudlet->mDiscord.libraryLoaded()) {
@@ -10660,13 +10660,13 @@ int TLuaInterpreter::setDiscordDetailText(lua_State* L)
         lua_pushboolean(L, true);
         return 1;
     } else {
-        lua_pushfstring(L, "setDiscordDetailText: bad argument #%d type (text as string expected, got %s!)", 1, luaL_typename(L, 1));
+        lua_pushfstring(L, "setDiscordDetail: bad argument #%d type (text as string expected, got %s!)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
 }
 
-// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordDetailText
-int TLuaInterpreter::getDiscordDetailText(lua_State* L)
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordDetail
+int TLuaInterpreter::getDiscordDetail(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
     if (!pMudlet->mDiscord.libraryLoaded()) {
@@ -10686,8 +10686,8 @@ int TLuaInterpreter::getDiscordDetailText(lua_State* L)
     return 1;
 }
 
-// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordStateText
-int TLuaInterpreter::setDiscordStateText(lua_State* L)
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#setDiscordState
+int TLuaInterpreter::setDiscordState(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
     if (!pMudlet->mDiscord.libraryLoaded()) {
@@ -10714,13 +10714,13 @@ int TLuaInterpreter::setDiscordStateText(lua_State* L)
         lua_pushboolean(L, true);
         return 1;
     } else {
-        lua_pushfstring(L, "setDiscordStateText: bad argument #%d type (text as string expected, got %s!)", 1, luaL_typename(L, 1));
+        lua_pushfstring(L, "setDiscordState: bad argument #%d type (text as string expected, got %s!)", 1, luaL_typename(L, 1));
         return lua_error(L);
     }
 }
 
-// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordStateText
-int TLuaInterpreter::getDiscordStateText(lua_State* L)
+// TODO: Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getDiscordState
+int TLuaInterpreter::getDiscordState(lua_State* L)
 {
     mudlet* pMudlet = mudlet::self();
     if (!pMudlet->mDiscord.libraryLoaded()) {
@@ -13154,14 +13154,14 @@ void TLuaInterpreter::initLuaGlobals()
     lua_register(pGlobalLua, "getAvailableFonts", TLuaInterpreter::getAvailableFonts);
     lua_register(pGlobalLua, "setDiscordApplicationID", TLuaInterpreter::setDiscordApplicationID);
     lua_register(pGlobalLua, "usingMudletsDiscordID", TLuaInterpreter::usingMudletsDiscordID);
-    lua_register(pGlobalLua, "setDiscordStateText", TLuaInterpreter::setDiscordStateText);
-    lua_register(pGlobalLua, "setDiscordDetailText", TLuaInterpreter::setDiscordDetailText);
+    lua_register(pGlobalLua, "setDiscordState", TLuaInterpreter::setDiscordState);
+    lua_register(pGlobalLua, "setDiscordDetail", TLuaInterpreter::setDiscordDetail);
     lua_register(pGlobalLua, "setDiscordLargeIcon", TLuaInterpreter::setDiscordLargeIcon);
     lua_register(pGlobalLua, "setDiscordLargeIconText", TLuaInterpreter::setDiscordLargeIconText);
     lua_register(pGlobalLua, "setDiscordSmallIcon", TLuaInterpreter::setDiscordSmallIcon);
     lua_register(pGlobalLua, "setDiscordSmallIconText", TLuaInterpreter::setDiscordSmallIconText);
-    lua_register(pGlobalLua, "getDiscordStateText", TLuaInterpreter::getDiscordStateText);
-    lua_register(pGlobalLua, "getDiscordDetailText", TLuaInterpreter::getDiscordDetailText);
+    lua_register(pGlobalLua, "getDiscordState", TLuaInterpreter::getDiscordState);
+    lua_register(pGlobalLua, "getDiscordDetail", TLuaInterpreter::getDiscordDetail);
     lua_register(pGlobalLua, "getDiscordLargeIcon", TLuaInterpreter::getDiscordLargeIcon);
     lua_register(pGlobalLua, "getDiscordLargeIconText", TLuaInterpreter::getDiscordLargeIconText);
     lua_register(pGlobalLua, "getDiscordSmallIcon", TLuaInterpreter::getDiscordSmallIcon);

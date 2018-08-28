@@ -431,8 +431,8 @@ public:
     static int getAvailableFonts(lua_State* L);
     static int setDiscordApplicationID(lua_State* L);
     static int usingMudletsDiscordID(lua_State*);
-    static int setDiscordStateText(lua_State*);
-    static int setDiscordDetailText(lua_State*);
+    static int setDiscordState(lua_State*);
+    static int setDiscordDetail(lua_State*);
     static int setDiscordLargeIcon(lua_State*);
     static int setDiscordLargeIconText(lua_State*);
     static int setDiscordSmallIcon(lua_State*);
@@ -440,8 +440,8 @@ public:
     static int setDiscordElapsedStartTime(lua_State*);
     static int setDiscordRemainingEndTime(lua_State*);
     static int setDiscordPartyValues(lua_State*);
-    static int getDiscordStateText(lua_State*);
-    static int getDiscordDetailText(lua_State*);
+    static int getDiscordState(lua_State*);
+    static int getDiscordDetail(lua_State*);
     static int getDiscordLargeIcon(lua_State*);
     static int getDiscordLargeIconText(lua_State*);
     static int getDiscordSmallIcon(lua_State*);
