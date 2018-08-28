@@ -186,7 +186,7 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
                                                                                "infomation at the bottom of the Rich Presence.</p>")));
     checkBox_discordLuaAPI->setToolTip(mudlet::htmlWrapper(tr("<p>Allow Lua to set Discord status</p>")));
 
-    lineEdit_discordUserName->setToolTip(mudlet::htmlWrapper(tr("<p>Mudlet will only show Rich Presence information while you use this Discord username (useful if you have multiple Discord accounts). Leave empty to show it for any Discord account you log in to.</p>")));
+    lineEdit_discordUserName->setToolTip(mudlet::htmlWrapper(tr("<p>Mudlet will only show Rich Presence information while you use this Discord username and/or discriminator (####). Useful if you have multiple Discord accounts, leave empty to show it for any Discord account you log in to.</p>")));
     lineEdit_discordUserDiscriminator->setToolTip(mudlet::htmlWrapper(tr("<p>Mudlet will only show Rich Presence information while you use this Discord username (useful if you have multiple Discord accounts). Leave empty to show it for any Discord account you log in to.</p>")));
 
 
