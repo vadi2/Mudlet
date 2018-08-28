@@ -2255,51 +2255,6 @@
           <string>Discord privacy</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
-          <item row="1" column="0" colspan="2">
-           <widget class="QComboBox" name="comboBox_discordLargeIconPrivacy">
-            <item>
-             <property name="text">
-              <string>Don't hide large icon or tooltip</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide large icon tooltip</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide large icon and tooltip</string>
-             </property>
-            </item>
-           </widget>
-          </item>
-          <item row="2" column="0" colspan="2">
-           <widget class="QComboBox" name="comboBox_discordSmallIconPrivacy">
-            <item>
-             <property name="text">
-              <string>Don't hide small icon or tooltip</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide small icon tooltip</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide small icon and tooltip</string>
-             </property>
-            </item>
-           </widget>
-          </item>
-          <item row="3" column="0" colspan="2">
-           <widget class="QCheckBox" name="checkBox_discordServerAccessToPartyInfo">
-            <property name="text">
-             <string>Hide party details</string>
-            </property>
-           </widget>
-          </item>
           <item row="4" column="0" rowspan="2" colspan="3">
            <widget class="QWidget" name="widget_discordUser" native="true">
             <property name="enabled">
@@ -2377,7 +2332,52 @@
             </item>
            </layout>
           </item>
-          <item row="0" column="2" colspan="2">
+          <item row="0" column="0" colspan="2">
+           <widget class="QComboBox" name="comboBox_discordLargeIconPrivacy">
+            <item>
+             <property name="text">
+              <string>Don't hide large icon or tooltip</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Hide large icon tooltip</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Hide large icon and tooltip</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="1" column="0" colspan="2">
+           <widget class="QComboBox" name="comboBox_discordSmallIconPrivacy">
+            <item>
+             <property name="text">
+              <string>Don't hide small icon or tooltip</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Hide small icon tooltip</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Hide small icon and tooltip</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="2">
+           <widget class="QCheckBox" name="checkBox_discordServerAccessToPartyInfo">
+            <property name="text">
+             <string>Hide party details</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0" colspan="2">
            <widget class="QCheckBox" name="checkBox_discordLuaAPI">
             <property name="text">
              <string>Enable Lua API</string>
@@ -2387,21 +2387,21 @@
             </property>
            </widget>
           </item>
-          <item row="1" column="2" colspan="2">
+          <item row="0" column="2" colspan="2">
            <widget class="QCheckBox" name="checkBox_discordServerAccessToDetail">
             <property name="text">
              <string>Hide detail</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="2" colspan="2">
+          <item row="1" column="2" colspan="2">
            <widget class="QCheckBox" name="checkBox_discordServerAccessToState">
             <property name="text">
              <string>Hide state</string>
             </property>
            </widget>
           </item>
-          <item row="3" column="2" colspan="2">
+          <item row="2" column="2" colspan="2">
            <widget class="QCheckBox" name="checkBox_discordServerAccessToTimerInfo">
             <property name="text">
              <string>Hide timer</string>
