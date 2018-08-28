@@ -363,16 +363,28 @@ void Discord::UpdatePresence()
 
     if (pHost->mDiscordAccessFlags & Host::DiscordSetDetail) {
         pDiscordPresence->setDetailText(mDetailTexts.value(pHost));
+    } else {
+        pDiscordPresence->setDetailText(QString());
     }
+
     if (pHost->mDiscordAccessFlags & Host::DiscordSetState) {
         pDiscordPresence->setStateText(mStateTexts.value(pHost));
+    } else {
+        pDiscordPresence->setStateText(QString());
     }
+
     if (pHost->mDiscordAccessFlags & Host::DiscordSetLargeIcon) {
         pDiscordPresence->setLargeImageKey(mLargeImages.value(pHost));
+    } else {
+        pDiscordPresence->setLargeImageKey(QString());
     }
+
     if (pHost->mDiscordAccessFlags & Host::DiscordSetLargeIconText) {
         pDiscordPresence->setLargeImageText(mLargeImageTexts.value(pHost));
+    } else {
+        pDiscordPresence->setLargeImageText(QString());
     }
+
     if (pHost->mDiscordAccessFlags & Host::DiscordSetSmallIcon) {
         pDiscordPresence->setSmallImageKey(mSmallImages.value(pHost));
     }

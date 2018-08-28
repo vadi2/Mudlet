@@ -457,17 +457,17 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         groupBox_discordPrivacy->show();
         checkBox_discordLuaAPI->setChecked(discordFlags & Host::DiscordLuaAccessEnabled);
 
-        if (!(discordFlags & Host::DiscordSetLargeIcon) && !(discordFlags & Host::DiscordSetLargeIconText)) {
+        if ((discordFlags & Host::DiscordSetLargeIcon) && (discordFlags & Host::DiscordSetLargeIconText)) {
             comboBox_discordLargeIconPrivacy->setCurrentIndex(0);
-        } else if (!(discordFlags & Host::DiscordSetLargeIcon) && (discordFlags & Host::DiscordSetLargeIconText)) {
+        } else if ((discordFlags & Host::DiscordSetLargeIcon) && !(discordFlags & Host::DiscordSetLargeIconText)) {
             comboBox_discordLargeIconPrivacy->setCurrentIndex(1);
         } else {
             comboBox_discordLargeIconPrivacy->setCurrentIndex(2);
         }
 
-        if (!(discordFlags & Host::DiscordSetSmallIcon) && !(discordFlags & Host::DiscordSetSmallIconText)) {
+        if ((discordFlags & Host::DiscordSetSmallIcon) && (discordFlags & Host::DiscordSetSmallIconText)) {
             comboBox_discordSmallIconPrivacy->setCurrentIndex(0);
-        } else if (!(discordFlags & Host::DiscordSetSmallIcon) && (discordFlags & Host::DiscordSetSmallIconText)) {
+        } else if ((discordFlags & Host::DiscordSetSmallIcon) && !(discordFlags & Host::DiscordSetSmallIconText)) {
             comboBox_discordSmallIconPrivacy->setCurrentIndex(1);
         } else {
             comboBox_discordSmallIconPrivacy->setCurrentIndex(2);
@@ -2076,35 +2076,35 @@ void dlgProfilePreferences::slot_save_and_exit()
 
         pHost->mSearchEngineName = search_engine_combobox->currentText();
 
-        auto smallIcon = false, smallIconText = false;
+        auto hideSmallIcon = false, hideSmallIconText = false;
         if (comboBox_discordSmallIconPrivacy->currentIndex() == 0) {
-            smallIcon = false;
-            smallIconText = false;
+            hideSmallIcon = false;
+            hideSmallIconText = false;
         } else if (comboBox_discordSmallIconPrivacy->currentIndex() == 1) {
-            smallIcon = false;
-            smallIconText = true;
+            hideSmallIcon = false;
+            hideSmallIconText = true;
         } else {
-            smallIcon = true;
-            smallIconText = true;
+            hideSmallIcon = true;
+            hideSmallIconText = true;
         }
 
-        auto largeIcon = false, largeIconText = false;
+        auto hideLargeIcon = false, hideLargeIconText = false;
         if (comboBox_discordLargeIconPrivacy->currentIndex() == 0) {
-            largeIcon = false;
-            largeIconText = false;
+            hideLargeIcon = false;
+            hideLargeIconText = false;
         } else if (comboBox_discordLargeIconPrivacy->currentIndex() == 1) {
-            largeIcon = false;
-            largeIconText = true;
+            hideLargeIcon = false;
+            hideLargeIconText = true;
         } else {
-            largeIcon = true;
-            largeIconText = true;
+            hideLargeIcon = true;
+            hideLargeIconText = true;
         }
 
         pHost->mDiscordAccessFlags = static_cast<Host::DiscordOptionFlags>(
-                                         (largeIcon ? Host::DiscordSetLargeIcon : Host::DiscordNoOption)
-                                         | (largeIconText ? Host::DiscordSetLargeIconText : Host::DiscordNoOption)
-                                         | (smallIcon ? Host::DiscordSetSmallIcon : Host::DiscordNoOption)
-                                         | (smallIconText ? Host::DiscordSetSmallIconText : Host::DiscordNoOption)
+                                         (hideLargeIcon ? Host::DiscordNoOption : Host::DiscordSetLargeIcon)
+                                         | (hideLargeIconText ? Host::DiscordNoOption : Host::DiscordSetLargeIconText)
+                                         | (hideSmallIcon ? Host::DiscordNoOption : Host::DiscordSetSmallIcon)
+                                         | (hideSmallIconText ? Host::DiscordNoOption : Host::DiscordSetSmallIconText)
                                          | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordNoOption : Host::DiscordSetDetail)
                                          | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordNoOption : Host::DiscordSetState)
                                          | (checkBox_discordLuaAPI->isChecked() ? Host::DiscordLuaAccessEnabled : Host::DiscordNoOption));
