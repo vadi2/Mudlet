@@ -23,3 +23,4 @@ QMAKE_LFLAGS += -fsanitize=address,fuzzer
 
 SOURCES += main.cpp
 
+include(../../src/mudlet.pro)
