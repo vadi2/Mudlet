@@ -245,7 +245,7 @@ unix:!macx {
     # Now picks up the first element of the environmental XDG_DATA_DIRS if
     # not overridden:
     isEmpty( DATAROOTDIR ) {
-        DATAROOTDIR = $$first($$replace( XDG_DATA_DIRS, ":", " "))
+#        DATAROOTDIR = $$first($$replace( XDG_DATA_DIRS, ":", " "))
         isEmpty( DATAROOTDIR ) DATAROOTDIR = $${PREFIX}/share
     }
 
