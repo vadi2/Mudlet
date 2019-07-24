@@ -334,6 +334,10 @@ macx {
     INCLUDEPATH += /usr/local/include
 }
 
+emscripten {
+    INCLUDEPATH += /usr/include
+}
+
 # use ccache if available
 unix {
     BASE_CXX = $$QMAKE_CXX
@@ -1409,3 +1413,4 @@ DISTFILES += \
     ../CI/mudlet-deploy-key-windows.ppk \
     ../CI/qt-silent-install.qs \
     ../CI/travis.compile.sh
+
