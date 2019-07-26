@@ -219,7 +219,12 @@ unix:!macx {
         LIBS += \
             -llua5.1 \
             -lhunspell
-        INCLUDEPATH += /usr/include/lua5.1
+
+        !emscripten {
+            INCLUDEPATH += /usr/include/lua5.1
+        } else {
+            QMAKE_CXXFLAGS += -Xclang -isystem /usr/include/lua5.1
+        }
     }
     LIBS += -lpcre \
         -L/usr/local/lib/ \
@@ -287,7 +292,7 @@ macx {
 }
 
 emscripten {
-    INCLUDEPATH += /usr/include
+    QMAKE_CXXFLAGS += -Xclang -isystem /usr/include
 }
 
 # use ccache if available
