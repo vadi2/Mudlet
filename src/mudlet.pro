@@ -293,9 +293,10 @@ macx {
 
 emscripten {
     QMAKE_CXXFLAGS += -Xclang -isystem/usr/include
-    QMAKE_CXXFLAGS += -Xclang -isystem/usr/include/x86_64-linux-gnu/
-#    INCLUDEPATH += -isystem /usr/include
+    QMAKE_CXXFLAGS += -Xclang -isystem/usr/include/x86_64-linux-gnu
+    QMAKE_CXXFLAGS += -fcolor-diagnostics
 }
+
 
 # use ccache if available
 unix {
