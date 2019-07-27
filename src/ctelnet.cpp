@@ -42,6 +42,7 @@
 #include <QProgressDialog>
 #include <QTextCodec>
 #include <QSslError>
+#include <QSslSocket>
 #include "post_guard.h"
 
 // Uncomment this to get debugging messages about WILL/WONT/DO/DONT commands for
