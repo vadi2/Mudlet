@@ -223,7 +223,7 @@ unix:!macx {
         !emscripten {
             INCLUDEPATH += /usr/include/lua5.1
         } else {
-            QMAKE_CXXFLAGS += -Xclang -isystem /usr/include/lua5.1
+            QMAKE_CXXFLAGS += -Xclang -isystem/usr/include/lua5.1
         }
     }
     LIBS += -lpcre \
@@ -292,7 +292,9 @@ macx {
 }
 
 emscripten {
-    QMAKE_CXXFLAGS += -Xclang -isystem /usr/include
+    QMAKE_CXXFLAGS += -Xclang -isystem/usr/include
+    QMAKE_CXXFLAGS += -Xclang -isystem/usr/include/x86_64-linux-gnu/
+#    INCLUDEPATH += -isystem /usr/include
 }
 
 # use ccache if available
