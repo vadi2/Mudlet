@@ -69,7 +69,7 @@ TTextEdit::TTextEdit(TConsole* pC, QWidget* pW, TBuffer* pB, Host* pH, bool isLo
     mLastClickTimer.start();
     if (pC->getType() != TConsole::CentralDebugConsole) {
         mFontHeight = QFontMetrics(mpHost->mDisplayFont).height();
-        mFontWidth = QFontMetrics(mpHost->mDisplayFont).width(QChar('W'));
+        mFontWidth = QFontMetrics(mpHost->mDisplayFont).averageCharWidth();
         mScreenWidth = 100;
         if ((width() / mFontWidth) < mScreenWidth) {
             mScreenWidth = 100; //width()/mFontWidth;
@@ -92,7 +92,7 @@ TTextEdit::TTextEdit(TConsole* pC, QWidget* pW, TBuffer* pB, Host* pH, bool isLo
         // This is part of the Central Debug Console
         mShowTimeStamps = true;
         mFontHeight = QFontMetrics(mDisplayFont).height();
-        mFontWidth = QFontMetrics(mDisplayFont).width(QChar('W'));
+        mFontWidth = QFontMetrics(mDisplayFont).averageCharWidth();
         mScreenWidth = 100;
         mDisplayFont.setFixedPitch(true);
 #if defined(Q_OS_MACOS) || defined(Q_OS_LINUX)
@@ -225,7 +225,7 @@ void TTextEdit::initDefaultSettings()
 void TTextEdit::updateScreenView()
 {
     if (isHidden()) {
-        mFontWidth = QFontMetrics(mDisplayFont).width(QChar(' '));
+        mFontWidth = QFontMetrics(mDisplayFont).averageCharWidth();
         mFontDescent = QFontMetrics(mDisplayFont).descent();
         mFontAscent = QFontMetrics(mDisplayFont).ascent();
         mFontHeight = mFontAscent + mFontDescent;
@@ -249,7 +249,7 @@ void TTextEdit::updateScreenView()
     // This was "if (pC->mType == TConsole::MainConsole) {"
     // and mIsMiniConsole is true for user created Mini Consoles and User Windows
     if (mpConsole->getType() == TConsole::MainConsole) {
-        mFontWidth = QFontMetrics(mpHost->mDisplayFont).width(QChar('W'));
+        mFontWidth = QFontMetrics(mpHost->mDisplayFont).averageCharWidth();
         mFontDescent = QFontMetrics(mpHost->mDisplayFont).descent();
         mFontAscent = QFontMetrics(mpHost->mDisplayFont).ascent();
         mFontHeight = mFontAscent + mFontDescent;
@@ -270,7 +270,7 @@ void TTextEdit::updateScreenView()
         }
 #endif
     } else {
-        mFontWidth = QFontMetrics(mDisplayFont).width(QChar('W'));
+        mFontWidth = QFontMetrics(mDisplayFont).averageCharWidth();
         mFontDescent = QFontMetrics(mDisplayFont).descent();
         mFontAscent = QFontMetrics(mDisplayFont).ascent();
         mFontHeight = mFontAscent + mFontDescent;
