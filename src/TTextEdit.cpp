@@ -1489,13 +1489,7 @@ void TTextEdit::slot_copySelectionToClipboardImage()
     for (int y = mPA.y(), total = mPB.y() + 1; y < total; ++y) {
         const QString lineText{mpBuffer->lineBuffer.at(y)};
         // Will accumulate the width in pixels of the current line:
-        int lineWidth{};
-        if (mShowTimeStamps) {
-            // The timestamp is (currently) 13 "normal width" characters
-            // but that might not always be the case in some future I18n
-            // situations:
-            lineWidth += 13 * mFontWidth;
-        }
+        int lineWidth{(mShowTimeStamps ? 13 : 0) * mFontWidth};
         // Accumulated width in "normal" width characters:
         int column{};
         QTextBoundaryFinder boundaryFinder(QTextBoundaryFinder::Grapheme, lineText);
@@ -1511,7 +1505,10 @@ void TTextEdit::slot_copySelectionToClipboardImage()
                 charWidth = getGraphemeWidth(unicode);
             }
             column +=charWidth;
-            lineWidth = charWidth * mFontWidth;
+            // The timestamp is (currently) 13 "normal width" characters
+            // but that might not always be the case in some future I18n
+            // situations:
+            lineWidth = (mShowTimeStamps ? 13 + column : column) * mFontWidth;
             // Increment for loop:
             indexOfChar = nextBoundary;
         }
@@ -1519,7 +1516,7 @@ void TTextEdit::slot_copySelectionToClipboardImage()
         largestLine = std::max(lineWidth, largestLine);
     }
 
-    auto widthpx = qMin(65500, largestLine * mFontWidth);
+    auto widthpx = qMin(65500, largestLine);
 
     auto rect = QRect(mPA.x(), mPA.y(), widthpx, heightpx);
 
