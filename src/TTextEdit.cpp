@@ -996,6 +996,11 @@ void TTextEdit::mouseMoveEvent(QMouseEvent* event)
 // caller(s):
 int TTextEdit::convertMouseXToBufferX(const int mouseX, const int lineNumber) const
 {
+#if defined (QT_DEBUG)
+    // Enable this from debugger to show output
+    static bool debug_mousePositionInLine = false;
+#endif
+
     if (lineNumber >= 0 && lineNumber < mpBuffer->lineBuffer.size()) {
         // Line number is (should be) within range of lines in the
         // TBuffer::lineBuffer - might need to check that this still works after
@@ -1011,12 +1016,27 @@ int TTextEdit::convertMouseXToBufferX(const int mouseX, const int lineNumber) co
         int currentX = 0;
         QString lineText = mpBuffer->lineBuffer.at(lineNumber);
         QTextBoundaryFinder boundaryFinder(QTextBoundaryFinder::Grapheme, lineText);
-        qDebug().noquote().nospace() << "TTextEdit::convertMouseXToBufferX(" << mouseX << ", " << lineNumber << ") INFO - finding mouse click position in line:";
+#if defined (QT_DEBUG)
+        if (debug_mousePositionInLine) {
+            qDebug().noquote().nospace() << "TTextEdit::convertMouseXToBufferX(" << mouseX << ", " << lineNumber << ") INFO - finding mouse click position in line:";
+        }
+#endif
         for (int indexOfChar = 0, total = lineText.size(); indexOfChar < total; /*incrementing is done inside loop*/) {
             int nextBoundary = boundaryFinder.toNextBoundary();
             // Width in "normal" width equivalent of this grapheme:
             int charWidth = 0;
             const QString grapheme = lineText.mid(indexOfChar, nextBoundary - indexOfChar);
+#if defined (QT_DEBUG)
+            if (debug_mousePositionInLine) {
+                if (indexOfChar > 0) {
+                    // Include graphemes BEFORE the current last one considered:
+                    qDebug().noquote().nospace() << lineText.left(indexOfChar) << "»" << grapheme << "«";
+                } else {
+                    // First grapheme:
+                    qDebug().noquote().nospace() << "»" << grapheme << "«";
+                }
+            }
+#endif
             const uint unicode = getGraphemeBaseCharacter(grapheme);
             if (unicode == '\t') {
                 charWidth = mTabStopwidth - (column % mTabStopwidth);
