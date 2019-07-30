@@ -453,9 +453,8 @@ inline uint TTextEdit::getGraphemeBaseCharacter(const QString& str) const
             return QChar::surrogateToUcs4(first, second);
         }
 
-        // Although this has been coded for it is not what I expect to see - SlySven:
         if (Q_UNLIKELY(first.isLowSurrogate() && second.isHighSurrogate())) {
-            qDebug().noquote().nospace() << "TTextEdit::getGraphemeBaseCharacter(\"str\") INFO - passed a QString comprising a Low followed by a High surrogate QChar, this is counter to the developers' expectations of the QString class construct!";
+            qDebug().noquote().nospace() << "TTextEdit::getGraphemeBaseCharacter(\"str\") INFO - passed a QString comprising a Low followed by a High surrogate QChar, this is not expected, they will be swapped around to try and recover but if this causes mojibake (text corrupted into meaningless symbols) please report this to the developers!";
             return QChar::surrogateToUcs4(second, first);
         }
 
@@ -996,11 +995,6 @@ void TTextEdit::mouseMoveEvent(QMouseEvent* event)
 // caller(s):
 int TTextEdit::convertMouseXToBufferX(const int mouseX, const int lineNumber) const
 {
-#if defined (QT_DEBUG)
-    // Enable this from debugger to show output
-    static bool debug_mousePositionInLine = false;
-#endif
-
     if (lineNumber >= 0 && lineNumber < mpBuffer->lineBuffer.size()) {
         // Line number is (should be) within range of lines in the
         // TBuffer::lineBuffer - might need to check that this still works after
@@ -1016,27 +1010,11 @@ int TTextEdit::convertMouseXToBufferX(const int mouseX, const int lineNumber) co
         int currentX = 0;
         QString lineText = mpBuffer->lineBuffer.at(lineNumber);
         QTextBoundaryFinder boundaryFinder(QTextBoundaryFinder::Grapheme, lineText);
-#if defined (QT_DEBUG)
-        if (debug_mousePositionInLine) {
-            qDebug().noquote().nospace() << "TTextEdit::convertMouseXToBufferX(" << mouseX << ", " << lineNumber << ") INFO - finding mouse click position in line:";
-        }
-#endif
-        for (int indexOfChar = 0, total = lineText.size(); indexOfChar < total; /*incrementing is done inside loop*/) {
+        for (int indexOfChar = 0, total = lineText.size(); indexOfChar < total;) {
             int nextBoundary = boundaryFinder.toNextBoundary();
             // Width in "normal" width equivalent of this grapheme:
             int charWidth = 0;
             const QString grapheme = lineText.mid(indexOfChar, nextBoundary - indexOfChar);
-#if defined (QT_DEBUG)
-            if (debug_mousePositionInLine) {
-                if (indexOfChar > 0) {
-                    // Include graphemes BEFORE the current last one considered:
-                    qDebug().noquote().nospace() << lineText.left(indexOfChar) << "»" << grapheme << "«";
-                } else {
-                    // First grapheme:
-                    qDebug().noquote().nospace() << "»" << grapheme << "«";
-                }
-            }
-#endif
             const uint unicode = getGraphemeBaseCharacter(grapheme);
             if (unicode == '\t') {
                 charWidth = mTabStopwidth - (column % mTabStopwidth);
@@ -1054,7 +1032,6 @@ int TTextEdit::convertMouseXToBufferX(const int mouseX, const int lineNumber) co
                 }
                 return std::max(0, indexOfChar);
             }
-            // Increment for loop:
             indexOfChar = nextBoundary;
         }
     }
@@ -1485,7 +1462,6 @@ void TTextEdit::slot_copySelectionToClipboardImage()
 
     // find the biggest width of text we need to work with
     int largestLine{};
-    qDebug().noquote().nospace() << "TTextEdit::slot_copySelectionToClipboardImage() INFO - line widths in \"normal\" character widths (and pixels):";
     for (int y = mPA.y(), total = mPB.y() + 1; y < total; ++y) {
         const QString lineText{mpBuffer->lineBuffer.at(y)};
         // Will accumulate the width in pixels of the current line:
@@ -1493,7 +1469,7 @@ void TTextEdit::slot_copySelectionToClipboardImage()
         // Accumulated width in "normal" width characters:
         int column{};
         QTextBoundaryFinder boundaryFinder(QTextBoundaryFinder::Grapheme, lineText);
-        for (int indexOfChar{}, total{lineText.size()}; indexOfChar < total; /*incrementing is done inside loop*/) {
+        for (int indexOfChar{}, total{lineText.size()}; indexOfChar < total;) {
             int nextBoundary{boundaryFinder.toNextBoundary()};
             // Width in "normal" width equivalent of this grapheme:
             int charWidth{};
@@ -1509,17 +1485,13 @@ void TTextEdit::slot_copySelectionToClipboardImage()
             // but that might not always be the case in some future I18n
             // situations:
             lineWidth = (mShowTimeStamps ? 13 + column : column) * mFontWidth;
-            // Increment for loop:
             indexOfChar = nextBoundary;
         }
-        qDebug().noquote().nospace() << "\"" << lineText << "\" " << column << " (" << lineWidth << ")";
         largestLine = std::max(lineWidth, largestLine);
     }
 
-    auto widthpx = qMin(65500, largestLine);
-
+    auto widthpx = std::min(65500, largestLine);
     auto rect = QRect(mPA.x(), mPA.y(), widthpx, heightpx);
-
     auto pixmap = QPixmap(widthpx, heightpx);
     pixmap.fill(palette().base().color());
 
