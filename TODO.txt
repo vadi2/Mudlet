@@ -1,6 +1,12 @@
 To compile
 
+Compile Qt with:
+./configure -feature-thread -xplatform wasm-emscripten -nomake examples -prefix $PWD/qtbase
+make -j 2 module-qtbase module-qtdeclarative module-network module-opengl module-uitools module-multimedia module-gui module-concurrent
+
 /home/vadi/Programs/Qt/5.13.0/Src/qtbase/bin/qmake src/mudlet.pro
+
+# do not use /home/vadi/Programs/Qt/5.13.0/wasm_32/bin/qmake, ie qt 5.13.0 - it does not have concurrent support
 
 https://github.com/k-takata/Onigmo/issues/130
 
