@@ -39,6 +39,7 @@
 
 #include "pre_guard.h"
 #include <QtUiTools>
+#include <QNetworkProxy>
 #include <zip.h>
 #include <memory>
 #include "post_guard.h"
@@ -67,6 +68,12 @@ Host::Host(int port, const QString& hostname, const QString& login, const QStrin
 , mFORCE_NO_COMPRESSION(false)
 , mFORCE_SAVE_ON_EXIT(false)
 , mInsertedMissingLF(false)
+, mSslTsl(false)
+, mUseProxy(false)
+, mProxyAddress(QString())
+, mProxyPort(0)
+, mProxyUsername(QString())
+, mProxyPassword(QString())
 , mIsGoingDown(false)
 , mIsProfileLoadingSequence(false)
 , mLF_ON_GA(true)
@@ -474,7 +481,6 @@ std::tuple<bool, QString, QString> Host::saveProfileAs(const QString& file)
 
 void Host::xmlSaved(const QString& xmlName)
 {
-    qDebug() << "saved" << xmlName;
     if (writers.contains(xmlName)) {
         auto writer = writers.take(xmlName);
         delete writer;
@@ -1767,7 +1773,8 @@ void Host::setName(const QString& newName)
     mTimerUnit.changeHostName(newName);
 }
 
-void Host::updateProxySettings(QNetworkAccessManager* manager) {
+void Host::updateProxySettings(QNetworkAccessManager* manager)
+{
     if (mUseProxy && !mProxyAddress.isEmpty() && mProxyPort != 0) {
         auto& proxy = getConnectionProxy();
         manager->setProxy(*proxy);

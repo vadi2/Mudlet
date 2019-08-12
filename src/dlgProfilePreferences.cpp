@@ -251,6 +251,7 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
     connect(pMudlet, &mudlet::signal_menuBarVisibilityChanged, this, &dlgProfilePreferences::slot_changeMenuBarVisibility);
     connect(pMudlet, &mudlet::signal_toolBarVisibilityChanged, this, &dlgProfilePreferences::slot_changeToolBarVisibility);
     connect(pMudlet, &mudlet::signal_showIconsOnMenusChanged, this, &dlgProfilePreferences::slot_changeShowIconsOnMenus);
+    connect(pMudlet, &mudlet::signal_guiLanguageChanged, this, &dlgProfilePreferences::slot_guiLanguageChanged);
 
     generateDiscordTooltips();
 
@@ -258,17 +259,61 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
 
     comboBox_guiLanguage->clear();
     for (auto& code : pMudlet->getAvailableTranslationCodes()) {
-        auto& translatedName = pMudlet->mLanguageCodeMap.value(code).first;
-        int translatedPc = pMudlet->mLanguageCodeMap.value(code).second;
-        comboBox_guiLanguage->addItem(translatedName, code);
-        if (translatedPc >= pMudlet->mTranslationStar) {
-            comboBox_guiLanguage->setItemIcon(comboBox_guiLanguage->count()-1, QIcon(":/icons/rating.png"));
+        auto& translation = pMudlet->mTranslationsMap.value(code);
+        auto& nativeName = translation.getNativeName();
+        if (translation.fromResourceFile()) {
+            auto& translatedPc = translation.getTranslatedPercentage();
+            if (translatedPc >= pMudlet->mTranslationGoldStar) {
+                comboBox_guiLanguage->addItem(QIcon(":/icons/rating.png"),
+                                              nativeName,
+                                              code);
+            } else {
+                // This will also be used if the percentage is set to zero
+                // because it was not found in the translation statistics file
+                // during compilation even though the Mudlet translation is in
+                // the resources file:
+                comboBox_guiLanguage->addItem(QIcon(),
+                                              tr("%1 (%2% done)",
+                                                 // Intentional argument to separate arguments
+                                                 "%1 is the (not-translated so users of the language can read it!) language name, %2 is percentage done.")
+                                              .arg(nativeName, QString::number(translatedPc)),
+                                              code);
+            }
+        } else {
+            // For translations that come from somewhere else we are not likely
+            // to have the translations statistics so no icon and no extra text:
+            comboBox_guiLanguage->addItem(QIcon(), nativeName, code);
         }
     }
     comboBox_guiLanguage->model()->sort(0);
-    auto current = pMudlet->mInterfaceLanguage;
-    comboBox_guiLanguage->setCurrentText(pMudlet->mLanguageCodeMap.value(current).first);
-    connect(comboBox_guiLanguage, QOverload<const QString &>::of(&QComboBox::currentIndexChanged), this, &dlgProfilePreferences::slot_changeGuiLanguage);
+    auto currentLanguage = pMudlet->getInterfaceLanguage();
+    int currentIndex = comboBox_guiLanguage->findData(currentLanguage);
+    if (Q_LIKELY(currentIndex != -1)) {
+        // The language code has been found in the UserData role for one of the
+        // entries - so select it
+        comboBox_guiLanguage->setCurrentIndex(currentIndex);
+        connect(comboBox_guiLanguage, QOverload<const QString &>::of(&QComboBox::currentIndexChanged), this, &dlgProfilePreferences::slot_changeGuiLanguage);
+    } else {
+        currentIndex = comboBox_guiLanguage->findData(QStringLiteral("en_US"));
+        if (Q_LIKELY(currentIndex != -1)) {
+           // The default code has been found in the UserData role for one of
+           // the entries - so select it as a fallback
+            comboBox_guiLanguage->setCurrentIndex(currentIndex);
+            connect(comboBox_guiLanguage, QOverload<const QString &>::of(&QComboBox::currentIndexChanged), this, &dlgProfilePreferences::slot_changeGuiLanguage);
+        } else if (comboBox_guiLanguage->count()) {
+            // There is at least ONE entry but it is not the expected one
+            // or the American English default - so select that first one as a
+            // last ditch effort:
+            comboBox_guiLanguage->setCurrentIndex(0);
+            connect(comboBox_guiLanguage, QOverload<const QString &>::of(&QComboBox::currentIndexChanged), this, &dlgProfilePreferences::slot_changeGuiLanguage);
+        } else {
+            // Nothing available - so disable the control:
+            comboBox_guiLanguage->setEnabled(false);
+            // And insert an Engineering English warning text - this is probably
+            // a sign of significant borkage in the translation system!
+            comboBox_guiLanguage->addItem(QStringLiteral("No translations available!"));
+        }
+    }
 }
 
 void dlgProfilePreferences::disableHostDetails()
@@ -276,7 +321,7 @@ void dlgProfilePreferences::disableHostDetails()
     // The Host pointer is a nullptr so disable every control that depends on it
 
     // on tab_general:
-    // groupBox_iconsAndToolbars is NOT dependent on pHost - leave it alone
+    // groupBox_iconsAndToolbars is NOT dependent on pHost - so leave it alone
     label_encoding->setEnabled(false);
     comboBox_encoding->setEnabled(false);
     groupBox_miscellaneous->setEnabled(false);
@@ -358,6 +403,7 @@ void dlgProfilePreferences::disableHostDetails()
 
 void dlgProfilePreferences::enableHostDetails()
 {
+    // on tab_general:
     label_encoding->setEnabled(true);
     comboBox_encoding->setEnabled(true);
     groupBox_miscellaneous->setEnabled(true);
@@ -795,11 +841,11 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         ssl_issued_label->setText(cert.subjectInfo(QSslCertificate::CommonName).join(","));
         ssl_expires_label->setText(cert.expiryDate().toString(Qt::LocalDate));
         ssl_serial_label->setText(QString::fromStdString(cert.serialNumber().toStdString()));
-        checkBox_self_signed->setStyleSheet("");
-        checkBox_expired->setStyleSheet("");
-        ssl_issuer_label->setStyleSheet("");
-        ssl_expires_label->setStyleSheet("");
-        checkBox_ssl->setStyleSheet("");
+        checkBox_self_signed->setStyleSheet(QString());
+        checkBox_expired->setStyleSheet(QString());
+        ssl_issuer_label->setStyleSheet(QString());
+        ssl_expires_label->setStyleSheet(QString());
+        checkBox_ssl->setStyleSheet(QString());
 
         if (!pHost->mTelnet.getSslErrors().empty()) {
             // handle ssl errors
@@ -854,6 +900,7 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
     checkBox_expired->setChecked(pHost->mSslIgnoreExpired);
     checkBox_ignore_all->setChecked(pHost->mSslIgnoreAll);
 
+    groupBox_proxy->setEnabled(true);
     groupBox_proxy->setChecked(pHost->mUseProxy);
     lineEdit_proxyAddress->setText(pHost->mProxyAddress);
     if (pHost->mProxyPort != 0) {
@@ -1121,6 +1168,8 @@ void dlgProfilePreferences::clearHostDetails()
     checkBox_discordServerAccessToTimerInfo->setChecked(false);
     lineEdit_discordUserName->clear();
     lineEdit_discordUserDiscriminator->clear();
+
+    groupBox_proxy->setDisabled(true);
 
     // Remove the reference to the Host/profile in the title:
     setWindowTitle(tr("Profile preferences"));
@@ -1459,6 +1508,7 @@ void dlgProfilePreferences::setDisplayFont()
     font.setPointSize(mFontSize);
     if (pHost->mDisplayFont != font) {
         pHost->mDisplayFont = font;
+        QFont::insertSubstitution(pHost->mDisplayFont.family(), QStringLiteral("Noto Color Emoji"));
         if (mudlet::self()->mConsoleMap.contains(pHost)) {
             mudlet::self()->mConsoleMap[pHost]->changeColors();
 
@@ -2397,7 +2447,9 @@ void dlgProfilePreferences::slot_save_and_exit()
     }
 
 #if defined(INCLUDE_UPDATER)
-    pMudlet->updater->setAutomaticUpdates(!checkbox_noAutomaticUpdates->isChecked());
+    if (!mudlet::scmIsDevelopmentVersion) {
+        pMudlet->updater->setAutomaticUpdates(!checkbox_noAutomaticUpdates->isChecked());
+    }
 #endif
 
     pMudlet->setToolBarIconSize(MainIconSize->value());
@@ -3380,17 +3432,53 @@ void dlgProfilePreferences::slot_changeShowIconsOnMenus(const Qt::CheckState sta
     }
 }
 
-void dlgProfilePreferences::slot_changeGuiLanguage(const QString &language)
+// This slot is called when the QComboBox for the locale/language in this dialog
+// is changed by the user.
+void dlgProfilePreferences::slot_changeGuiLanguage(const QString& language)
 {
     Q_UNUSED(language);
 
     auto languageCode = comboBox_guiLanguage->currentData().toString();
-    // WIP remove hardcoding when PR is done and languages have names in Preferences
-    if (languageCode == QStringLiteral("English")) {
-        mudlet::self()->setInterfaceLanguage(QStringLiteral("en_US"));
-    } else {
-        mudlet::self()->setInterfaceLanguage(languageCode);
+    mudlet::self()->setInterfaceLanguage(languageCode);
+    label_languageChangeWarning->show();
+}
+
+// This slot is called when the mudlet singleton tells everything that the
+// locale/language selection has been changed (new translators installed)
+// It probably came about because the control for it on THIS dialog was changed
+// but it need not - the most obvious example would be if multi-playing and
+// the preferences were open for more than one profile and the control was
+// changed in another profile's preferences.
+void dlgProfilePreferences::slot_guiLanguageChanged(const QString& language)
+{
+    // First ensure our QComboBox is set to the given value:
+    if (comboBox_guiLanguage->currentData().toString() != language) {
+        // Ah, it wasn't us who changed it - so we must adopt the new value
+        // but not signal anything to prevent endless loops:
+        comboBox_guiLanguage->blockSignals(true);
+        comboBox_guiLanguage->setCurrentIndex(comboBox_guiLanguage->findData(language));
+        comboBox_guiLanguage->blockSignals(false);
     }
 
-    label_languageChangeWarning->show();
+    // Now change the displayed texts that are translated - importantly this
+    // is done so that the message that says "restart Mudlet to finish changing
+    // the language" is shown in the newly selected langauge - on the basis that
+    // it is the one the user understands rather than the currently used one.
+    retranslateUi(this);
+
+    // Re identify which Profile we are showing the settings for (otherwise if
+    // multiple profiles have this dialog open they revert to a plain
+    // "Profile preferences" dialog title except that duplicates get a " <#>"
+    // suffix to the title to tell them apart which is not good for telling
+    // which profile is represented by each dialog when we were previously
+    // showing the profile name as well):
+    if (mpHost) {
+        setWindowTitle(tr("Profile preferences - %1").arg(mpHost->getName()));
+    }
+
+    // If we wanted to support changing the locale/language without having to
+    // restart then the above: retranslateUi(...) + regenerate texts that are
+    // assembled after the class instance was created {i.e. outside of the
+    // setupUi(...) call in the constructor} would be needed in every class with
+    // persistent UI texts - this is not trivial and has been deemed NWIH...!
 }
