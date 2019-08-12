@@ -9,5 +9,9 @@ ELIMINATE_DUPLICATE_FUNCTIONS=1 make
 
 # do not use /home/vadi/Programs/Qt/5.13.0/wasm_32/bin/qmake, ie qt 5.13.0 - it does not have concurrent support
 
+# have a workaround
 https://github.com/k-takata/Onigmo/issues/130
+
+# need to update edbee for this
+https://github.com/kkos/oniguruma/issues/77
 
