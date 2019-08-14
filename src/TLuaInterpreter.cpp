@@ -1153,10 +1153,8 @@ int TLuaInterpreter::setProfileIcon(lua_State* L)
     }
 
     Host& host = getHostFromLua(L);
-    bool success;
-    QString message;
 
-    std::tie(success, message) = mudlet::self()->setProfileIcon(host.getName(), iconPath);
+    auto[success, message] = mudlet::self()->setProfileIcon(host.getName(), iconPath);
     if (success) {
         lua_pushboolean(L, true);
         return 1;
@@ -1171,10 +1169,8 @@ int TLuaInterpreter::setProfileIcon(lua_State* L)
 int TLuaInterpreter::resetProfileIcon(lua_State* L)
 {
     Host& host = getHostFromLua(L);
-    bool success;
-    QString message;
 
-    std::tie(success, message) = mudlet::self()->resetProfileIcon(host.getName());
+    auto [success, message] = mudlet::self()->resetProfileIcon(host.getName());
     if (success) {
         lua_pushboolean(L, true);
         return 1;
@@ -4852,6 +4848,10 @@ int TLuaInterpreter::searchRoom(lua_State* L)
         if (!roomIdsFound.isEmpty()) {
             for (int i : roomIdsFound) {
                 TRoom* pR = host.mpMap->mpRoomDB->getRoom(i);
+                if (!pR) {
+                    continue;
+                }
+
                 QString name = pR->name;
                 int roomID = pR->getId();
                 lua_pushnumber(L, roomID);
@@ -10384,11 +10384,8 @@ int TLuaInterpreter::downloadFile(lua_State* L)
     }
 
     QNetworkRequest request = QNetworkRequest(url);
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 9, 0))
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-#else
-    request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
-#endif
+
     // This should fix: https://bugs.launchpad.net/mudlet/+bug/1366781
     request.setRawHeader(QByteArray("User-Agent"), QByteArray(QStringLiteral("Mozilla/5.0 (Mudlet/%1%2)").arg(APP_VERSION, APP_BUILD).toUtf8().constData()));
 #ifndef QT_NO_SSL

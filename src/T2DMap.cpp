@@ -447,10 +447,14 @@ void T2DMap::slot_switchArea(const QString& newAreaName)
                         }
                     }
 
-                    mOx = closestCenterRoom->x;
-                    // Map y coordinates are reversed on 2D map!
-                    mOy = -closestCenterRoom->y;
-                    mOz = closestCenterRoom->z;
+                    if (closestCenterRoom) {
+                        mOx = closestCenterRoom->x;
+                        // Map y coordinates are reversed on 2D map!
+                        mOy = -closestCenterRoom->y;
+                        mOz = closestCenterRoom->z;
+                    } else {
+                        mOx = mOy = mOz = 0;
+                    }
                 }
 
                 if (!validRoomFound) {
@@ -806,16 +810,13 @@ void T2DMap::paintEvent(QPaintEvent* e)
         }
         static quint8 roomVnumMargin = 10;
         roomVNumFont.setBold(true);
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
-        // QFont::PreferNoShaping is only available in Qt 5.10 or later
+
         // QFont::PreferOutline will help to select a font that will scale to any
         // size - which is important for good rendering over a range of sizes
         // QFont::PreferAntialias will look better - except perhaps at very small
         // sizes (but we prevent that by checking in the method call afterwards):
         roomVNumFont.setStyleStrategy(QFont::StyleStrategy(QFont::PreferNoShaping|QFont::PreferAntialias|QFont::PreferOutline));
-#else
-        roomVNumFont.setStyleStrategy(QFont::StyleStrategy(QFont::PreferAntialias|QFont::PreferOutline));
-#endif
+
         isFontBigEnoughToShowRoomVnum = sizeFontToFitTextInRect(roomVNumFont, roomTestRect, QStringLiteral("8").repeated(mMaxRoomIdDigits), roomVnumMargin);
     }
 
