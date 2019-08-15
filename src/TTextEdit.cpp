@@ -894,16 +894,16 @@ void TTextEdit::mouseMoveEvent(QMouseEvent* event)
         }
 
         if (oldAY < mPA.y()) {
-            for (int y = oldAY, total = mPA.y(); y < total; ++y) {
-                for (auto& x : mpBuffer->buffer[y]) {
-                    x.deselect();
+            for (int yIndex = oldAY, total = mPA.y(); yIndex < total; ++yIndex) {
+                for (auto& TQchar : mpBuffer->buffer[yIndex]) {
+                    TQchar.deselect();
                 }
             }
         }
         if (oldBY > mPB.y()) {
-            for (int y = mPB.y() + 1; y <= oldBY; ++y) {
-                for (auto& x : mpBuffer->buffer[y]) {
-                    x.deselect();
+            for (int yIndex = mPB.y() + 1; yIndex <= oldBY; ++yIndex) {
+                for (auto& TQchar : mpBuffer->buffer[yIndex]) {
+                    TQchar.deselect();
                 }
             }
         }
@@ -921,30 +921,32 @@ void TTextEdit::mouseMoveEvent(QMouseEvent* event)
     if (p1.manhattanLength() < p2.manhattanLength()) {
         if (mPA.y() < PC.y() || ((mPA.x() < PC.x()) && (mPA.y() == PC.y()))) {
             int y1 = PC.y();
-            for (int y = y1, total = mPA.y(); y >= total; --y) {
-                if (y >= static_cast<int>(mpBuffer->buffer.size()) || y < 0) {
+            for (int yIndex = y1, total = mPA.y(); yIndex >= total; --yIndex) {
+                if (yIndex >= static_cast<int>(mpBuffer->buffer.size()) || yIndex < 0) {
                     break;
                 }
-                int x = mpBuffer->buffer.at(y).size() - 1;
-                if (y == y1) {
-                    x = PC.x();
-                    if (x >= static_cast<int>(mpBuffer->buffer.at(y).size())) {
-                        x = static_cast<int>(mpBuffer->buffer.at(y).size()) - 1;
+                auto& bufferLine = mpBuffer->buffer.at(yIndex);
+                int xIndex = bufferLine.size() - 1;
+                if (yIndex == y1) {
+                    xIndex = PC.x();
+                    if (xIndex >= static_cast<int>(bufferLine.size())) {
+                        xIndex = static_cast<int>(bufferLine.size()) - 1;
                     }
-                    if (x < 0) {
-                        x = 0;
+                    if (xIndex < 0) {
+                        xIndex = 0;
                     }
                 }
-                for (;; --x) {
-                    if ((y == mPA.y()) && (x < mPA.x())) {
+                for (;; --xIndex) {
+                    if ((yIndex == mPA.y()) && (xIndex < mPA.x())) {
                         break;
                     }
 
-                    if (x < static_cast<int>(mpBuffer->buffer[y].size()) && x >= 0) {
-                        if (mpBuffer->buffer.at(y).at(x).isSelected()) {
-                            mpBuffer->buffer.at(y).at(x).deselect();
-                            mpBuffer->dirty[y] = true;
+                    if (xIndex >= 0 && xIndex < static_cast<int>(mpBuffer->buffer[yIndex].size())) {
+                        if (bufferLine.at(xIndex).isSelected()) {
+                            bufferLine[xIndex].deselect();
+                            mpBuffer->dirty[yIndex] = true;
                         }
+
                     } else {
                         break;
                     }
@@ -955,22 +957,23 @@ void TTextEdit::mouseMoveEvent(QMouseEvent* event)
     } else {
         if (mPB.y() > PC.y() || (mPB.x() > PC.x() && mPB.y() == PC.y())) {
             int y1 = PC.y();
-            for (int y = y1, total = mPB.y(); y <= total; ++y) {
+            for (int yIndex = y1, total = mPB.y(); yIndex <= total; ++yIndex) {
                 int x = 0;
-                if (y == y1) {
+                if (yIndex == y1) {
                     x = PC.x();
                 }
-                if (y >= static_cast<int>(mpBuffer->buffer.size()) || y < 0) {
+                if (yIndex >= static_cast<int>(mpBuffer->buffer.size()) || yIndex < 0) {
                     break;
                 }
+                auto& bufferLine = mpBuffer->buffer.at(yIndex);
                 for (;; ++x) {
-                    if ((y == mPB.y()) && (x > mPB.x())) {
+                    if ((yIndex == mPB.y()) && (x > mPB.x())) {
                         break;
                     }
-                    if (x < static_cast<int>(mpBuffer->buffer.at(y).size())) {
-                        if (mpBuffer->buffer.at(y).at(x).isSelected()) {
-                            mpBuffer->buffer.at(y).at(x).deselect();
-                            mpBuffer->dirty[y] = true;
+                    if (x < static_cast<int>(bufferLine.size())) {
+                        if (bufferLine.at(x).isSelected()) {
+                            bufferLine[x].deselect();
+                            mpBuffer->dirty[yIndex] = true;
                         }
                     } else {
                         break;
