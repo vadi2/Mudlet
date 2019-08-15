@@ -918,7 +918,9 @@ void TTextEdit::mouseMoveEvent(QMouseEvent* event)
     normaliseSelection();
     QPoint p1 = mPA - PC;
     QPoint p2 = mPB - PC;
-    if (p1.manhattanLength() < p2.manhattanLength()) {
+    if ( (abs(p1.y()) < abs(p2.y()))
+       ||((abs(p1.y()) == abs(p2.y()) && abs(p1.x()) < abs(p2.x())))) {
+
         if (mPA.y() < PC.y() || ((mPA.x() < PC.x()) && (mPA.y() == PC.y()))) {
             int y1 = PC.y();
             for (int yIndex = y1, total = mPA.y(); yIndex >= total; --yIndex) {
