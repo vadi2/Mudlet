@@ -132,6 +132,7 @@ private:
     std::pair<bool, int> drawTextForClipboard(QPainter& p, QRect r, int lineOffset) const;
     int convertMouseXToBufferX(const int mouseX, const int lineNumber) const;
     int getGraphemeWidth(uint unicode) const;
+    void normaliseSelection();
 
     int mFontHeight;
     int mFontWidth;

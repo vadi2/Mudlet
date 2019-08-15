@@ -832,6 +832,13 @@ void TTextEdit::swap(QPoint& p1, QPoint& p2)
     p2 = tmp;
 }
 
+void TTextEdit::normaliseSelection()
+{
+    if (mPA.y() > mPB.y() || ((mPA.y() == mPB.y()) && (mPA.x() > mPB.x()))) {
+        swap(mPA, mPB);
+    }
+}
+
 void TTextEdit::mouseMoveEvent(QMouseEvent* event)
 {
     if (mFontWidth == 0 || mFontHeight == 0) {
@@ -907,12 +914,8 @@ void TTextEdit::mouseMoveEvent(QMouseEvent* event)
         highlight();
         return;
     }
-    if ((mPA.y() == mPB.y()) && (mPA.x() > mPB.x())) {
-        swap(mPA, mPB);
-    }
-    if (mPA.y() > mPB.y()) {
-        swap(mPA, mPB);
-    }
+
+    normaliseSelection();
     QPoint p1 = mPA - PC;
     QPoint p2 = mPB - PC;
     if (p1.manhattanLength() < p2.manhattanLength()) {
@@ -978,13 +981,8 @@ void TTextEdit::mouseMoveEvent(QMouseEvent* event)
 
         mPB = PC;
     }
-    if ((mPA.y() == mPB.y()) && (mPA.x() > mPB.x())) {
-        swap(mPA, mPB);
-    }
-    if (mPA.y() > mPB.y()) {
-        swap(mPA, mPB);
-    }
 
+    normaliseSelection();
     highlight();
 }
 
@@ -1323,12 +1321,7 @@ void TTextEdit::slot_copySelectionToClipboard()
 
 void TTextEdit::slot_copySelectionToClipboardHTML()
 {
-    if ((mPA.y() == mPB.y()) && (mPA.x() > mPB.x())) {
-        swap(mPA, mPB);
-    }
-    if (mPA.y() > mPB.y()) {
-        swap(mPA, mPB);
-    }
+    normaliseSelection();
 
     QString title;
     if (mpConsole->getType() == TConsole::CentralDebugConsole) {
@@ -1432,13 +1425,7 @@ void TTextEdit::slot_copySelectionToClipboardImage()
 
     // if selection was made backwards swap
     // right to left
-    if ((mPA.y() == mPB.y()) && (mPA.x() > mPB.x())) {
-        swap(mPA, mPB);
-    }
-    // down to up
-    if (mPA.y() > mPB.y()) {
-        swap(mPA, mPB);
-    }
+    normaliseSelection();
 
     if (mFontWidth <= 0 || mFontHeight <= 0) {
         return;
@@ -1568,13 +1555,7 @@ QString TTextEdit::getSelectedText(char newlineChar)
 
     // if selection was made backwards swap
     // right to left
-    if ((mPA.y() == mPB.y()) && (mPA.x() > mPB.x())) {
-        swap(mPA, mPB);
-    }
-    // down to up
-    if (mPA.y() > mPB.y()) {
-        swap(mPA, mPB);
-    }
+    normaliseSelection();
 
     QString text;
 
