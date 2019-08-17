@@ -65,7 +65,7 @@ TTextEdit::TTextEdit(TConsole* pC, QWidget* pW, TBuffer* pB, Host* pH, bool isLo
 , mWideAmbigousWidthGlyphs(pH->wideAmbiguousEAsianGlyphs())
 , mUseOldUnicode8(false)
 , mTabStopwidth(8)
-, mTimeStampWidth(13)
+, mTimeStampWidth(13) // Should be the same as the size of the timeStampFormat constant in the TBuffer class
 {
     mLastClickTimer.start();
     if (pC->getType() != TConsole::CentralDebugConsole) {
@@ -1059,9 +1059,7 @@ int TTextEdit::convertMouseXToBufferX(const int mouseX, const int lineNumber) co
             }
             column +=charWidth;
             leftX = rightX;
-            // The need to add 2 seems a little odd but it does work to make the
-            // position decoding the same whether time stamps are showing or not!
-            rightX = (mShowTimeStamps ? mTimeStampWidth + column + 2 : column) * mFontWidth;
+            rightX = (mShowTimeStamps ? mTimeStampWidth + column : column) * mFontWidth;
             debugText << QStringLiteral("[%1]%2[%3]").arg(QString::number(leftX), grapheme, QString::number(rightX - 1));
             if (leftX <= mouseX && mouseX < rightX) {
                 return std::max(0, indexOfChar);
