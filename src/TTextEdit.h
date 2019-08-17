@@ -110,7 +110,7 @@ public:
     qreal mLetterSpacing;
 
 public slots:
-    void slot_toggleTimeStamps();
+    void slot_toggleTimeStamps(const bool);
     void slot_copySelectionToClipboard();
     void slot_selectAll();
     void slot_scrollBarMoved(int);

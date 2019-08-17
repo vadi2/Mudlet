@@ -174,11 +174,13 @@ void TTextEdit::focusInEvent(QFocusEvent* event)
 }
 
 
-void TTextEdit::slot_toggleTimeStamps()
+void TTextEdit::slot_toggleTimeStamps(const bool state)
 {
-    mShowTimeStamps = !mShowTimeStamps;
-    forceUpdate();
-    update();
+    if (mShowTimeStamps != state) {
+        mShowTimeStamps = state;
+        forceUpdate();
+        update();
+    }
 }
 
 void TTextEdit::slot_scrollBarMoved(int line)
