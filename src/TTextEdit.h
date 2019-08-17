@@ -172,6 +172,10 @@ private:
     // probably be 1 (so that a tab is just treated as a space), 2, 4 and 8,
     // in the past it was typically 8 and this is what we'll use at present:
     int mTabStopwidth;
+    // How many normal width characters that are used for the time stamps; it
+    // would only be valid to change this by clearing the buffer first - so
+    // making this a const value for the moment:
+    const int mTimeStampWidth;
 };
 
 #endif // MUDLET_TTEXTEDIT_H
