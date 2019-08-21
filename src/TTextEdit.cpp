@@ -443,6 +443,10 @@ inline void TTextEdit::drawCharacters(QPainter& painter, const QRect& rect, QStr
 #endif
 }
 
+// Extract the base (first) part which will be one or two QChars
+// and if they ARE a surrogate pair convert them back to the single
+// Unicode codepoint (needs around 21 bits, can be contained in a
+// 32bit unsigned integer) value:
 inline uint TTextEdit::getGraphemeBaseCharacter(const QString& str) const
 {
     if (str.isEmpty()) {
@@ -1039,17 +1043,19 @@ int TTextEdit::convertMouseXToBufferX(const int mouseX, const int lineNumber) co
         // by the average character width to determine whether the mouse is over
         // a particular grapheme:
         int column = 0;
-        // This is the calculated (estimated) cumulative width of all of the
-        // graphemes considered in the line so far:
+        // These are the calculated horizontal limits in pixels from the left
+        // for the current grapheme being considered in the line:
         int leftX = 0;
         int rightX = 0;
         QString lineText = mpBuffer->lineBuffer.at(lineNumber);
-        QStringList debugText;
+        // QStringList debugText;
         QTextBoundaryFinder boundaryFinder(QTextBoundaryFinder::Grapheme, lineText);
         for (int indexOfChar = 0, total = lineText.size(); indexOfChar < total;) {
             int nextBoundary = boundaryFinder.toNextBoundary();
             // Width in "normal" width characters equivalent of this grapheme:
             int charWidth = 0;
+            // This could contain a surrogate pair (i.e. pair of QChars) and/or
+            // include suffixed combining diacritical marks (additional QChars):
             const QString grapheme = lineText.mid(indexOfChar, nextBoundary - indexOfChar);
             const uint unicode = getGraphemeBaseCharacter(grapheme);
             if (unicode == '\t') {
@@ -1060,8 +1066,9 @@ int TTextEdit::convertMouseXToBufferX(const int mouseX, const int lineNumber) co
             column +=charWidth;
             leftX = rightX;
             rightX = (mShowTimeStamps ? mTimeStampWidth + column : column) * mFontWidth;
-            debugText << QStringLiteral("[%1]%2[%3]").arg(QString::number(leftX), grapheme, QString::number(rightX - 1));
+            // debugText << QStringLiteral("[%1]%2[%3]").arg(QString::number(leftX), grapheme, QString::number(rightX - 1));
             if (leftX <= mouseX && mouseX < rightX) {
+                // qDebug().nospace().noquote() << "TTextEdit::convertMouseXToBufferX(" << mouseX << ", " << lineNumber << ") INFO - placing cursor over the last grapheme within the calculated limits of:\n" << debugText.join(QString());
                 return std::max(0, indexOfChar);
             }
             indexOfChar = nextBoundary;
