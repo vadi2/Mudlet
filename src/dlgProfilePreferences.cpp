@@ -36,6 +36,7 @@
 #include "edbee/views/texteditorscrollarea.h"
 
 #include "pre_guard.h"
+#include <chrono>
 #include <QtConcurrent>
 #include <QColorDialog>
 #include <QFileDialog>
@@ -47,6 +48,7 @@
 #include <QUiLoader>
 #include "post_guard.h"
 
+using namespace std::chrono_literals;
 
 dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
 : QDialog(pF)
@@ -256,6 +258,7 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
     generateDiscordTooltips();
 
     label_languageChangeWarning->hide();
+    label_invalidFontError->hide();
 
     comboBox_guiLanguage->clear();
     for (auto& code : pMudlet->getAvailableTranslationCodes()) {
@@ -314,6 +317,41 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pF, Host* pHost)
             comboBox_guiLanguage->addItem(QStringLiteral("No translations available!"));
         }
     }
+
+    setupPasswordsMigration();
+}
+
+void dlgProfilePreferences::setupPasswordsMigration()
+{
+    hidePasswordMigrationLabelTimer = std::make_unique<QTimer>(this);
+    hidePasswordMigrationLabelTimer->setSingleShot(true);
+
+    connect(hidePasswordMigrationLabelTimer.get(), &QTimer::timeout, this, &dlgProfilePreferences::hidePasswordMigrationLabel);
+
+    connect(mudlet::self(), &mudlet::signal_passwordsMigratedToSecure, [=]() {
+        label_password_migration_notification->setText(tr("Migrated all passwords to secure storage."));
+        comboBox_store_passwords_in->setEnabled(true);
+        hidePasswordMigrationLabelTimer->start(10s);
+    });
+
+    connect(mudlet::self(), &mudlet::signal_passwordMigratedToSecure, [=](const QString& profile) {
+        label_password_migration_notification->setText(
+                tr("Migrated %1...", "This notifies the user that progress is being made on profile migration by saying what profile was just migrated to store passwords securely").arg(profile));
+    });
+
+    connect(mudlet::self(), &mudlet::signal_passwordsMigratedToProfiles, [=]() {
+        label_password_migration_notification->setText(tr("Migrated all passwords to profile storage."));
+        comboBox_store_passwords_in->setEnabled(true);
+        hidePasswordMigrationLabelTimer->start(10s);
+    });
+
+    if (mudlet::self()->storingPasswordsSecurely()) {
+        comboBox_store_passwords_in->setCurrentIndex(0);
+    } else {
+        comboBox_store_passwords_in->setCurrentIndex(1);
+    }
+
+    connect(comboBox_store_passwords_in, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &dlgProfilePreferences::slot_passwords_location_changed);
 }
 
 void dlgProfilePreferences::disableHostDetails()
@@ -365,6 +403,7 @@ void dlgProfilePreferences::disableHostDetails()
     comboBox_mapFileSaveFormatVersion->setEnabled(false);
     comboBox_mapFileSaveFormatVersion->clear();
     label_mapFileActionResult->hide();
+    hidePasswordMigrationLabel();
     label_mapSymbolsFont->setEnabled(false);
     fontComboBox_mapSymbols->setEnabled(false);
     checkBox_isOnlyMapSymbolFontToBeUsed->setEnabled(false);
@@ -601,8 +640,8 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
     // same with special connection warnings
     need_reconnect_for_specialoption->hide();
 
-    fontComboBox->setCurrentFont(pHost->mDisplayFont);
-    mFontSize = pHost->mDisplayFont.pointSize();
+    fontComboBox->setCurrentFont(pHost->getDisplayFont());
+    mFontSize = pHost->getDisplayFont().pointSize();
     if (mFontSize < 0) {
         mFontSize = 10;
     }
@@ -710,6 +749,7 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
     //encoding->setCurrentIndex( pHost->mEncoding );
     mFORCE_SAVE_ON_EXIT->setChecked(pHost->mFORCE_SAVE_ON_EXIT);
     mEnableGMCP->setChecked(pHost->mEnableGMCP);
+    mEnableMSSP->setChecked(pHost->mEnableMSSP);
     mEnableMSDP->setChecked(pHost->mEnableMSDP);
 
     // load profiles into mappers "copy map to profile" combobox
@@ -744,6 +784,8 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
 
     // label to show on successful map file action
     label_mapFileActionResult->hide();
+
+    hidePasswordMigrationLabel();
 
     //doubleclick ignore
     QString ignore;
@@ -976,6 +1018,7 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
     connect(pushButton_background_color_2, &QAbstractButton::clicked, this, &dlgProfilePreferences::setBgColor2);
 
     connect(mEnableGMCP, &QAbstractButton::clicked, need_reconnect_for_data_protocol, &QWidget::show);
+    connect(mEnableMSSP, &QAbstractButton::clicked, need_reconnect_for_data_protocol, &QWidget::show);
     connect(mEnableMSDP, &QAbstractButton::clicked, need_reconnect_for_data_protocol, &QWidget::show);
 
     connect(mFORCE_MCCP_OFF, &QAbstractButton::clicked, need_reconnect_for_specialoption, &QWidget::show);
@@ -1056,6 +1099,7 @@ void dlgProfilePreferences::disconnectHostRelatedControls()
     disconnect(pushButton_background_color_2, &QAbstractButton::clicked, nullptr, nullptr);
 
     disconnect(mEnableGMCP, &QAbstractButton::clicked, nullptr, nullptr);
+    disconnect(mEnableMSSP, &QAbstractButton::clicked, nullptr, nullptr);
     disconnect(mEnableMSDP, &QAbstractButton::clicked, nullptr, nullptr);
 
     disconnect(mFORCE_MCCP_OFF, &QAbstractButton::clicked, nullptr, nullptr);
@@ -1133,6 +1177,7 @@ void dlgProfilePreferences::clearHostDetails()
     mAlertOnNewData->setChecked(false);
     mFORCE_SAVE_ON_EXIT->setChecked(false);
     mEnableGMCP->setChecked(false);
+    mEnableMSSP->setChecked(false);
     mEnableMSDP->setChecked(false);
 
     pushButton_chooseProfiles->setEnabled(false);
@@ -1145,6 +1190,8 @@ void dlgProfilePreferences::clearHostDetails()
     pushButton_chooseProfiles->setEnabled(false);
 
     label_mapFileActionResult->hide();
+
+    hidePasswordMigrationLabel();
 
     doubleclick_ignore_lineedit->clear();
 
@@ -1189,6 +1236,7 @@ void dlgProfilePreferences::loadEditorTab()
     auto config = edbeePreviewWidget->config();
     config->beginChanges();
     config->setSmartTab(true);
+    config->setUseTabChar(false); // when you press Enter for a newline, pad with spaces and not tabs
     config->setCaretBlinkRate(200);
     config->setIndentSize(2);
     config->setThemeName(pHost->mEditorTheme);
@@ -1197,7 +1245,7 @@ void dlgProfilePreferences::loadEditorTab()
                                   ? edbee::TextEditorConfig::ShowWhitespaces
                                   : edbee::TextEditorConfig::HideWhitespaces);
     config->setUseLineSeparator(mudlet::self()->mEditorTextOptions & QTextOption::ShowLineAndParagraphSeparators);
-    config->setFont(pHost->mDisplayFont);
+    config->setFont(pHost->getDisplayFont());
     config->setAutocompleteAutoShow(pHost->mEditorAutoComplete);
     config->endChanges();
     edbeePreviewWidget->textDocument()->setLanguageGrammar(edbee::Edbee::instance()->grammarManager()->detectGrammarWithFilename(QStringLiteral("Buck.lua")));
@@ -1509,26 +1557,37 @@ void dlgProfilePreferences::setDisplayFont()
     if (!pHost) {
         return;
     }
-    QFont font = fontComboBox->currentFont();
-    font.setPointSize(mFontSize);
-    if (pHost->mDisplayFont != font) {
-        pHost->mDisplayFont = font;
-        QFont::insertSubstitution(pHost->mDisplayFont.family(), QStringLiteral("Noto Color Emoji"));
-        if (mudlet::self()->mConsoleMap.contains(pHost)) {
-            mudlet::self()->mConsoleMap[pHost]->changeColors();
+    QFont newFont = fontComboBox->currentFont();
+    newFont.setPointSize(mFontSize);
 
-            // update the display properly when font or size selections change.
-            mudlet::self()->mConsoleMap[pHost]->mUpperPane->updateScreenView();
-            mudlet::self()->mConsoleMap[pHost]->mUpperPane->forceUpdate();
-            mudlet::self()->mConsoleMap[pHost]->mLowerPane->updateScreenView();
-            mudlet::self()->mConsoleMap[pHost]->mLowerPane->forceUpdate();
-            mudlet::self()->mConsoleMap[pHost]->refresh();
-        }
-        auto config = edbeePreviewWidget->config();
-        config->beginChanges();
-        config->setFont(font);
-        config->endChanges();
+    if (pHost->getDisplayFont() == newFont) {
+        return;
     }
+
+    if (auto [validFont, errorMessage] = pHost->setDisplayFont(newFont); !validFont) {
+        label_invalidFontError->show();
+        return;
+    }
+    label_invalidFontError->hide();
+
+    QFont::insertSubstitution(pHost->mDisplayFont.family(), QStringLiteral("Noto Color Emoji"));
+    auto* mainConsole = mudlet::self()->mConsoleMap.value(pHost);
+    if (!mainConsole) {
+        return;
+    }
+
+    // update the display properly when font or size selections change.
+    mainConsole->changeColors();
+    mainConsole->mUpperPane->updateScreenView();
+    mainConsole->mUpperPane->forceUpdate();
+    mainConsole->mLowerPane->updateScreenView();
+    mainConsole->mLowerPane->forceUpdate();
+    mainConsole->refresh();
+
+    auto config = edbeePreviewWidget->config();
+    config->beginChanges();
+    config->setFont(newFont);
+    config->endChanges();
 }
 
 // Currently UNUSED!
@@ -1926,6 +1985,31 @@ void dlgProfilePreferences::hideActionLabel()
     label_mapFileActionResult->hide();
 }
 
+void dlgProfilePreferences::hidePasswordMigrationLabel()
+{
+    label_password_migration_notification->hide();
+}
+
+void dlgProfilePreferences::slot_passwords_location_changed(int index)
+{
+    // index 0 = use secure storage, index 1 = use profile storage
+    if (index == 0) {
+        if (mudlet::self()->migratePasswordsToSecureStorage()) {
+            label_password_migration_notification->setText(tr("Migrating passwords to secure storage..."));
+            label_password_migration_notification->show();
+            comboBox_store_passwords_in->setDisabled(true);
+            hidePasswordMigrationLabelTimer->stop();
+        }
+    } else {
+        if (mudlet::self()->migratePasswordsToProfileStorage()) {
+            label_password_migration_notification->setText(tr("Migrating passwords to profiles..."));
+            label_password_migration_notification->show();
+            comboBox_store_passwords_in->setDisabled(true);
+            hidePasswordMigrationLabelTimer->stop();
+        }
+    }
+}
+
 void dlgProfilePreferences::copyMap()
 {
     Host* pHost = mpHost;
@@ -2243,6 +2327,7 @@ void dlgProfilePreferences::slot_save_and_exit()
         pHost->mFORCE_GA_OFF = mFORCE_GA_OFF->isChecked();
         pHost->mFORCE_SAVE_ON_EXIT = mFORCE_SAVE_ON_EXIT->isChecked();
         pHost->mEnableGMCP = mEnableGMCP->isChecked();
+        pHost->mEnableMSSP = mEnableMSSP->isChecked();
         pHost->mEnableMSDP = mEnableMSDP->isChecked();
         pHost->mMapperUseAntiAlias = mMapperUseAntiAlias->isChecked();
         if (pHost->mpMap && pHost->mpMap->mpMapper) {
