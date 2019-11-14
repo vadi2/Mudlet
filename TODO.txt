@@ -16,5 +16,6 @@ https://github.com/k-takata/Onigmo/issues/130
 # need to update edbee for this
 https://github.com/kkos/oniguruma/issues/77
 
-# 3rd party libraries... unsolved
-https://emscripten.org/docs/compiling/Building-Projects.html#using-libraries
+# 3rd party libraries
+https://forum.qt.io/post/559355
+
