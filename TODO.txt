@@ -2,9 +2,9 @@ To compile
 
 Compile Qt with:
 ./configure -feature-thread -xplatform wasm-emscripten -nomake examples -prefix $PWD/qtbase
-make -j 2 module-qtbase module-qtdeclarative module-network module-opengl module-uitools module-multimedia module-gui module-concurrent
+make -j 2 module-qtbase module-qtdeclarative module-qttools module-qtmultimedia
 
-/home/vadi/Programs/Qt/5.13.0/Src/qtbase/bin/qmake src/mudlet.pro
+/media/vadi/SSDer/Programs/Qt/5.14.0/Src/qtbase/bin/qmake src/mudlet.pro
 source ./emsdk_env.sh
 ELIMINATE_DUPLICATE_FUNCTIONS=1 make
 
