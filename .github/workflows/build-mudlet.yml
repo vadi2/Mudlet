@@ -59,13 +59,14 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         # these aren't available or don't work well in vcpkg
-        brew install pkg-config libzzip libzip
+        brew install pkg-config libzzip libzip yajl
 
     - name: (Linux) Install apt dependencies
       if: runner.os == 'Linux'
       run: |
         # these aren't available or don't work well in vcpkg
-        sudo apt install pkg-config libzip-dev libglu1-mesa-dev libpulse-dev libxkbcommon-x11-0
+        sudo apt install pkg-config libzip-dev libglu1-mesa-dev libpulse-dev \
+        libxkbcommon-x11-0 yajl
 
     - uses: leafo/gh-actions-lua@v5
       with:
@@ -75,6 +76,7 @@ jobs:
     - name: Install Luarocks dependencies
       run: |
         YAJL_PATH="$(pkg-config --variable=libdir yajl)"
+        echo "Setting search path to $YAJL_PATH"
         luarocks install --local lua-yajl YAJL_LIBDIR="${YAJL_PATH}"
 
     # Restore from cache the previously built ports. If "cache miss", then provision vcpkg, install desired ports, finally cache everything for the next run.
