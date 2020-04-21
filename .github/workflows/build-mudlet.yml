@@ -59,7 +59,7 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         # these aren't available or don't work well in vcpkg
-        brew install pkg-config libzzip libzip yajl
+        brew install pkg-config libzzip libzip yajl luarocks
 
     - name: (Linux) Install apt dependencies
       if: runner.os == 'Linux'
@@ -69,6 +69,7 @@ jobs:
         libxkbcommon-x11-0 libyajl-dev
 
     - uses: leafo/gh-actions-lua@v5
+      if: runner.os == 'Linux'
       with:
         luaVersion: "5.1.5"
     - uses: leafo/gh-actions-luarocks@v2
