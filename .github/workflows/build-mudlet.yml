@@ -59,20 +59,19 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         # these aren't available or don't work well in vcpkg
-        brew install pkg-config libzzip libzip yajl luarocks
+        brew install pkg-config libzzip libzip yajl lua@5.1 luarocks
 
     - name: (Linux) Install apt dependencies
       if: runner.os == 'Linux'
       run: |
         # these aren't available or don't work well in vcpkg
         sudo apt install pkg-config libzip-dev libglu1-mesa-dev libpulse-dev \
-        libxkbcommon-x11-0 libyajl-dev
+        libxkbcommon-x11-0 libyajl-dev luarocks
 
     - uses: leafo/gh-actions-lua@v5
       if: runner.os == 'Linux'
       with:
         luaVersion: "5.1.5"
-    - uses: leafo/gh-actions-luarocks@v2
 
     - name: Install Luarocks dependencies
       run: |
