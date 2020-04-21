@@ -74,7 +74,8 @@ jobs:
 
     - name: Install Luarocks dependencies
       run: |
-        luarocks install lua-yajl
+        YAJL_PATH="$(pkg-config --variable=libdir yajl)"
+        luarocks install --local lua-yajl YAJL_LIBDIR="${YAJL_PATH}"
 
     # Restore from cache the previously built ports. If "cache miss", then provision vcpkg, install desired ports, finally cache everything for the next run.
     - name: Restore from cache and run vcpkg
