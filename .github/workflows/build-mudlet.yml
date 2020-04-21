@@ -67,6 +67,15 @@ jobs:
         # these aren't available or don't work well in vcpkg
         sudo apt install pkg-config libzip-dev libglu1-mesa-dev libpulse-dev libxkbcommon-x11-0
 
+    - uses: leafo/gh-actions-lua@v5
+      with:
+        luaVersion: "5.1.5"
+    - uses: leafo/gh-actions-luarocks@v2
+
+    - name: Install Luarocks dependencies
+      run: |
+        luarocks install lua-yajl
+
     # Restore from cache the previously built ports. If "cache miss", then provision vcpkg, install desired ports, finally cache everything for the next run.
     - name: Restore from cache and run vcpkg
       uses: lukka/run-vcpkg@v2
