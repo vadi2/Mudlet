@@ -41,7 +41,10 @@
 #include <QProgressDialog>
 #include <QPainter>
 #include <QBuffer>
+#include "simdjson.h"
 #include "post_guard.h"
+
+using namespace simdjson;
 
 // A common set of predefined QStrings so that there are no duplicated
 // QStringLiteral(...)s in this file:
@@ -2871,6 +2874,10 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     file.close();
     QJsonParseError jsonErr;
     QJsonDocument doc(QJsonDocument::fromJson(mapData, &jsonErr));
+
+    dom::parser parser;
+    dom::element simd_doc = parser.load(source.toStdString()); 
+
     if (jsonErr.error != QJsonParseError::NoError) {
         return {false, QStringLiteral("could not parse file \"%1\", reason: \"%2\" at offset %3")
                     .arg(source, jsonErr.errorString(), QString::number(jsonErr.offset))};
