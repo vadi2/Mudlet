@@ -505,3 +505,18 @@ if(UNIX AND NOT APPLE)
       CONFIGURATIONS Debug Release
       COMPONENT All)
 endif()
+
+include(FetchContent)
+
+FetchContent_Declare(
+  simdjson
+  GIT_REPOSITORY https://github.com/simdjson/simdjson.git
+  GIT_TAG  v0.8.1
+  GIT_SHALLOW TRUE)
+
+set(SIMDJSON_JUST_LIBRARY ON CACHE INTERNAL "")
+set(SIMDJSON_BUILD_STATIC ON CACHE INTERNAL "")
+
+FetchContent_MakeAvailable(simdjson)
+
+target_link_libraries(mudlet simdjson)
