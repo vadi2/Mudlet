@@ -34,17 +34,14 @@
 #include "mudlet.h"
 
 #include "pre_guard.h"
+#include <QBuffer>
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QJsonParseError>
 #include <QMessageBox>
-#include <QProgressDialog>
 #include <QPainter>
-#include <QBuffer>
-
-#undef slots
-#include "simdjson.h"
-#define slots
+#include <QProgressDialog>
+#include <charconv>
 
 #include "post_guard.h"
 
@@ -2716,7 +2713,7 @@ std::pair<bool, QString> TMap::writeJsonMapFile(const QString& dest)
     // Use this to track any changes. in a major.minor number format, minor
     // is to be three digits long.
     // 0.002 was the first published draft
-    // 0.003 changed the format to encapsulte the room symbol text, it also
+    // 0.003 changed the format to encapsulate the room symbol text, it also
     // include the room symbol color that was added during the development and
     // refactored the storage of colors to identify whether there is an alpha
     // component or not in the array of values.
@@ -2866,55 +2863,56 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
         return {false, QStringLiteral("import or export already in progress")};
     }
 
-    QFile file(source);
-    if (!file.open(QFile::ReadOnly)) {
-        qWarning().noquote().nospace() << "TMap::readJsonMapFile(...) WARNING - Could not open JSON file \"" << source << "\".";
-        return {false, QStringLiteral("could not open file \"%1\"").arg(source)};
-    }
-
-    QByteArray mapData = file.readAll();
-    file.close();
-    QJsonParseError jsonErr;
-    QJsonDocument doc(QJsonDocument::fromJson(mapData, &jsonErr));
-
     simdjson::dom::parser parser;
-    auto simd_doc = parser.load(source.toStdString()); 
+    simdjson::error_code error;
+    auto simd_doc = parser.load(source.toStdString());
 
-    if (jsonErr.error != QJsonParseError::NoError) {
-        return {false, QStringLiteral("could not parse file \"%1\", reason: \"%2\" at offset %3")
-                    .arg(source, jsonErr.errorString(), QString::number(jsonErr.offset))};
-    }
+    // if (jsonErr.error != QJsonParseError::NoError) {
+    //     return {false, QStringLiteral("could not parse file \"%1\", reason: \"%2\" at offset %3")
+    //                 .arg(source, jsonErr.errorString(), QString::number(jsonErr.offset))};
+    // }
 
-    if (doc.isEmpty()) {
-        qDebug() << "TMap::readJsonMapFile(\"" << source << "\") INFO - no Json file data detected, this is not a Mudlet JSON map file.";
-        return {false, QStringLiteral("empty Json file, no map data detected")};
-    }
+    // if (simd_doc.isEmpty()) {
+    //     qDebug() << "TMap::readJsonMapFile(\"" << source << "\") INFO - no Json file data detected, this is not a Mudlet JSON map file.";
+    //     return {false, QStringLiteral("empty Json file, no map data detected")};
+    // }
 
     // Read all the base level stuff:
-    QJsonObject mapObj{doc.object()};
     double formatVersion = 0.0f;
-    if (mapObj.contains(scFORMAT_VERSION) && mapObj[scFORMAT_VERSION].isDouble()) {
-        formatVersion = mapObj[scFORMAT_VERSION].toDouble();
-        if (qFuzzyCompare(1.0, formatVersion + 1.0) || formatVersion < 0.0030 || formatVersion > 0.0030) {
-            // We only handle 0.003f right now (0.001f was borked, 0.002f
-            // didn't include room symbol color):
-            qDebug() << "TMap::readJsonMapFile(\"" << source << "\") INFO - Version information was found: " << formatVersion << "and it is not okay.";
-            return {false, QStringLiteral("invalid version: %1 detected").arg(formatVersion, 0, 'f', 3, QLatin1Char('0'))};
-        }
-    } else {
+    error = simd_doc["formatVersion"].get(formatVersion);
+    if (error) {
         qDebug() << "TMap::readJsonMapFile(\"" << source << "\") INFO - Version information was not found, this is not likely to be a Mudlet JSON map file.";
         return {false, QStringLiteral("no version number detected")};
     }
+    if (qFuzzyCompare(1.0, formatVersion + 1.0) || formatVersion < 0.0030 || formatVersion > 0.0030) {
+        // We only handle 0.003f right now (0.001f was borked, 0.002f
+        // didn't include room symbol color):
+        qDebug() << "TMap::readJsonMapFile(\"" << source << "\") INFO - Version information was found: " << formatVersion << "and it is not okay.";
+        return {false, QStringLiteral("invalid version: %1 detected").arg(formatVersion, 0, 'f', 3, QLatin1Char('0'))};
+    }
 
-    if (!mapObj.contains(scAREAS) || !mapObj.value(scAREAS).isArray()) {
+    // TODO: necessary?
+    simdjson::dom::array areas;
+    error = simd_doc["areas"].get(areas);
+    if (error) {
         return {false, QStringLiteral("no areas detected")};
     }
 
-    mProgressDialogAreasTotal = qRound(mapObj[scAREA_COUNT].toDouble());
+    // TODO: overly stringent? not actually necessary, can be recovered from
+    error = simd_doc["areaCount"].get(mProgressDialogAreasTotal);
+    if (error) {
+        return {false, QStringLiteral("area count missing in map")};
+    }
     mProgressDialogAreasCount = 0;
-    mProgressDialogRoomsTotal = qRound(mapObj[scROOM_COUNT].toDouble());
+    error = simd_doc["roomCount"].get(mProgressDialogRoomsTotal);
+    if (error) {
+        return {false, QStringLiteral("room count missing in map")};
+    }
     mProgressDialogRoomsCount = 0;
-    mProgressDialogLabelsTotal = qRound(mapObj[scLABEL_COUNT].toDouble());
+    error = simd_doc["labelCount"].get(mProgressDialogLabelsTotal);
+    if (error) {
+        return {false, QStringLiteral("label count missing in map")};
+    }
     mProgressDialogLabelsCount = 0;
     mpProgressDialog = new QProgressDialog(tr("Import JSON map data to %1\n"
                                               "Areas: %2 of: %3   Rooms: %4 of: %5   Labels: %6 of: %7...")
@@ -2939,73 +2937,67 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     mpProgressDialog->setMinimumDuration(0); // Normally waits for 4 seconds before showing
     qApp->processEvents();
 
-    mDefaultAreaName = mapObj[scDEFAULT_AREA_NAME].toString();
-    mUnnamedAreaName = mapObj[scANONYMOUS_AREA_NAME].toString();
-    QString mapSymbolFontText = mapObj[scMAP_SYMBOL_FONT_DETAILS].toString();
-    float mapSymbolFontFudgeFactor = (qRound(mapObj[scMAP_SYMBOL_FUDGE_FACTOR].toDouble() * 1000.0)) / 1000;
-    bool isOnlyMapSymbolFontToBeUsed = mapObj[scONLY_USE_MAP_SYMBOL_FONT].toBool();
-    int playerRoomStyle = qRound(mapObj[scPLAYER_ROOM_STYLE].toDouble());
-    quint8 playerRoomOuterDiameterPercentage = qRound(mapObj[scPLAYER_OUTER_DIA_PERCENTAGE].toDouble());
-    quint8 playerRoomInnerDiameterPercentage = qRound(mapObj[scPLAYER_INNER_DIA_PERCENTAGE].toDouble());
+    error = simd_doc["defaultAreaName"].get(mDefaultAreaName);
+    error = simd_doc["anonymousAreaName"].get(mUnnamedAreaName);
+    QString mapSymbolFontText;
+    error = simd_doc["mapSymbolFontDetails"].get(mapSymbolFontText);
+    float mapSymbolFontFudgeFactor;
+    error = simd_doc["mapSymbolFontFudgeFactor"].get(mapSymbolFontFudgeFactor);
+    mapSymbolFontFudgeFactor = qRound(mapSymbolFontFudgeFactor * 1000.0) / 1000;
+
+    bool isOnlyMapSymbolFontToBeUsed;
+    error = simd_doc["onlyMapSymbolFontToBeUsed"].get(isOnlyMapSymbolFontToBeUsed);
+    int playerRoomStyle;
+    error = simd_doc["playerRoomStyle"].get(playerRoomStyle);
+
+    quint8 playerRoomInnerDiameterPercentage, playerRoomOuterDiameterPercentage;
+    error = simd_doc["playerRoomInnerDiameterPercentage"].get(playerRoomInnerDiameterPercentage);
+    error = simd_doc["playerRoomOuterDiameterPercentage"].get(playerRoomOuterDiameterPercentage);
+
     QColor playerRoomOuterColor;
     QColor playerRoomInnerColor;
 
-    if (mapObj.contains(scPLAYER_ROOM_COLORS) && mapObj.value(scPLAYER_ROOM_COLORS).isArray()) {
-        QJsonArray playerRoomColorArray = mapObj.value(scPLAYER_ROOM_COLORS).toArray();
-        if (playerRoomColorArray.size() == 2 && playerRoomColorArray.at(0).isObject() && playerRoomColorArray.at(1).isObject()) {
-            playerRoomOuterColor = readJsonColor(playerRoomColorArray.at(0).toObject());
-            playerRoomInnerColor = readJsonColor(playerRoomColorArray.at(1).toObject());
-        }
+    simdjson::dom::array playerRoomColorArray;
+    error = simd_doc["playerRoomColors"].get(playerRoomColorArray);
+    if (playerRoomColorArray.size() == 2 && playerRoomColorArray.at(0).type() == simdjson::dom::element_type::OBJECT && playerRoomColorArray.at(1).type() == simdjson::dom::element_type::OBJECT) {
+        simdjson::dom::object outerColor, innerColor;
+        error = playerRoomColorArray.at(0).get(outerColor);
+        error = playerRoomColorArray.at(1).get(innerColor);
+        playerRoomOuterColor = readJsonColor(outerColor);
+        playerRoomInnerColor = readJsonColor(innerColor);
     }
 
     QMap<int, int> envColors;
-    if (mapObj.contains(scENV_TO_COLOR_MAPPING) && mapObj.value(scENV_TO_COLOR_MAPPING).isObject()) {
-        const QJsonObject envColorObj{mapObj.value(scENV_TO_COLOR_MAPPING).toObject()};
-        if (!envColorObj.isEmpty()) {
-            const QList<QString> keys = envColorObj.keys();
-            for (int i = 0, total = keys.count(); i < total; ++i) {
-                QString key = keys.at(i);
-                bool isOk = false;
-                int index = key.toInt(&isOk);
-                if (isOk && envColorObj.value(key).isDouble()) {
-                    int value = envColorObj.value(key).toInt();
-                    envColors.insert(index, value);
-                }
+    const simdjson::dom::object envColorObj;
+    error = simd_doc["envToColorMapping"].get(envColorObj);
+
+    for (auto [key, value] : envColorObj) {
+        if (value.type() == simdjson::dom::element_type::INT64) {
+            int keyInt;
+            if (auto [p, error] = std::from_chars(key.data(), key.data() + key.size(), keyInt); error == std::errc()) {
+                envColors.insert(keyInt, int64_t(value));
             }
+        } else {
+            qWarning() << "env color key not an int";
         }
     }
 
     QMap<int, QColor> customEnvColors;
-    if (mapObj.contains(scCUSTOM_ENV_COLORS) && mapObj.value(scCUSTOM_ENV_COLORS).isArray()) {
-        const QJsonArray customEnvColorArray = mapObj.value(scCUSTOM_ENV_COLORS).toArray();
-        if (!customEnvColorArray.isEmpty()) {
-            for (int index = 0, total = customEnvColorArray.count(); index < total; ++index) {
-                const QJsonObject customEnvColorObj{customEnvColorArray.at(index).toObject()};
-                if (customEnvColorObj.contains(scID)
-                    && ((customEnvColorObj.contains(scCOLOR_32RGBA) && customEnvColorObj.value(scCOLOR_32RGBA).isArray())
-                        ||(customEnvColorObj.contains(scCOLOR_24RGB) && customEnvColorObj.value(scCOLOR_24RGB).isArray()))
-                    && customEnvColorObj.value(scID).isDouble()) {
-
-                    const int id{customEnvColorObj.value(scID).toInt()};
-                    const QColor color{readJsonColor(customEnvColorObj)};
-                    customEnvColors.insert(id, color);
-                }
-            }
-        }
+    const simdjson::dom::array customEnvColorArray;
+    error = simd_doc["customEnvColors"].get(customEnvColorArray);
+    for (simdjson::dom::object customEnvColorObj : customEnvColorArray) {
+        const int id {};
+        error = customEnvColorObj["id"].get(id);
+        const QColor color{readJsonColor(customEnvColorObj)};
+        customEnvColors.insert(id, color);
     }
 
     QHash<QString, int> playersRoomId;
-    if (mapObj.contains(scPLAYERS_ROOM_ID) && mapObj.value(scPLAYERS_ROOM_ID).isObject()) {
-        const QJsonObject playersRoomIdObj{mapObj.value(scPLAYERS_ROOM_ID).toObject()};
-        if (!playersRoomIdObj.isEmpty()) {
-            QList<QString> keys = playersRoomIdObj.keys();
-            for (int index = 0, total = keys.count(); index < total; ++index) {
-                const QString profileName{keys.at(index)};
-                if (playersRoomIdObj.value(profileName).isDouble()) {
-                    playersRoomId.insert(profileName, playersRoomIdObj.value(profileName).toInt());
-                }
-            }
-        }
+    const simdjson::dom::object playersRoomIdObj;
+    error = simd_doc["playersRoomId"].get(playersRoomIdObj);
+
+    for (auto [profileNameStringView, location] : playersRoomIdObj) {
+        playersRoomId.insert(QString::fromStdString(std::string(profileNameStringView).c_str()), location);
     }
 
     TRoomDB* pNewRoomDB = new TRoomDB(this);
@@ -3121,7 +3113,7 @@ void TMap::writeJsonColor(QJsonObject& obj, const QColor& color)
     }
 }
 
-QColor TMap::readJsonColor(const QJsonObject& obj)
+QColor TMap::readJsonColor(const simdjson::dom::object& obj)
 {
     if (!(   (obj.contains(scCOLOR_32RGBA) && obj.value(scCOLOR_32RGBA).isArray())
           || (obj.contains(scCOLOR_24RGB) && obj.value(scCOLOR_24RGB).isArray()))) {
@@ -3129,33 +3121,36 @@ QColor TMap::readJsonColor(const QJsonObject& obj)
         return QColor();
     }
 
-    QJsonArray colorRGBAArray;
+    simdjson::dom::array colorRGBAArray;
+    simdjson::error_code error;
+
     bool hasAlpha = false;
     int red = 0;
     int green = 0;
     int blue = 0;
     int alpha = 255;
-    if (obj.contains(scCOLOR_32RGBA)) {
-        colorRGBAArray = obj.value(scCOLOR_32RGBA).toArray();
+    error = obj["color32RGBA"].get(colorRGBAArray);
+    if (!error) {
         hasAlpha = true;
     } else {
-        colorRGBAArray = obj.value(scCOLOR_24RGB).toArray();
+        error = obj["color24RGB"].get(colorRGBAArray);
     }
+    if (error) {
+        return QColor();
+    }
+
     int size = colorRGBAArray.size();
-    if ((size == 3 || size == 4)
-        && colorRGBAArray.at(0).isDouble()
-        && colorRGBAArray.at(1).isDouble()
-        && colorRGBAArray.at(2).isDouble()) {
+    if (size == 3 || size == 4) {
 
-        red = qRound(colorRGBAArray.at(0).toDouble());
-        green = qRound(colorRGBAArray.at(1).toDouble());
-        blue = qRound(colorRGBAArray.at(2).toDouble());
-        return QColor(red, green, blue);
+        error = colorRGBAArray.at(0).get(red);
+        error = colorRGBAArray.at(1).get(green);
+        error = colorRGBAArray.at(2).get(blue);
+        return error ? QColor() : QColor(red, green, blue);
     }
 
-    if (hasAlpha && size == 4 && colorRGBAArray.at(3).isDouble()) {
-        alpha = qRound(colorRGBAArray.at(3).toDouble());
-        return QColor(red, green, blue, alpha);
+    if (hasAlpha && size == 4) {;
+        error = colorRGBAArray.at(3).get(alpha);
+        return error ? QColor(red, green, blue) : QColor(red, green, blue, alpha);
     }
 
     return QColor();

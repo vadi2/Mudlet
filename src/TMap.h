@@ -42,6 +42,10 @@
 #include <QPointer>
 #include <QSizeF>
 #include <QVector3D>
+
+#undef slots
+#include "simdjson.h"
+#define slots
 #include "post_guard.h"
 
 #include <stdlib.h>
@@ -153,7 +157,7 @@ public:
     QColor getColor(int id);
 
     static void writeJsonColor(QJsonObject&, const QColor&);
-    static QColor readJsonColor(const QJsonObject&);
+    static QColor readJsonColor(const simdjson::dom::object&);
 
 
     TRoomDB* mpRoomDB;
