@@ -567,6 +567,7 @@ mudlet::mudlet()
     // Show the update option if the code is present AND if this is a
     // release OR a public test version:
     dactionUpdate->setVisible(scmIsReleaseVersion || scmIsPublicTestVersion);
+    dactionUpdateHistory->setVisible(scmIsReleaseVersion || scmIsPublicTestVersion);
     // Show the report issue option if the updater code is present (as it is
     // less likely to be for: {Linux} distribution packaged versions of Mudlet
     // - or people hacking their own versions and neither of those types are
@@ -579,10 +580,13 @@ mudlet::mudlet()
     } else {
         dactionReportIssue->setVisible(false);
     }
+    connect(dactionUpdateHistory, &QAction::triggered, this, &mudlet::slot_show_update_history);
+
 #else
     // Unconditionally hide the update and report bug menu items if the updater
     // code is not included:
     dactionUpdate->setVisible(false);
+    dactionUpdateHistory->setVisible(false);
     dactionReportIssue->setVisible(false);
 #endif
     connect(dactionPackageManager, &QAction::triggered, this, &mudlet::slot_package_manager);
@@ -3719,6 +3723,11 @@ void mudlet::slot_check_manual_update()
 void mudlet::slot_report_issue()
 {
     QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/Mudlet/Mudlet/issues/new")));
+}
+
+void mudlet::slot_show_update_history()
+{
+    updater->showChangelog();
 }
 
 // Means to turn-off the hard coded popup delay in QActions provided by:

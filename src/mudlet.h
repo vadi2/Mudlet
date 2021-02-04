@@ -513,6 +513,7 @@ private slots:
     void slot_update_installed();
     void slot_updateAvailable(const int);
     void slot_report_issue();
+    void slot_show_update_history();
 #endif
     void slot_toggle_compact_input_line();
     void slot_compact_input_line(const bool);

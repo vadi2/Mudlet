@@ -126,10 +126,12 @@ void Updater::showDialogManually() const
     QObject::disconnect(feed, &dblsqd::Feed::ready, this, &Updater::showDialogManually);
 }
 
-void Updater::showChangelog() const
+void Updater::showChangelog(bool onlyUpdates) const
 {
     auto changelogDialog = new dblsqd::UpdateDialog(feed, dblsqd::UpdateDialog::ManualChangelog);
-    changelogDialog->setPreviousVersion(getPreviousVersion());
+    if (onlyUpdates) {
+        changelogDialog->setPreviousVersion(getPreviousVersion());
+    }
     changelogDialog->show();
 }
 

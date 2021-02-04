@@ -45,7 +45,7 @@ public:
     virtual ~Updater();
     void checkUpdatesOnStart();
     void manuallyCheckUpdates();
-    void showChangelog() const;
+    void showChangelog(bool onlyUpdates = true) const;
     void setAutomaticUpdates(bool state);
     bool updateAutomatically() const;
     bool shouldShowChangelog();
