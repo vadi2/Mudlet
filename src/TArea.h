@@ -33,6 +33,10 @@
 #include <QMap>
 #include <QPair>
 #include <QVector3D>
+
+#undef slots
+#include "simdjson.h"
+#define slots
 #include "post_guard.h"
 
 class TRoomDB;
@@ -63,7 +67,7 @@ public:
     QMap<int, QMap<int, QMultiMap<int, int>>> koordinatenSystem();
     int createLabelId() const;
     void writeJsonArea(QJsonArray&) const;
-    std::pair<int, QString> readJsonArea(const QJsonArray&, const int);
+    std::pair<int, QString> readJsonArea(const simdjson::dom::object& areaObj);
 
 
     QSet<int> rooms; // rooms of this area
@@ -96,14 +100,14 @@ private:
     TArea() { qFatal("FATAL: illegal default constructor use of TArea()"); };
 
 
-    QMap<QString, QString> readJsonUserData(const QJsonObject& obj) const;
+    QMap<QString, QString> readJsonUserData(const simdjson::dom::object& obj) const;
     void writeJsonUserData(QJsonObject&) const;
 
-    void readJsonLabels(const QJsonObject&);
+    void readJsonLabels(const simdjson::dom::object& areaObj);
     void writeJsonLabels(QJsonObject&) const;
 
     void writeJsonLabel(QJsonArray&, const int, const TMapLabel*) const;
-    void readJsonLabel(const QJsonObject&);
+    void readJsonLabel(const simdjson::dom::object&);
 
     QSizeF readJsonSize(const QJsonObject&, const QString&) const;
     void writeJsonSize(QJsonObject&, const QString&, const QSizeF&) const;

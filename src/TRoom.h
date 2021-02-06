@@ -33,6 +33,10 @@
 #include <QMap>
 #include <QSet>
 #include <QVector3D>
+
+#undef slots
+#include "simdjson.h"
+#define slots
 #include "post_guard.h"
 
 
@@ -139,7 +143,7 @@ public:
     inline int stringToDirCode(const QString&) const;
     bool hasExitOrSpecialExit(const QString&) const;
     void writeJsonRoom(QJsonArray&) const;
-    int readJsonRoom(const QJsonArray&, const int, const int);
+    int readJsonRoom(const simdjson::dom::object&, const int);
 
 
     int x = 0;
@@ -175,15 +179,15 @@ public:
 
 
 private:
-    bool readJsonExits(const QJsonObject&);
-    void readJsonExitStubs(const QJsonObject&);
-    bool readJsonNormalExit(const QJsonObject&, const int);
-    bool readJsonSpecialExit(const QJsonObject&, const QString&);
-    void readJsonCustomExitLine(const QJsonObject&, const QString&);
-    void readJsonUserData(const QJsonObject&);
-    void readJsonDoor(const QJsonObject&, const QString&);
-    void readJsonHighlight(const QJsonObject&);
-    void readJsonSymbol(const QJsonObject&);
+    bool readJsonExits(const simdjson::dom::object&);
+    void readJsonExitStubs(const simdjson::dom::object&);
+    bool readJsonNormalExit(const simdjson::dom::object&, const int);
+    bool readJsonSpecialExit(const simdjson::dom::object&, const QString&);
+    void readJsonCustomExitLine(const simdjson::dom::object&, const QString&);
+    void readJsonUserData(const simdjson::dom::object&);
+    void readJsonDoor(const simdjson::dom::object&, const QString&);
+    void readJsonHighlight(const simdjson::dom::object&);
+    void readJsonSymbol(const simdjson::dom::object&);
 
     void writeJsonExits(QJsonObject&) const;
     void writeJsonExitStubs(QJsonObject&) const;

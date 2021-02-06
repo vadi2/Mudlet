@@ -3002,9 +3002,12 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
 
     TRoomDB* pNewRoomDB = new TRoomDB(this);
     bool abort = false;
-    for (int i = 0, total = mapObj.value(scAREAS).toArray().count(); i < total; ++i) {
+    const simdjson::dom::array areaData;
+    error = simd_doc["areas"].get(areaData);
+
+    for (simdjson::dom::object area : areaData) {
         TArea* pArea = new TArea(this, pNewRoomDB);
-        auto [id, name] = pArea->readJsonArea(mapObj.value(scAREAS).toArray(), i);
+        auto [id, name] = pArea->readJsonArea(area);
         ++mProgressDialogAreasCount;
         if (incrementJsonProgressDialog(false, true, 0)) {
             abort = true;
@@ -3115,12 +3118,6 @@ void TMap::writeJsonColor(QJsonObject& obj, const QColor& color)
 
 QColor TMap::readJsonColor(const simdjson::dom::object& obj)
 {
-    if (!(   (obj.contains(scCOLOR_32RGBA) && obj.value(scCOLOR_32RGBA).isArray())
-          || (obj.contains(scCOLOR_24RGB) && obj.value(scCOLOR_24RGB).isArray()))) {
-        // Return a null color if one was not found
-        return QColor();
-    }
-
     simdjson::dom::array colorRGBAArray;
     simdjson::error_code error;
 

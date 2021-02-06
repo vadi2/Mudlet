@@ -664,36 +664,44 @@ void TArea::writeJsonArea(QJsonArray& array) const
     array.append(areaValue);
 }
 
-std::pair<int, QString> TArea::readJsonArea(const QJsonArray& array, const int areaIndex)
+std::pair<int, QString> TArea::readJsonArea(const simdjson::dom::object& areaObj)
 {
-    const QJsonObject areaObj{array.at(areaIndex).toObject()};
-    const int id = areaObj.value(scID).toInt();
-    const QString name{areaObj.value(scNAME).toString()};
-    gridMode = areaObj.value(scGRID_MODE).toBool();
-    mUserData = readJsonUserData(areaObj.value(scUSER_DATA).toObject());
+    simdjson::error_code error;
+
+    const int areaId{};
+    error = areaObj["areaId"].get(areaId);
+    const QString name;
+    error = areaObj["name"].get(name);
+    error = areaObj["gridMode"].get(gridMode);
+    simdjson::dom::object userData;
+    error = areaObj["userData"].get(userData);
+    mUserData = readJsonUserData(userData);
     int roomCount = 0;
-    for (int roomIndex = 0, total = areaObj.value(scROOMS).toArray().count(); roomIndex < total; ++roomIndex) {
-        TRoom* pR = new TRoom(mpRoomDB);
-        int roomId = pR->readJsonRoom(areaObj.value(scROOMS).toArray(), roomIndex, id);
-        rooms.insert(roomId);
-        // This also sets the room id for the TRoom:
-        mpRoomDB->addRoom(roomId, pR, true);
-        if (++roomCount % 10 == 0) {
-            if (mpMap->incrementJsonProgressDialog(false, true, 10)) {
-                // Cancel has been hit - so give up straight away:
-                return {0, {}};
+    simdjson::dom::array roomsArray;
+    error = areaObj["roomsArray"].get(roomsArray);
+    if (!error) {
+        for (const auto& room: roomsArray) {
+            TRoom* pR = new TRoom(mpRoomDB);
+            int roomId = pR->readJsonRoom(room, areaId);
+            rooms.insert(roomId);
+            // This also sets the room areaId for the TRoom:
+            mpRoomDB->addRoom(roomId, pR, true);
+            if (++roomCount % 10 == 0) {
+                if (mpMap->incrementJsonProgressDialog(false, true, 10)) {
+                    // Cancel has been hit - so give up straight away:
+                    return {0, {}};
+                }
             }
         }
     }
+
     if (roomCount % 10 != 0) {
         // Must add on any remainder otherwise the total will be wrong:
         mpMap->incrementJsonProgressDialog(false, true, roomCount % 10);
     }
 
-    if (areaObj.contains(scLABELS) && areaObj.value(scLABELS).isArray()) {
-        readJsonLabels(areaObj);
-    }
-    return {id, name};
+    readJsonLabels(areaObj);
+    return {areaId, name};
 }
 
 void TArea::writeJsonUserData(QJsonObject& obj) const
@@ -714,19 +722,12 @@ void TArea::writeJsonUserData(QJsonObject& obj) const
 }
 
 // Takes a userData object and parses all its elements
-QMap<QString, QString> TArea::readJsonUserData(const QJsonObject& obj) const
+QMap<QString, QString> TArea::readJsonUserData(const simdjson::dom::object& obj) const
 {
     QMap<QString, QString> results;
-    if (obj.isEmpty()) {
-        // Skip doing anything more if there is nothing to do:
-        return results;
-    }
 
-    QStringList keys = obj.keys();
-    for (int i = 0, total = keys.count(); i < total; ++i) {
-        if (obj.value(keys.at(i)).isString()) {
-            results.insert(keys.at(i), obj.value(keys.at(i)).toString());
-        }
+    for (const auto [key, value] : obj) {
+        results.insert(QString::fromStdString(std::string(key).c_str()), QString::fromStdString(std::string(value).c_str()));
     }
     return results;
 }
@@ -753,17 +754,18 @@ void TArea::writeJsonLabels(QJsonObject& obj) const
 }
 
 // obj is the (area) container that contains the label array
-void TArea::readJsonLabels(const QJsonObject& obj)
+void TArea::readJsonLabels(const simdjson::dom::object& areaObj)
 {
-    const QJsonArray labelsArray = obj.value(scLABELS).toArray();
+    simdjson::error_code error;
+    const simdjson::dom::array labelsArray;
+    error = areaObj["labels"].get(labelsArray);
 
-    if (labelsArray.isEmpty()) {
-        // No labels at all in this area
+    if (error || labelsArray.size() == 0) {
         return;
     }
 
-    for (int index = 0, total = labelsArray.count(); index < total; ++index) {
-        readJsonLabel(labelsArray.at(index).toObject());
+    for (const auto& label: labelsArray) {
+        readJsonLabel(label);
         if (mpMap->incrementJsonProgressDialog(false, false, 1)) {
             // Cancel has been hit - so give up straight away:
             return;
@@ -830,46 +832,49 @@ void TArea::writeJsonLabel(QJsonArray& array, const int id, const TMapLabel* pLa
     array.append(labelValue);
 }
 
-void TArea::readJsonLabel(const QJsonObject& labelObj)
+void TArea::readJsonLabel(const simdjson::dom::object& labelObj)
 {
     TMapLabel label;
+    simdjson::error_code error;
 
-    int labelId = labelObj.value(scID).toInt();
+    const int labelId {};
+    error = labelObj["id"].get(labelId);
 
-    label.pos = readJson3DCoordinates(labelObj, scCOORDINATES);
-
-    label.size = readJsonSize(labelObj, scSIZE);
-
-    if (labelObj.contains(scTEXT) && labelObj.value(scTEXT).isString()) {
-        label.text = labelObj.value(scTEXT).toString();
-    }
-
-    if (labelObj.contains(scCOLORS) && labelObj.value(scCOLORS).isArray() && labelObj.value(scCOLORS).toArray().size() == 2) {
-        // For an image the colors are not used and tend to be set to black, if
-        // so skip them. Ufortunately because of the way QColour s are assembled
-        // the operator== is too picky for our purposes as even the way the
-        // colour was put together (color spec type) can make them NOT seem to
-        // be the same when we'd think they were...
-        QJsonArray colorsArray = labelObj.value(scCOLORS).toArray();
-        label.fgColor = TMap::readJsonColor(colorsArray.at(0).toObject());
-        label.bgColor = TMap::readJsonColor(colorsArray.at(1).toObject());
-    } else {
-        label.fgColor = defaultLabelForeground;
-        label.bgColor = defaultLabelBackground;
-    }
-
-    QJsonArray imageArray = labelObj.value(scIMAGE).toArray();
-    QList<QByteArray> pixmapData;
-    for (int i = 0, total = imageArray.size(); i < total; ++i) {
-        pixmapData.append(imageArray.at(i).toString().toLatin1());
-    }
-    label.pix = convertBase64DataToImage(pixmapData);
-
-    label.showOnTop = labelObj.value(scSHOW_ON_TOP).toBool();
-
-    label.noScaling = !labelObj.value(scSCALED).toBool(true);
-
-    mMapLabels.insert(labelId, label);
+    // TODO: complete me
+//    label.pos = readJson3DCoordinates(labelObj, scCOORDINATES);
+//
+//    label.size = readJsonSize(labelObj, scSIZE);
+//
+//    if (labelObj.contains(scTEXT) && labelObj.value(scTEXT).isString()) {
+//        label.text = labelObj.value(scTEXT).toString();
+//    }
+//
+//    if (labelObj.contains(scCOLORS) && labelObj.value(scCOLORS).isArray() && labelObj.value(scCOLORS).toArray().size() == 2) {
+//        // For an image the colors are not used and tend to be set to black, if
+//        // so skip them. Ufortunately because of the way QColour s are assembled
+//        // the operator== is too picky for our purposes as even the way the
+//        // colour was put together (color spec type) can make them NOT seem to
+//        // be the same when we'd think they were...
+//        QJsonArray colorsArray = labelObj.value(scCOLORS).toArray();
+//        label.fgColor = TMap::readJsonColor(colorsArray.at(0).toObject());
+//        label.bgColor = TMap::readJsonColor(colorsArray.at(1).toObject());
+//    } else {
+//        label.fgColor = defaultLabelForeground;
+//        label.bgColor = defaultLabelBackground;
+//    }
+//
+//    QJsonArray imageArray = labelObj.value(scIMAGE).toArray();
+//    QList<QByteArray> pixmapData;
+//    for (int i = 0, total = imageArray.size(); i < total; ++i) {
+//        pixmapData.append(imageArray.at(i).toString().toLatin1());
+//    }
+//    label.pix = convertBase64DataToImage(pixmapData);
+//
+//    label.showOnTop = labelObj.value(scSHOW_ON_TOP).toBool();
+//
+//    label.noScaling = !labelObj.value(scSCALED).toBool(true);
+//
+//    mMapLabels.insert(labelId, label);
 }
 
 void TArea::writeTwinValues(QJsonObject& obj, const QString& title, const QPointF& point) const
