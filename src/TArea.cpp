@@ -668,7 +668,7 @@ std::pair<int, QString> TArea::readJsonArea(const simdjson::dom::object& areaObj
 {
     simdjson::error_code error;
 
-    const int areaId{};
+    int areaId{};
     error = areaObj["areaId"].get(areaId);
     const QString name;
     error = areaObj["name"].get(name);
