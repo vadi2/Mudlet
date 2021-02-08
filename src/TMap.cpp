@@ -2996,8 +2996,8 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     const simdjson::dom::object playersRoomIdObj;
     error = simd_doc["playersRoomId"].get(playersRoomIdObj);
 
-    for (auto [profileNameStringView, location] : playersRoomIdObj) {
-        playersRoomId.insert(QString::fromStdString(std::string(profileNameStringView).c_str()), location);
+    for (auto [profileName, location] : playersRoomIdObj) {
+        playersRoomId.insert(QString::fromUtf8(profileName.data(), profileName.size()), location);
     }
 
     TRoomDB* pNewRoomDB = new TRoomDB(this);

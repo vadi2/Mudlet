@@ -2278,7 +2278,7 @@ void TRoom::writeJsonUserData(QJsonObject& obj) const
 void TRoom::readJsonUserData(const simdjson::dom::object& obj)
 {
     for (const auto [key, value] : obj) {
-        userData.insert(QString::fromStdString(std::string(key).c_str()), QString::fromStdString(std::string(value).c_str()));
+        userData.insert(QString::fromUtf8(key.data(), key.size()), QString::fromUtf8(value.data(), value.size()));
     }
 }
 

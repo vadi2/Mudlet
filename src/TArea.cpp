@@ -727,7 +727,7 @@ QMap<QString, QString> TArea::readJsonUserData(const simdjson::dom::object& obj)
     QMap<QString, QString> results;
 
     for (const auto [key, value] : obj) {
-        results.insert(QString::fromStdString(std::string(key).c_str()), QString::fromStdString(std::string(value).c_str()));
+        results.insert(QString::fromUtf8(key.data(), key.size()), QString::fromUtf8(value.data(), value.size()));
     }
     return results;
 }
