@@ -670,7 +670,7 @@ std::pair<int, QString> TArea::readJsonArea(const simdjson::dom::object& areaObj
 
     int areaId{};
     error = areaObj["areaId"].get(areaId);
-    const QString name;
+    QString name;
     error = areaObj["name"].get(name);
     error = areaObj["gridMode"].get(gridMode);
     simdjson::dom::object userData;
@@ -727,7 +727,8 @@ QMap<QString, QString> TArea::readJsonUserData(const simdjson::dom::object& obj)
     QMap<QString, QString> results;
 
     for (const auto [key, value] : obj) {
-        results.insert(QString::fromUtf8(key.data(), key.size()), QString::fromUtf8(value.data(), value.size()));
+        // TODO: fix the value conversion
+        results.insert(QString::fromUtf8(key.data(), key.size()), QString::fromStdString(std::string(value).c_str()));
     }
     return results;
 }
@@ -757,7 +758,7 @@ void TArea::writeJsonLabels(QJsonObject& obj) const
 void TArea::readJsonLabels(const simdjson::dom::object& areaObj)
 {
     simdjson::error_code error;
-    const simdjson::dom::array labelsArray;
+    simdjson::dom::array labelsArray;
     error = areaObj["labels"].get(labelsArray);
 
     if (error || labelsArray.size() == 0) {
@@ -837,7 +838,7 @@ void TArea::readJsonLabel(const simdjson::dom::object& labelObj)
     TMapLabel label;
     simdjson::error_code error;
 
-    const int labelId {};
+    int labelId {};
     error = labelObj["id"].get(labelId);
 
     // TODO: complete me

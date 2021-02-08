@@ -2968,7 +2968,7 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     }
 
     QMap<int, int> envColors;
-    const simdjson::dom::object envColorObj;
+    simdjson::dom::object envColorObj;
     error = simd_doc["envToColorMapping"].get(envColorObj);
 
     for (auto [key, value] : envColorObj) {
@@ -2983,17 +2983,17 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     }
 
     QMap<int, QColor> customEnvColors;
-    const simdjson::dom::array customEnvColorArray;
+    simdjson::dom::array customEnvColorArray;
     error = simd_doc["customEnvColors"].get(customEnvColorArray);
     for (simdjson::dom::object customEnvColorObj : customEnvColorArray) {
-        const int id {};
+        int id {};
         error = customEnvColorObj["id"].get(id);
         const QColor color{readJsonColor(customEnvColorObj)};
         customEnvColors.insert(id, color);
     }
 
     QHash<QString, int> playersRoomId;
-    const simdjson::dom::object playersRoomIdObj;
+    simdjson::dom::object playersRoomIdObj;
     error = simd_doc["playersRoomId"].get(playersRoomIdObj);
 
     for (auto [profileName, location] : playersRoomIdObj) {
@@ -3002,7 +3002,7 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
 
     TRoomDB* pNewRoomDB = new TRoomDB(this);
     bool abort = false;
-    const simdjson::dom::array areaData;
+    simdjson::dom::array areaData;
     error = simd_doc["areas"].get(areaData);
 
     for (simdjson::dom::object area : areaData) {
