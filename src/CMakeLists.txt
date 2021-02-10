@@ -453,7 +453,7 @@ if(APPLE)
   file(GLOB DIC_FILES "*.dic")
   file(GLOB AFF_FILES "*.aff")
   target_sources(mudlet PRIVATE ${MUDLET_LUA_FILES} ${LUA_TRANSLATIONS} ${DIC_FILES} ${AFF_FILES})
-  
+
   foreach(FILE ${MUDLET_LUA_FILES})
     string(REPLACE ${CMAKE_CURRENT_SOURCE_DIR} "" PATH_IN_BUNDLE ${FILE} )
     get_filename_component(PATH_IN_BUNDLE "${PATH_IN_BUNDLE}" DIRECTORY)
@@ -520,3 +520,4 @@ set(SIMDJSON_BUILD_STATIC ON CACHE INTERNAL "")
 FetchContent_MakeAvailable(simdjson)
 
 target_link_libraries(mudlet simdjson)
+target_compile_definitions(simdjson PUBLIC SIMDJSON_EXCEPTIONS=OFF)
