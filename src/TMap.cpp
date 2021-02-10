@@ -3034,6 +3034,7 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
         simdjson::dom::object areaObject;
         if (error = areaElement.get(areaObject); error) {
             // TODO: error checking
+            qWarning() << "could not read area object";
             continue;
         }
         TArea* pArea = new TArea(this, pNewRoomDB);

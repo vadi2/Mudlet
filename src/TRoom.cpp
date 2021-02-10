@@ -1808,9 +1808,9 @@ int TRoom::readJsonRoom(const simdjson::dom::object& roomObj, const int areaId)
     area = areaId;
 
     simdjson::dom::object userData;
-    error = roomObj["userData"].get(userData);
-
-    readJsonUserData(userData);
+    if (error = roomObj["userData"].get(userData); !error) {
+        readJsonUserData(userData);
+    }
 
     simdjson::dom::array coordinatesArray;
     error = roomObj["coordinates"].get(coordinatesArray);
@@ -1838,8 +1838,9 @@ int TRoom::readJsonRoom(const simdjson::dom::object& roomObj, const int areaId)
     environment = static_cast<int>(tempInt);
 
     simdjson::dom::object highlightObj;
-    error = roomObj["highlight"].get(highlightObj);
-    readJsonHighlight(highlightObj);
+    if (error = roomObj["highlight"].get(highlightObj); !error) {
+        readJsonHighlight(highlightObj);
+    }
 
     QString hashForRoomID;
     error = roomObj["hash"].get(tempString);

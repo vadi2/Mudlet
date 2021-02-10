@@ -668,7 +668,9 @@ std::pair<int, QString> TArea::readJsonArea(const simdjson::dom::object& areaObj
 {
     simdjson::error_code error;
     int64_t temp;
-    error = areaObj["areaId"].get(temp);
+    if (error = areaObj["id"].get(temp); error) {
+        qDebug() << "could not read areaId: " << error;
+    }
     int areaId = static_cast<int>(temp);
 
     std::string_view tempView;
@@ -681,8 +683,7 @@ std::pair<int, QString> TArea::readJsonArea(const simdjson::dom::object& areaObj
     mUserData = readJsonUserData(userData);
     int roomCount = 0;
     simdjson::dom::array roomsArray;
-    error = areaObj["roomsArray"].get(roomsArray);
-    if (!error) {
+    if (error = areaObj["rooms"].get(roomsArray); !error) {
         for (simdjson::dom::element roomElement : roomsArray) {
             simdjson::dom::object roomObject;
             if (error = roomElement.get(roomObject); error) {
@@ -701,6 +702,8 @@ std::pair<int, QString> TArea::readJsonArea(const simdjson::dom::object& areaObj
                 }
             }
         }
+    } else {
+        std::cerr << "could not read roomsArray: " << error << std::endl;
     }
 
     if (roomCount % 10 != 0) {
