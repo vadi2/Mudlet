@@ -2954,12 +2954,13 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
 
     bool isOnlyMapSymbolFontToBeUsed;
     error = simd_doc["onlyMapSymbolFontToBeUsed"].get<bool>(isOnlyMapSymbolFontToBeUsed);
-    int playerRoomStyle;
-    error = simd_doc["playerRoomStyle"].get<int>(playerRoomStyle);
+    error = simd_doc["playerRoomStyle"].get(tempInt);
+    int playerRoomStyle = static_cast<int>(tempInt);
 
-    int playerRoomInnerDiameterPercentage, playerRoomOuterDiameterPercentage;
-    error = simd_doc["playerRoomInnerDiameterPercentage"].get<int>(playerRoomInnerDiameterPercentage);
-    error = simd_doc["playerRoomOuterDiameterPercentage"].get<int>(playerRoomOuterDiameterPercentage);
+    error = simd_doc["playerRoomInnerDiameterPercentage"].get(tempInt);
+    int playerRoomInnerDiameterPercentage = static_cast<int>(tempInt);
+    error = simd_doc["playerRoomOuterDiameterPercentage"].get(tempInt);
+    int playerRoomOuterDiameterPercentage = static_cast<int>(tempInt);
 
     QColor playerRoomOuterColor;
     QColor playerRoomInnerColor;
@@ -3005,8 +3006,8 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
             // TODO: error checking
             continue;
         }
-        int id {};
-        error = customEnvColorObj["id"].get<int>(id);
+        error = customEnvColorObj["id"].get(tempInt);
+        int id = static_cast<int>(tempInt);
         const QColor color{readJsonColor(customEnvColorObj)};
         customEnvColors.insert(id, color);
     }

@@ -735,14 +735,15 @@ QMap<QString, QString> TArea::readJsonUserData(const simdjson::dom::object& obj)
     QMap<QString, QString> results;
     simdjson::error_code error;
 
-    for (const auto [key, value] : obj) {
-        std::string_view dataString;
-        if (error = value.get(dataString); error) {
-            // TODO: error checking
-            continue;
-        }
-        results.insert(QString::fromUtf8(key.data(), key.size()), QString::fromUtf8(dataString.data(), dataString.size()));
-    }
+    // FIXME: crashes
+    // for (const auto [key, value] : obj) {
+    //     std::string_view dataString;
+    //     if (error = value.get(dataString); error) {
+    //         // TODO: error checking
+    //         continue;
+    //     }
+    //     results.insert(QString::fromUtf8(key.data(), key.size()), QString::fromUtf8(dataString.data(), dataString.size()));
+    // }
     return results;
 }
 
