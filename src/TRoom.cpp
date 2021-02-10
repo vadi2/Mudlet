@@ -1906,7 +1906,12 @@ bool TRoom::readJsonExits(const simdjson::dom::object& roomObj)
     error = roomObj["exits"].get(exitArray);
 
     bool hasCustomExits = false;
-    for (const auto exitObj : exitArray) {
+    for (simdjson::dom::element exitElement : exitArray) {
+        simdjson::dom::object exitObj;
+        if (error = exitElement.get(exitObj); error) {
+            // TODO: error checking
+            continue;
+        }
         error = exitObj["name"].get(tempString);
         QString dirString = QString::fromUtf8(tempString.data(), tempString.size());
         const int dirCode = stringToDirCode(dirString);

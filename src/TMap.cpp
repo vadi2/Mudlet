@@ -2992,7 +2992,12 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     QMap<int, QColor> customEnvColors;
     simdjson::dom::array customEnvColorArray;
     error = simd_doc["customEnvColors"].get(customEnvColorArray);
-    for (simdjson::dom::object customEnvColorObj : customEnvColorArray) {
+    for (simdjson::dom::element customEnvColorElement : customEnvColorArray) {
+        simdjson::dom::object customEnvColorObj;
+        if (error = customEnvColorElement.get(customEnvColorObj); error) {
+            // TODO: error checking
+            continue;
+        }
         int id {};
         error = customEnvColorObj["id"].get<int>(id);
         const QColor color{readJsonColor(customEnvColorObj)};
@@ -3012,9 +3017,14 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     simdjson::dom::array areaData;
     error = simd_doc["areas"].get(areaData);
 
-    for (simdjson::dom::object area : areaData) {
+    for (simdjson::dom::element areaElement : areaData) {
+        simdjson::dom::object areaObject;
+        if (error = areaElement.get(areaObject); error) {
+            // TODO: error checking
+            continue;
+        }
         TArea* pArea = new TArea(this, pNewRoomDB);
-        auto [id, name] = pArea->readJsonArea(area);
+        auto [id, name] = pArea->readJsonArea(areaObject);
         ++mProgressDialogAreasCount;
         if (incrementJsonProgressDialog(false, true, 0)) {
             abort = true;

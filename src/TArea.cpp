@@ -773,8 +773,13 @@ void TArea::readJsonLabels(const simdjson::dom::object& areaObj)
         return;
     }
 
-    for (const auto& label: labelsArray) {
-        readJsonLabel(label);
+    for (simdjson::dom::element labelElement : labelsArray) {
+        simdjson::dom::object labelObject;
+        if (error = labelElement.get(labelObject); error) {
+            // TODO: error checking
+            continue;
+        }
+        readJsonLabel(labelObject);
         if (mpMap->incrementJsonProgressDialog(false, false, 1)) {
             // Cancel has been hit - so give up straight away:
             return;
