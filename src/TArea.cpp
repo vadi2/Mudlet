@@ -667,11 +667,14 @@ void TArea::writeJsonArea(QJsonArray& array) const
 std::pair<int, QString> TArea::readJsonArea(const simdjson::dom::object& areaObj)
 {
     simdjson::error_code error;
+    int64_t temp;
+    error = areaObj["areaId"].get(temp);
+    int areaId = static_cast<int>(temp);
 
-    int areaId{};
-    error = areaObj["areaId"].get(areaId);
-    QString name;
-    error = areaObj["name"].get(name);
+    std::string_view tempView;
+    error = areaObj["name"].get(tempView);
+    QString name = QString::fromUtf8(tempView.data(), tempView.size());
+
     error = areaObj["gridMode"].get(gridMode);
     simdjson::dom::object userData;
     error = areaObj["userData"].get(userData);
@@ -680,9 +683,14 @@ std::pair<int, QString> TArea::readJsonArea(const simdjson::dom::object& areaObj
     simdjson::dom::array roomsArray;
     error = areaObj["roomsArray"].get(roomsArray);
     if (!error) {
-        for (const auto& room: roomsArray) {
+        for (simdjson::dom::element roomElement : roomsArray) {
+            simdjson::dom::object roomObject;
+            if (error = roomElement.get(roomObject); error) {
+                // TODO: error checking
+                continue;
+            }
             TRoom* pR = new TRoom(mpRoomDB);
-            int roomId = pR->readJsonRoom(room, areaId);
+            int roomId = pR->readJsonRoom(roomObject, areaId);
             rooms.insert(roomId);
             // This also sets the room areaId for the TRoom:
             mpRoomDB->addRoom(roomId, pR, true);
@@ -837,9 +845,10 @@ void TArea::readJsonLabel(const simdjson::dom::object& labelObj)
 {
     TMapLabel label;
     simdjson::error_code error;
+    int64_t temp;
 
-    int labelId {};
-    error = labelObj["id"].get(labelId);
+    error = labelObj["id"].get(temp);
+    int labelId = static_cast<int>(temp);
 
     // TODO: complete me
 //    label.pos = readJson3DCoordinates(labelObj, scCOORDINATES);

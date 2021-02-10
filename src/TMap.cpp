@@ -2865,6 +2865,8 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
 
     simdjson::dom::parser parser;
     simdjson::error_code error;
+    int64_t tempInt;
+
     auto simd_doc = parser.load(source.toStdString());
 
     // if (jsonErr.error != QJsonParseError::NoError) {
@@ -2898,18 +2900,20 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
         return {false, QStringLiteral("no areas detected")};
     }
 
+    int64_t areaCount;
+    error = simd_doc["areaCount"].get(areaCount);
     // TODO: overly stringent? not actually necessary, can be recovered from
-    error = simd_doc["areaCount"].get(mProgressDialogAreasTotal);
-    if (error) {
-        return {false, QStringLiteral("area count missing in map")};
-    }
+    if (error) { return {false, QStringLiteral("area count missing in map")}; }
+    mProgressDialogAreasTotal = static_cast<int>(areaCount);
     mProgressDialogAreasCount = 0;
-    error = simd_doc["roomCount"].get(mProgressDialogRoomsTotal);
+    error = simd_doc["roomCount"].get(tempInt);
+    mProgressDialogRoomsTotal = static_cast<int>(tempInt);
     if (error) {
         return {false, QStringLiteral("room count missing in map")};
     }
     mProgressDialogRoomsCount = 0;
-    error = simd_doc["labelCount"].get(mProgressDialogLabelsTotal);
+    error = simd_doc["labelCount"].get(tempInt);
+    mProgressDialogLabelsTotal = static_cast<int>(tempInt);
     if (error) {
         return {false, QStringLiteral("label count missing in map")};
     }
@@ -2937,22 +2941,25 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     mpProgressDialog->setMinimumDuration(0); // Normally waits for 4 seconds before showing
     qApp->processEvents();
 
-    error = simd_doc["defaultAreaName"].get(mDefaultAreaName);
-    error = simd_doc["anonymousAreaName"].get(mUnnamedAreaName);
-    QString mapSymbolFontText;
-    error = simd_doc["mapSymbolFontDetails"].get(mapSymbolFontText);
-    float mapSymbolFontFudgeFactor;
+    std::string_view temp;
+    error = simd_doc["defaultAreaName"].get(temp);
+    mDefaultAreaName = QString::fromUtf8(temp.data(), temp.size());
+    error = simd_doc["anonymousAreaName"].get(temp);
+    mUnnamedAreaName = QString::fromUtf8(temp.data(), temp.size());
+    error = simd_doc["mapSymbolFontDetails"].get(temp);
+    QString mapSymbolFontText = QString::fromUtf8(temp.data(), temp.size());
+    double mapSymbolFontFudgeFactor;
     error = simd_doc["mapSymbolFontFudgeFactor"].get(mapSymbolFontFudgeFactor);
     mapSymbolFontFudgeFactor = qRound(mapSymbolFontFudgeFactor * 1000.0) / 1000;
 
     bool isOnlyMapSymbolFontToBeUsed;
-    error = simd_doc["onlyMapSymbolFontToBeUsed"].get(isOnlyMapSymbolFontToBeUsed);
+    error = simd_doc["onlyMapSymbolFontToBeUsed"].get<bool>(isOnlyMapSymbolFontToBeUsed);
     int playerRoomStyle;
-    error = simd_doc["playerRoomStyle"].get(playerRoomStyle);
+    error = simd_doc["playerRoomStyle"].get<int>(playerRoomStyle);
 
-    quint8 playerRoomInnerDiameterPercentage, playerRoomOuterDiameterPercentage;
-    error = simd_doc["playerRoomInnerDiameterPercentage"].get(playerRoomInnerDiameterPercentage);
-    error = simd_doc["playerRoomOuterDiameterPercentage"].get(playerRoomOuterDiameterPercentage);
+    int playerRoomInnerDiameterPercentage, playerRoomOuterDiameterPercentage;
+    error = simd_doc["playerRoomInnerDiameterPercentage"].get<int>(playerRoomInnerDiameterPercentage);
+    error = simd_doc["playerRoomOuterDiameterPercentage"].get<int>(playerRoomOuterDiameterPercentage);
 
     QColor playerRoomOuterColor;
     QColor playerRoomInnerColor;
@@ -2987,7 +2994,7 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     error = simd_doc["customEnvColors"].get(customEnvColorArray);
     for (simdjson::dom::object customEnvColorObj : customEnvColorArray) {
         int id {};
-        error = customEnvColorObj["id"].get(id);
+        error = customEnvColorObj["id"].get<int>(id);
         const QColor color{readJsonColor(customEnvColorObj)};
         customEnvColors.insert(id, color);
     }
@@ -3137,16 +3144,20 @@ QColor TMap::readJsonColor(const simdjson::dom::object& obj)
     }
 
     int size = colorRGBAArray.size();
+    int64_t temp;
     if (size == 3 || size == 4) {
-
-        error = colorRGBAArray.at(0).get(red);
-        error = colorRGBAArray.at(1).get(green);
-        error = colorRGBAArray.at(2).get(blue);
+        error = colorRGBAArray.at(0).get(temp);
+        red = static_cast<int>(temp);
+        error = colorRGBAArray.at(1).get(temp);
+        green = static_cast<int>(temp);
+        error = colorRGBAArray.at(2).get(temp);
+        blue = static_cast<int>(temp);
         return error ? QColor() : QColor(red, green, blue);
     }
 
     if (hasAlpha && size == 4) {;
-        error = colorRGBAArray.at(3).get(alpha);
+        error = colorRGBAArray.at(3).get(temp);
+        alpha = static_cast<int>(temp);
         return error ? QColor(red, green, blue) : QColor(red, green, blue, alpha);
     }
 

@@ -1795,11 +1795,16 @@ void TRoom::writeJsonRoom(QJsonArray& obj) const
 int TRoom::readJsonRoom(const simdjson::dom::object& roomObj, const int areaId)
 {
     simdjson::error_code error;
+    int64_t tempInt;
+    std::string_view tempString;
+
     // This is not needed to be stored into id as that is done when the room is
     // added to the TRoomDB via a TRoomDB::addRoom(...) call:
-    int roomId;
-    error = roomObj["id"].get(roomId);
-    error = roomObj["name"].get(name);
+    error = roomObj["id"].get(tempInt);
+    int roomId = static_cast<int>(tempInt);
+    error = roomObj["name"].get(tempString);
+    name = QString::fromUtf8(tempString.data(), tempString.size());
+
     area = areaId;
 
     simdjson::dom::object userData;
@@ -1814,17 +1819,22 @@ int TRoom::readJsonRoom(const simdjson::dom::object& roomObj, const int areaId)
     z = coordinatesArray.at(2);
 
     error = roomObj["locked"].get(isLocked);
-    error = roomObj["weight"].get(weight);
-    error = roomObj["symbol"].get(mSymbol);
-    error = roomObj["environment"].get(environment);
+    error = roomObj["weight"].get(tempInt);
+    weight = static_cast<int>(tempInt);
+    error = roomObj["symbol"].get(tempString);
+    mSymbol = QString::fromUtf8(tempString.data(), tempString.size());
+    error = roomObj["environment"].get(tempInt);
+    environment = static_cast<int>(tempInt);
 
     simdjson::dom::object highlightObj;
     error = roomObj["highlight"].get(highlightObj);
     readJsonHighlight(highlightObj);
 
     QString hashForRoomID;
-    error = roomObj["hash"].get(hashForRoomID);
-    if (!hashForRoomID.isEmpty()) {
+    error = roomObj["hash"].get(tempString);
+    hashForRoomID = QString::fromUtf8(tempString.data(), tempString.size());
+    if (!hashForRoomID.isEmpty())
+    {
         mpRoomDB->hashToRoomID.insert(hashForRoomID, roomId);
         mpRoomDB->roomIDToHash.insert(roomId, hashForRoomID);
     }
@@ -1891,13 +1901,14 @@ void TRoom::writeJsonExits(QJsonObject& obj) const
 bool TRoom::readJsonExits(const simdjson::dom::object& roomObj)
 {
     simdjson::error_code error;
+    std::string_view tempString;
     simdjson::dom::array exitArray;
     error = roomObj["exits"].get(exitArray);
 
     bool hasCustomExits = false;
     for (const auto exitObj : exitArray) {
-        QString dirString;
-        error = exitObj["name"].get(dirString);
+        error = exitObj["name"].get(tempString);
+        QString dirString = QString::fromUtf8(tempString.data(), tempString.size());
         const int dirCode = stringToDirCode(dirString);
         if (dirCode != DIR_OTHER) {
             if (readJsonNormalExit(exitObj, dirCode)) {
@@ -1954,8 +1965,10 @@ void TRoom::writeJsonNormalExit(QJsonArray& array, const int dir) const
 bool TRoom::readJsonNormalExit(const simdjson::dom::object& exitObj, const int dir)
 {
     simdjson::error_code error;
-    int exitRoomId;
-    error = exitObj["exitId"].get(exitRoomId);
+    int64_t tempInt;
+
+    error = exitObj["exitId"].get(tempInt);
+    int exitRoomId = static_cast<int>(tempInt);
     bool hasCustomExit = false;
     if (exitRoomId < 1) {
         qDebug().nospace().noquote() << "TRoom::readJsonNormalExit(...) INFO - when reading exits for room id: " << id << " the normal \"" << dirCodeToString(dir)
@@ -2005,15 +2018,15 @@ bool TRoom::readJsonNormalExit(const simdjson::dom::object& exitObj, const int d
         Q_UNREACHABLE(); // Special exits should never have gotten into this method!
     }
 
-    int exitWeight {};
-    error = exitObj["weight"].get(exitWeight);
+    error = exitObj["weight"].get(tempInt);
+    int exitWeight = static_cast<int>(tempInt);
     // TODO: clang-tidy says this is always false?
     if (exitWeight > 0) {
         exitWeights.insert(shortString, exitWeight);
     }
 
     bool exitLocked {};
-    error = exitObj["locked"].get(exitWeight);
+    error = exitObj["locked"].get(exitLocked);
 
     if (exitLocked) {
         // We don't bother to include this item for unlocked exits but we will
@@ -2070,9 +2083,10 @@ void TRoom::writeJsonSpecialExit(QJsonArray& array, const QString& dir, const in
 bool TRoom::readJsonSpecialExit(const simdjson::dom::object& exitObj, const QString& dir)
 {
     simdjson::error_code error;
+    int64_t tempInt;
 
-    int exitRoomId {};
-    error = exitObj["exitId"].get(exitRoomId);
+    error = exitObj["exitId"].get(tempInt);
+    int exitRoomId = static_cast<int>(tempInt);
     bool hasCustomExit = false;
     // TODO: clang-tidy thinks this is always true
     if (exitRoomId < 1) {
@@ -2083,8 +2097,8 @@ bool TRoom::readJsonSpecialExit(const simdjson::dom::object& exitObj, const QStr
 
     mSpecialExits.insert(dir, exitRoomId);
 
-    int exitWeight {};
-    error = exitObj["weight"].get(exitWeight);
+    error = exitObj["weight"].get(tempInt);
+    int exitWeight = static_cast<int>(tempInt);
     // TODO: clang-tidy thinks this is always false
     if (!error && exitWeight > 0) {
         exitWeights.insert(dir, exitWeight);
@@ -2133,9 +2147,10 @@ void TRoom::writeJsonDoor(QJsonObject& obj, const QString& key) const
 void TRoom::readJsonDoor(const simdjson::dom::object& exitObj, const QString& dir)
 {
     simdjson::error_code error;
-    QString doorString;
+    std::string_view tempString;
 
-    error = exitObj["door"].get(doorString);
+    error = exitObj["door"].get(tempString);
+    QString doorString = QString::fromUtf8(tempString.data(), tempString.size());
     if (error) {
         return;
     }
@@ -2209,6 +2224,8 @@ void TRoom::readJsonCustomExitLine(const simdjson::dom::object& customLineObj, c
 {
     simdjson::error_code error;
     simdjson::dom::array customLinePointsArray;
+    std::string_view tempString;
+
     error = customLineObj["coordinates"].get(customLinePointsArray);
 
     // Safety step to not insert anything for an empty custom line
@@ -2239,8 +2256,8 @@ void TRoom::readJsonCustomExitLine(const simdjson::dom::object& customLineObj, c
         customLinesArrow.insert(directionString, false);
     }
 
-    QString lineStyle;
-    error = customLineObj["style"].get(lineStyle);
+    error = customLineObj["style"].get(tempString);
+    QString lineStyle = QString::fromUtf8(tempString.data(), tempString.size());
     if (!error) {
         if (lineStyle == scDASH_LINE) {
             customLinesStyle.insert(directionString, Qt::DashLine);
@@ -2328,8 +2345,10 @@ void TRoom::readJsonExitStubs(const simdjson::dom::object& roomObj)
     // Given a forecast that we might eventually allow special exit stubs, issue
     // a warning if we detect such a thing in the current file:
     for (const auto& exitStubObj : exitStubsArray) {
-        QString direction;
-        error = exitStubObj["name"].get(direction);
+        std::string_view directionView;
+        error = exitStubObj["name"].get(directionView);
+        QString direction = QString::fromUtf8(directionView.data(), directionView.size());
+
         if (error) {
             continue;
         }
@@ -2383,6 +2402,8 @@ void TRoom::writeJsonHighlight(QJsonObject& obj) const
 void TRoom::readJsonHighlight(const simdjson::dom::object& highlightObj)
 {
     simdjson::error_code error;
+    double tempDouble;
+
     error = highlightObj["active"].get(highlight);
 
     simdjson::dom::array highlightColorArray;
@@ -2393,7 +2414,8 @@ void TRoom::readJsonHighlight(const simdjson::dom::object& highlightObj)
         highlightColor2 = TMap::readJsonColor(highlightColorArray.at(1));
     }
 
-    error = highlightObj["radius"].get(highlightRadius);
+    error = highlightObj["radius"].get(tempDouble);
+    highlightRadius = static_cast<float>(tempDouble);
 }
 
 void TRoom::writeJsonSymbol(QJsonObject& roomObj) const
