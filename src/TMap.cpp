@@ -2966,12 +2966,14 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
 
     simdjson::dom::array playerRoomColorArray;
     error = simd_doc["playerRoomColors"].get(playerRoomColorArray);
-    if (playerRoomColorArray.size() == 2 && playerRoomColorArray.at(0).type() == simdjson::dom::element_type::OBJECT && playerRoomColorArray.at(1).type() == simdjson::dom::element_type::OBJECT) {
+    if (playerRoomColorArray.size() == 2) {
         simdjson::dom::object outerColor, innerColor;
         error = playerRoomColorArray.at(0).get(outerColor);
         error = playerRoomColorArray.at(1).get(innerColor);
-        playerRoomOuterColor = readJsonColor(outerColor);
-        playerRoomInnerColor = readJsonColor(innerColor);
+        if (!error) {
+            playerRoomOuterColor = readJsonColor(outerColor);
+            playerRoomInnerColor = readJsonColor(innerColor);
+        }
     }
 
     QMap<int, int> envColors;
@@ -2981,8 +2983,13 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     for (auto [key, value] : envColorObj) {
         if (value.type() == simdjson::dom::element_type::INT64) {
             int keyInt;
-            if (auto [p, error] = std::from_chars(key.data(), key.data() + key.size(), keyInt); error == std::errc()) {
-                envColors.insert(keyInt, int64_t(value));
+            if (auto [p, conversionError] = std::from_chars(key.data(), key.data() + key.size(), keyInt); conversionError == std::errc()) {
+                int64_t valueInt;
+                if (error = value.get(valueInt); error) {
+                    // TODO: error checking
+                    continue;
+                }
+                envColors.insert(keyInt, int64_t(valueInt));
             }
         } else {
             qWarning() << "env color key not an int";
@@ -3008,8 +3015,13 @@ std::pair<bool, QString> TMap::readJsonMapFile(const QString& source)
     simdjson::dom::object playersRoomIdObj;
     error = simd_doc["playersRoomId"].get(playersRoomIdObj);
 
-    for (auto [profileName, location] : playersRoomIdObj) {
-        playersRoomId.insert(QString::fromUtf8(profileName.data(), profileName.size()), location);
+    for (auto [profileName, locationElement] : playersRoomIdObj) {
+        int64_t locationInt;
+        if (error = locationElement.get(locationInt); error) {
+            // TODO: error checking
+            continue;
+        }
+        playersRoomId.insert(QString::fromUtf8(profileName.data(), profileName.size()), locationInt);
     }
 
     TRoomDB* pNewRoomDB = new TRoomDB(this);

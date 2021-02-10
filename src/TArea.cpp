@@ -733,10 +733,15 @@ void TArea::writeJsonUserData(QJsonObject& obj) const
 QMap<QString, QString> TArea::readJsonUserData(const simdjson::dom::object& obj) const
 {
     QMap<QString, QString> results;
+    simdjson::error_code error;
 
     for (const auto [key, value] : obj) {
-        // TODO: fix the value conversion
-        results.insert(QString::fromUtf8(key.data(), key.size()), QString::fromStdString(std::string(value).c_str()));
+        std::string_view dataString;
+        if (error = value.get(dataString); error) {
+            // TODO: error checking
+            continue;
+        }
+        results.insert(QString::fromUtf8(key.data(), key.size()), QString::fromUtf8(dataString.data(), dataString.size()));
     }
     return results;
 }

@@ -1814,9 +1814,20 @@ int TRoom::readJsonRoom(const simdjson::dom::object& roomObj, const int areaId)
 
     simdjson::dom::array coordinatesArray;
     error = roomObj["coordinates"].get(coordinatesArray);
-    x = coordinatesArray.at(0);
-    y = coordinatesArray.at(1);
-    z = coordinatesArray.at(2);
+    if (error = coordinatesArray.at(0).get(tempInt); !error) {
+        // TODO: error checking
+        x = tempInt;
+    }
+
+    if (error = coordinatesArray.at(1).get(tempInt); !error) {
+        // TODO: error checking
+        y = tempInt;
+    }
+
+    if (error = coordinatesArray.at(2).get(tempInt); !error) {
+        // TODO: error checking
+        z = tempInt;
+    }
 
     error = roomObj["locked"].get(isLocked);
     error = roomObj["weight"].get(tempInt);
@@ -2299,8 +2310,15 @@ void TRoom::writeJsonUserData(QJsonObject& obj) const
 
 void TRoom::readJsonUserData(const simdjson::dom::object& obj)
 {
-    for (const auto [key, value] : obj) {
-        userData.insert(QString::fromUtf8(key.data(), key.size()), QString::fromStdString(std::string(value).c_str()));
+    simdjson::error_code error;
+
+    for (const auto [keyStringView, valueElement] : obj) {
+        std::string_view valueStringView;
+        if (error = valueElement.get(valueStringView); error) {
+            // TODO: error checking
+            continue;
+        }
+        userData.insert(QString::fromUtf8(keyStringView.data(), keyStringView.size()), QString::fromUtf8(valueStringView.data(), valueStringView.size()));
     }
 }
 
@@ -2349,7 +2367,13 @@ void TRoom::readJsonExitStubs(const simdjson::dom::object& roomObj)
 
     // Given a forecast that we might eventually allow special exit stubs, issue
     // a warning if we detect such a thing in the current file:
-    for (const auto& exitStubObj : exitStubsArray) {
+    for (simdjson::dom::element exitStubElement : exitStubsArray) {
+        simdjson::dom::object exitStubObj;
+        if (error = exitStubElement.get(exitStubObj); error) {
+            // TODO: error checking
+            continue;
+        }
+
         std::string_view directionView;
         error = exitStubObj["name"].get(directionView);
         QString direction = QString::fromUtf8(directionView.data(), directionView.size());
@@ -2415,8 +2439,15 @@ void TRoom::readJsonHighlight(const simdjson::dom::object& highlightObj)
     error = highlightObj["colors"].get(highlightColorArray);
 
     if (highlightColorArray.size() == 2) {
-        highlightColor = TMap::readJsonColor(highlightColorArray.at(0));
-        highlightColor2 = TMap::readJsonColor(highlightColorArray.at(1));
+        simdjson::dom::object colorObject;
+        if (error = highlightColorArray.at(0).get(colorObject); !error) {
+            // TODO: error checking
+            highlightColor = TMap::readJsonColor(colorObject);
+        }
+        if (error = highlightColorArray.at(1).get(colorObject); !error) {
+            // TODO: error checking
+            highlightColor2 = TMap::readJsonColor(colorObject);
+        }
     }
 
     error = highlightObj["radius"].get(tempDouble);
