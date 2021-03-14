@@ -599,6 +599,7 @@ public:
     static int enableMapInfo(lua_State*);
     static int disableMapInfo(lua_State*);
     static int getProfileTabNumber(lua_State*);
+    static int getVisualSelection(lua_State*);
     // PLACEMARKER: End of Lua functions declarations
 
 

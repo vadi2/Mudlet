@@ -91,6 +91,7 @@ public:
     int getColumnCount();
     int getRowCount();
     void reportCodepointErrors();
+    QString getSelectedText(const QChar& newlineChar = QChar::LineFeed, const bool showTimestamps = false);
 
     QColor mBgColor;
     // position of cursor, in characters, across the entire buffer
@@ -132,7 +133,6 @@ private slots:
 
 private:
     void initDefaultSettings();
-    QString getSelectedText(const QChar& newlineChar = QChar::LineFeed, const bool showTimestamps = false);
     static QString htmlCenter(const QString&);
     static QString convertWhitespaceToVisual(const QChar& first, const QChar& second = QChar::Null);
     static QString byteToLuaCodeOrChar(const char*);

@@ -831,6 +831,18 @@ int TLuaInterpreter::getProfileTabNumber(lua_State* L)
     return warnArgumentValue(L, __func__, "could not retrieve the tab number");
 }
 
+int TLuaInterpreter::getVisualSelection(lua_State* L)
+{
+    Host& host = getHostFromLua(L);
+    QString windowName;
+    if (lua_gettop(L) > 0) {
+        windowName = WINDOW_NAME(L, 1);
+    }
+
+    auto console = CONSOLE(L, windowName);
+    lua_pushstring(L, console->mLowerPane->getSelectedText().toUtf8().constData());
+}
+
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#getCommandSeparator
 int TLuaInterpreter::getCommandSeparator(lua_State* L)
 {
@@ -13734,6 +13746,7 @@ void TLuaInterpreter::initLuaGlobals()
     lua_register(pGlobalLua, "enableMapInfo", TLuaInterpreter::enableMapInfo);
     lua_register(pGlobalLua, "disableMapInfo", TLuaInterpreter::disableMapInfo);
     lua_register(pGlobalLua, "getProfileTabNumber", TLuaInterpreter::getProfileTabNumber);
+    lua_register(pGlobalLua, "getVisualSelection", TLuaInterpreter::getVisualSelection);
     // PLACEMARKER: End of main Lua interpreter functions registration
 
     QStringList additionalLuaPaths;
