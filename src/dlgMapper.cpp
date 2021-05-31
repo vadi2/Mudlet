@@ -377,3 +377,13 @@ bool dlgMapper::isFloatAndDockable() const
     }
     return false;
 }
+
+// Is the mapper contained inside a floating/dockable QDockWidget?
+bool dlgMapper::isFloatAndDockable() const
+{
+    // The class name should be a const char* - no QString wrapper is needed:
+    if (parentWidget() && parentWidget()->inherits("QDockWidget")) {
+        return true;
+    }
+    return false;
+}
