@@ -430,31 +430,32 @@ public:
     // Options dialog when there's no active host
     QPointer<dlgProfilePreferences> mpDlgProfilePreferences;
 
-    inline static const QStringList scmDefaultGames {QStringLiteral("3Kingdoms"),
-                                                     QStringLiteral("3Scapes"),
-                                                     QStringLiteral("Aardwolf"),
-                                                     QStringLiteral("Achaea"),
-                                                     QStringLiteral("Aetolia"),
-                                                     QStringLiteral("Avalon.de"),
-                                                     QStringLiteral("BatMUD"),
-                                                     QStringLiteral("Clessidra"),
-                                                     QStringLiteral("Fierymud"),
-                                                     QStringLiteral("Imperian"),
-                                                     QStringLiteral("Luminari"),
-                                                     QStringLiteral("Lusternia"),
-                                                     QStringLiteral("Materia Magica"),
-                                                     QStringLiteral("Midnight Sun 2"),
-                                                     QStringLiteral("Realms of Despair"),
-                                                     QStringLiteral("Reinos de Leyenda"),
-                                                     QStringLiteral("StickMUD"),
-                                                     QStringLiteral("WoTMUD"),
-                                                     QStringLiteral("ZombieMUD"),
-                                                     QStringLiteral("Carrion Fields"),
-                                                     QStringLiteral("Cleft of Dimensions"),
-                                                     QStringLiteral("CoreMUD"),
-                                                     QStringLiteral("God Wars II"),
-                                                     QStringLiteral("Slothmud"),
-                                                     QStringLiteral("Legends of the Jedi")};
+    inline static const QStringList scmDefaultGames {
+        "3Scapes",
+        "Aardwolf",
+        "Achaea",
+        "Aetolia",
+        "Avalon.de",
+        "BatMUD",
+        "Clessidra",
+        "Fierymud",
+        "Imperian",
+        "Luminari",
+        "Lusternia",
+        "Materia Magica",
+        "Midnight Sun 2",
+        "Realms of Despair",
+        "Reinos de Leyenda",
+        "StickMUD",
+        "WoTMUD",
+        "ZombieMUD",
+        "Carrion Fields",
+        "Cleft of Dimensions",
+        "CoreMUD",
+        "God Wars II",
+        "Slothmud",
+        "Legends of the Jedi"
+    };
 
 public slots:
     void processEventLoopHack_timerRun();
