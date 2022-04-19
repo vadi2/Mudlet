@@ -1164,3 +1164,52 @@ if not ttsSpeak then --check if ttsSpeak is defined, if not then Mudlet lacks TT
     _G[fn] = function() debugc(string.format("%s: Mudlet was compiled without TTS capabilities", fn)) end
   end
 end
+
+-- moveRoom(roomId, deltaX, deltaY, deltaZ)
+-- overwrite moveRoom with a function takes in a table of directions and translates them to relative coordinates
+local oldmoveRoom = moveRoom
+function moveRoom(...)
+  local args = {...}
+  -- if first argument is not a table, then pass it to moveRoom directly
+  if type(args[2]) ~= "table" then
+    return oldmoveRoom(...)
+  end
+
+  local directions = {
+    north = {x = 0, y = 1, z = 0},
+    northeast = {x = 1, y = 1, z = 0},
+    east = {x = 1, y = 0, z = 0},
+    southeast = {x = 1, y = -1, z = 0},
+    south = {x = 0, y = -1, z = 0},
+    southwest = {x = -1, y = -1, z = 0},
+    west = {x = -1, y = 0, z = 0},
+    northwest = {x = -1, y = 1, z = 0},
+    up = {x = 0, y = 0, z = 1},
+    down = {x = 0, y = 0, z = -1},
+  }
+
+  directions.n = directions.north
+  directions.ne = directions.northeast
+  directions.e = directions.east
+  directions.se = directions.southeast
+  directions.s = directions.south
+  directions.sw = directions.southwest
+  directions.w = directions.west
+  directions.nw = directions.northwest
+  directions.u = directions.up
+  directions.d = directions.down
+
+  local room = args[1]
+  local shiftRooms = args[2]
+
+  local x, y, z = getRoomCoordinates(room)
+  for direction, shift in pairs(shiftRooms) do
+    if directions[direction] then
+      x = x + directions[direction].x * shift
+      y = y + directions[direction].y * shift
+      z = z + directions[direction].z * shift
+    end
+  end
+
+  setRoomCoordinates(room, x, y, z)
+end
