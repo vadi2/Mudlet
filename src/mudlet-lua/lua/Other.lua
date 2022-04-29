@@ -1170,7 +1170,6 @@ end
 local oldmoveRoom = moveRoom
 function moveRoom(...)
   local args = {...}
-  -- if first argument is not a table, then pass it to moveRoom directly
   if type(args[2]) ~= "table" then
     return oldmoveRoom(...)
   end
@@ -1211,5 +1210,5 @@ function moveRoom(...)
     end
   end
 
-  setRoomCoordinates(room, x, y, z)
+  moveRoom(room, x, y, z)
 end
