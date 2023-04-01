@@ -1,7 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2008-2012 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2018 by Stephen Lyons - slysven@virginmedia.com         *
+ *   Copyright (C) 2018, 2020, 2022 by Stephen Lyons                       *
+ *                                               - slysven@virginmedia.com *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -27,15 +28,7 @@
 #include "TKey.h"
 
 KeyUnit::KeyUnit(Host* pHost)
-: statsKeyTotal(0)
-, statsTempKeys(0)
-, statsActiveKeys(0)
-, statsActiveKeysMax(0)
-, statsActiveKeysMin(0)
-, statsActiveKeysAverage(0)
-, statsTempKeysCreated(0)
-, statsTempKeysKilled(0)
-, mRunAllKeyMatches(false)
+: mRunAllKeyMatches(false)
 , mpHost(pHost)
 , mMaxID(0)
 , mModuleMember(false)
@@ -43,6 +36,12 @@ KeyUnit::KeyUnit(Host* pHost)
     setupKeyNames();
 }
 
+void KeyUnit::resetStats()
+{
+    statsItemsTotal = 0;
+    statsTempItems = 0;
+    statsActiveItems = 0;
+}
 
 void KeyUnit::_uninstall(TKey* pChild, const QString& packageName)
 {
@@ -68,16 +67,16 @@ void KeyUnit::uninstall(const QString& packageName)
     uninstallList.clear();
 }
 
-bool KeyUnit::processDataStream(int key, int modifier)
+bool KeyUnit::processDataStream(const Qt::Key key, const Qt::KeyboardModifiers modifiers)
 {
     bool isMatchFound = false;
     for (auto keyObject : mKeyRootNodeList) {
-        if (keyObject->match(key, modifier, mRunAllKeyMatches)) {
+        if (keyObject->match(key, modifiers, mRunAllKeyMatches)) {
             if (!mRunAllKeyMatches) {
                 return true;
-            } else {
-                isMatchFound = true;
             }
+
+            isMatchFound = true;
         }
     }
 
@@ -109,7 +108,7 @@ void KeyUnit::reenableAllTriggers()
 
 TKey* KeyUnit::findFirstKey(QString& name)
 {
-    QMap<QString, TKey*>::const_iterator it = mLookupTable.constFind(name);
+    auto it = mLookupTable.constFind(name);
     if (it != mLookupTable.cend() && it.key() == name) {
         return it.value();
     }
@@ -119,7 +118,7 @@ TKey* KeyUnit::findFirstKey(QString& name)
 bool KeyUnit::enableKey(const QString& name)
 {
     bool found = false;
-    QMap<QString, TKey*>::const_iterator it = mLookupTable.constFind(name);
+    auto it = mLookupTable.constFind(name);
     while (it != mLookupTable.cend() && it.key() == name) {
         TKey* pT = it.value();
         // Unlike the TTriggerUnit version of this code we directly set
@@ -136,7 +135,7 @@ bool KeyUnit::enableKey(const QString& name)
 bool KeyUnit::disableKey(const QString& name)
 {
     bool found = false;
-    QMap<QString, TKey*>::const_iterator it = mLookupTable.constFind(name);
+    auto it = mLookupTable.constFind(name);
     while (it != mLookupTable.cend() && it.key() == name) {
         TKey* pT = it.value();
         // Unlike the TTriggerUnit version of this code we directly clear
@@ -207,8 +206,6 @@ void KeyUnit::addKeyRootNode(TKey* pT, int parentPosition, int childPosition, bo
 
 void KeyUnit::reParentKey(int childID, int oldParentID, int newParentID, int parentPosition, int childPosition)
 {
-    QMutexLocker locker(&mKeyUnitLock);
-
     TKey* pOldParent = getKeyPrivate(oldParentID);
     TKey* pNewParent = getKeyPrivate(newParentID);
     TKey* pChild = getKeyPrivate(childID);
@@ -245,22 +242,13 @@ void KeyUnit::removeKeyRootNode(TKey* pT)
 
 TKey* KeyUnit::getKey(int id)
 {
-    QMutexLocker locker(&mKeyUnitLock);
-    if (mKeyMap.find(id) != mKeyMap.end()) {
-        return mKeyMap.value(id);
-    } else {
-        return nullptr;
-    }
+    return mKeyMap.value(id);
 }
 
 
 TKey* KeyUnit::getKeyPrivate(int id)
 {
-    if (mKeyMap.find(id) != mKeyMap.end()) {
-        return mKeyMap.value(id);
-    } else {
-        return nullptr;
-    }
+    return mKeyMap.value(id);
 }
 
 bool KeyUnit::registerKey(TKey* pT)
@@ -326,104 +314,68 @@ int KeyUnit::getNewID()
     return ++mMaxID;
 }
 
-QString KeyUnit::getKeyName(int keyCode, int modifierCode)
+QString KeyUnit::getKeyName(const Qt::Key keyCode, const Qt::KeyboardModifiers modifierCode) const
 {
     QString name;
-    /*
-     Qt::NoModifier      0x00000000 No modifier key is pressed.
-     Qt::ShiftModifier   0x02000000 A Shift key on the keyboard is pressed.
-     Qt::ControlModifier 0x04000000 A Ctrl key on the keyboard is pressed.
-     Qt::AltModifier     0x08000000 An Alt key on the keyboard is pressed.
-     Qt::MetaModifier    0x10000000 A Meta key on the keyboard is pressed.
-     Qt::KeypadModifier  0x20000000 A keypad button is pressed.
-     Qt::GroupSwitchModifier 0x40000000 X11 only. A Mode_switch key on the keyboard is pressed.
-    */
-    if (modifierCode == 0x00000000) {
-        name += "no modifiers + ";
-    }
-    if (modifierCode & 0x02000000) {
-        name += "shift + ";
-    }
-    if (modifierCode & 0x04000000) {
-        name += "control + ";
-    }
-    if (modifierCode & 0x08000000) {
-        name += "alt + ";
-    }
-    if (modifierCode & 0x10000000) {
-        name += "meta + ";
-    }
-    if (modifierCode & 0x20000000) {
-        name += "keypad + ";
-    }
-    if (modifierCode & 0x40000000) {
-        name += "groupswitch + ";
-    }
+    name = ((modifierCode & Qt::ShiftModifier) ? "shift + " : QString())
+         % ((modifierCode & Qt::ControlModifier) ? "control + " : QString())
+         % ((modifierCode & Qt::AltModifier) ? "alt + " : QString())
+         % ((modifierCode & Qt::MetaModifier) ? "meta + " : QString())
+         % ((modifierCode & Qt::KeypadModifier) ? "keypad + " : QString())
+         % ((modifierCode & Qt::GroupSwitchModifier) ? "groupswitch + " : QString());
+
+
     if (mKeys.contains(keyCode)) {
-        name += mKeys[keyCode];
-        return name;
-    } else {
-        return QString("undefined key");
+        return name % mKeys.value(keyCode);
     }
+
+    return tr("%1undefined key (code: 0x%2)",
+              // Intentional comment to separate arguments
+              "%1 is a string describing the modifier keys (e.g. \"shift\" or \"control\") "
+              "used with the key, whose 'code' number, in %2 is not one that we have a name "
+              "for. This is probably one of those extra keys around the edge of the keyboard "
+              "that some people have.").arg(name).arg(keyCode, 4, 16, QLatin1Char('0'));
 }
 
-void KeyUnit::initStats()
+void KeyUnit::assembleReport(TKey* pItem)
 {
-    statsKeyTotal = 0;
-    statsTempKeys = 0;
-    statsActiveKeys = 0;
-    statsActiveKeysMax = 0;
-    statsActiveKeysMin = 0;
-    statsActiveKeysAverage = 0;
-    statsTempKeysCreated = 0;
-    statsTempKeysKilled = 0;
-}
-
-void KeyUnit::_assembleReport(TKey* pChild)
-{
-    std::list<TKey*>* childrenList = pChild->mpMyChildrenList;
-    for (auto pT : *childrenList) {
-        _assembleReport(pT);
-        if (pT->isActive()) {
-            statsActiveKeys++;
-        }
-        if (pT->isTemporary()) {
-            statsTempKeys++;
-        }
-        statsKeyTotal++;
-    }
-}
-
-QString KeyUnit::assembleReport()
-{
-    statsActiveKeys = 0;
-    statsKeyTotal = 0;
-    statsTempKeys = 0;
-    for (auto pChild : mKeyRootNodeList) {
+    std::list<TKey*>* childrenList = pItem->mpMyChildrenList;
+    for (auto pChild : *childrenList) {
+        ++statsItemsTotal;
         if (pChild->isActive()) {
-            statsActiveKeys++;
+            ++statsActiveItems;
         }
         if (pChild->isTemporary()) {
-            statsTempKeys++;
+            ++statsTempItems;
         }
-        statsKeyTotal++;
-        std::list<TKey*>* childrenList = pChild->mpMyChildrenList;
-        for (auto pT : *childrenList) {
-            _assembleReport(pT);
-            if (pT->isActive()) {
-                statsActiveKeys++;
-            }
-            if (pT->isTemporary()) {
-                statsTempKeys++;
-            }
-            statsKeyTotal++;
+        assembleReport(pChild);
+    }
+}
+
+std::tuple<QString, int, int, int> KeyUnit::assembleReport()
+{
+    resetStats();
+    for (auto pItem : mKeyRootNodeList) {
+        ++statsItemsTotal;
+        if (pItem->isActive()) {
+            ++statsActiveItems;
         }
+        if (pItem->isTemporary()) {
+            ++statsTempItems;
+        }
+        assembleReport(pItem);
     }
     QStringList msg;
-    msg << "Keys current total: " << QString::number(statsKeyTotal) << "\n"
-        << "tempKeys current total: " << QString::number(statsTempKeys) << "\n"
-        << "active Keys: " << QString::number(statsActiveKeys) << "\n";
-    return msg.join("");
+    msg << QLatin1String("Keys current total: ") << QString::number(statsItemsTotal) << QLatin1String("\n")
+        << QLatin1String("tempKeys current total: ") << QString::number(statsTempItems) << QLatin1String("\n")
+        << QLatin1String("active Keys: ") << QString::number(statsActiveItems) << QLatin1String("\n");
+
+    return {
+        msg.join(QString()),
+        statsItemsTotal,
+        statsTempItems,
+        statsActiveItems
+    };
 }
 
 void KeyUnit::markCleanup(TKey* pT)

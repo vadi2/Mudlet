@@ -1,6 +1,7 @@
 /***************************************************************************
  *   Copyright (C) 2008-2012 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
+ *   Copyright (C) 2022 by Stephen Lyons - slysven@virginmedia.com         *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -24,6 +25,13 @@
 
 #include "Host.h"
 #include "TScript.h"
+
+void ScriptUnit::resetStats()
+{
+    statsItemsTotal = 0;
+    statsTempItems = 0;
+    statsActiveItems = 0;
+}
 
 void ScriptUnit::_uninstall(TScript* pChild, const QString& packageName)
 {
@@ -117,7 +125,6 @@ void ScriptUnit::removeScriptRootNode(TScript* pT)
 
 TScript* ScriptUnit::getScript(int id)
 {
-    QMutexLocker locker(&mScriptUnitLock);
     if (mScriptMap.find(id) != mScriptMap.end()) {
         return mScriptMap.value(id);
     } else {
@@ -158,6 +165,7 @@ void ScriptUnit::unregisterScript(TScript* pT)
         removeScript(pT);
         return;
     } else {
+        removeScript(pT);
         removeScriptRootNode(pT);
         return;
     }
@@ -169,8 +177,6 @@ void ScriptUnit::addScript(TScript* pT)
     if (!pT) {
         return;
     }
-
-    QMutexLocker locker(&mScriptUnitLock);
 
     if (!pT->getID()) {
         pT->setID(getNewID());
@@ -205,4 +211,55 @@ void ScriptUnit::compileAll()
             script->compileAll();
         }
     }
+}
+
+QVector<int> ScriptUnit::findScriptId(const QString& name) const
+{
+    QVector<int> Ids;
+    for (auto script : mScriptMap) {
+        if (script->getName() == name) {
+            Ids.append(script->getID());
+        }
+    }
+    return Ids;
+}
+
+void ScriptUnit::assembleReport(TScript* pItem)
+{
+    std::list<TScript*>* childrenList = pItem->mpMyChildrenList;
+    for (auto pChild : *childrenList) {
+        ++statsItemsTotal;
+        if (pChild->isActive()) {
+            ++statsActiveItems;
+        }
+        if (pChild->isTemporary()) {
+            ++statsTempItems;
+        }
+        assembleReport(pChild);
+    }
+}
+
+std::tuple<QString, int, int, int> ScriptUnit::assembleReport()
+{
+    resetStats();
+    for (auto pItem : mScriptRootNodeList) {
+        ++statsItemsTotal;
+        if (pItem->isActive()) {
+            ++statsActiveItems;
+        }
+        if (pItem->isTemporary()) {
+            ++statsTempItems;
+        }
+        assembleReport(pItem);
+    }
+    QStringList msg;
+    msg << QLatin1String("Scripts current total: ") << QString::number(statsItemsTotal) << QLatin1String("\n")
+        << QLatin1String("tempScripts current total: ") << QString::number(statsTempItems) << QLatin1String("\n")
+        << QLatin1String("active Scripts: ") << QString::number(statsActiveItems) << QLatin1String("\n");
+    return {
+        msg.join(QString()),
+        statsItemsTotal,
+        statsTempItems,
+        statsActiveItems
+    };
 }

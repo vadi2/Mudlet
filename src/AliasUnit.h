@@ -4,6 +4,7 @@
 /***************************************************************************
  *   Copyright (C) 2008-2011 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
+ *   Copyright (C) 2022 by Stephen Lyons - slysven@virginmedia.com         *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -24,7 +25,6 @@
 
 #include "pre_guard.h"
 #include <QMultiMap>
-#include <QMutex>
 #include <QPointer>
 #include <QString>
 #include "post_guard.h"
@@ -41,7 +41,10 @@ class AliasUnit
     friend class XMLimport;
 
 public:
-    AliasUnit(Host* pHost) : mpHost(pHost), mMaxID(0), mModuleMember() { initStats(); }
+    explicit AliasUnit(Host* pHost)
+    : mpHost(pHost)
+    {}
+
     std::list<TAlias*> getAliasRootNodeList() { return mAliasRootNodeList; }
     TAlias* getAlias(int id);
     void compileAll();
@@ -49,6 +52,7 @@ public:
     bool enableAlias(const QString&);
     bool disableAlias(const QString&);
     bool killAlias(const QString& name);
+    void removeAllTempAliases();
     bool registerAlias(TAlias* pT);
     void unregisterAlias(TAlias* pT);
     void uninstall(const QString&);
@@ -57,34 +61,21 @@ public:
     bool processDataStream(const QString&);
     void stopAllTriggers();
     void reenableAllTriggers();
-    QString assembleReport();
+    std::tuple<QString, int, int, int> assembleReport();
     int getNewID();
     void markCleanup(TAlias* pT);
     void doCleanup();
 
     QMultiMap<QString, TAlias*> mLookupTable;
     std::list<TAlias*> mCleanupList;
-    QMutex mAliasUnitLock;
-    int statsAliasTotal;
-    int statsTempAliases;
-    int statsActiveAliases;
-    int statsActiveAliasesMax;
-    int statsActiveAliasesMin;
-    int statsActiveAliasesAverage;
-    int statsTempAliasesCreated;
-    int statsTempAliasesKilled;
-    int statsAverageLineProcessingTime;
-    int statsMaxLineProcessingTime;
-    int statsMinLineProcessingTime;
-    int statsRegexAliases;
     QList<TAlias*> uninstallList;
 
 
 private:
     AliasUnit() = default;
 
-    void initStats();
-    void _assembleReport(TAlias*);
+    void resetStats();
+    void assembleReport(TAlias*);
     TAlias* getAliasPrivate(int id);
     void addAliasRootNode(TAlias* pT, int parentPosition = -1, int childPosition = -1, bool moveAlias = false);
     void addAlias(TAlias* pT);
@@ -94,8 +85,11 @@ private:
     QPointer<Host> mpHost;
     QMap<int, TAlias*> mAliasMap;
     std::list<TAlias*> mAliasRootNodeList;
-    int mMaxID;
-    bool mModuleMember;
+    int mMaxID = 0;
+    bool mModuleMember = false;
+    int statsItemsTotal = 0;
+    int statsTempItems = 0;
+    int statsActiveItems = 0;
 };
 
 #endif // MUDLET_ALIASUNIT_H

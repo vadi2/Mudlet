@@ -1,5 +1,11 @@
 # Some global variables / settings
 $workingBaseDir = "C:\src\"
+if (Test-Path env:WORKING_BASE_DIR) {
+  $workingBaseDir = $env:WORKING_BASE_DIR
+}
+
+echo "workingBaseDir is $workingBaseDir"
+
 $logFile = "$workingBaseDir\verbose_output.log"
 $ciScriptDir = (Get-Item -Path ".\" -Verbose).FullName
 
@@ -8,7 +14,9 @@ if (-not $(Test-Path "$workingBaseDir")) {
 }
 
 $64Bit = (Get-WmiObject Win32_OperatingSystem).OSArchitecture -eq "64-bit"
-if($64Bit){
+# Appveyor's CMake is in C:\Program Files\CMake
+
+if($64Bit -and ($Env:APPVEYOR -ne "True")){
   $CMakePath = "C:\Program Files (x86)\CMake\bin"
 } else {
   $CMakePath = "C:\Program Files\CMake\bin"
@@ -22,7 +30,7 @@ function SetQtBaseDir([string] $logFile) {
     }
     catch
     {
-      $Env:QT_BASE_DIR = "C:\Qt\5.12.3\mingw73_32"
+      $Env:QT_BASE_DIR = "C:\Qt\5.14.2\mingw73_32"
     }
   }
   Write-Output "Using $Env:QT_BASE_DIR as QT base directory." | Tee-Object -File "$logFile" -Append
@@ -81,7 +89,7 @@ function script:exec {
 
 # Checks, whether sh.exe is found in the PATH. If so, these parts get filtered out and the remaining PATH gets returned.
 function filterPathForSh {
-    $noShPath = ($Env:PATH.Split(';') | Where-Object { -NOT (Test-Path (Join-Path $_ "sh.exe") -PathType Leaf) }) -join ';'
+    $noShPath = ($Env:PATH.Split(';') | Where-Object { -NOT (Test-Path ([System.IO.Path]::Combine($_, "sh.exe")) -PathType Leaf) }) -join ';'
     return $noShPath
 }
 
@@ -114,8 +122,8 @@ function DownloadFile([string] $url, [string] $outputFile, [bool] $bigDownload =
 function ExtractTar([string] $tarFile, [string] $outputPath) {
   Step "Extracting source distribution"
   $file = Get-ChildItem $tarFile
-  exec "7z" @("x", "$($file.FullName)", "-y")
-  exec "7z" @("-o$outputPath", "x", "$($file.Directory)\$($file.BaseName)", "-y")
+  exec "7z" @("-o$outputPath", "x", "$($file.FullName)", "-y")
+  exec "7z" @("-o$outputPath", "x", "$($outputPath)\$($file.BaseName)", "-y")
 }
 
 function ExtractZip([string] $zipFile, [string] $outputPath) {
@@ -203,21 +211,29 @@ function InstallMsys() {
   exec "mingw-get" @("install", "mingw32-autotools")
 }
 
-function InstallBoost() {
-  DownloadFile "https://sourceforge.net/projects/boost/files/boost/1.67.0/boost_1_67_0.tar.gz/download" "boost.tar.gz" $true
+function InstallBoost([string] $outputLocation = "C:\Libraries\") {
+  DownloadFile "https://sourceforge.net/projects/boost/files/boost/1.77.0/boost_1_77_0.tar.gz/download" "boost.tar.gz" $true
   if (!(Test-Path -Path "C:\Libraries\" -PathType Container)) {
     Step "Creating Boost path"
     New-Item -Path "C:\Libraries\" -ItemType "directory" >> "$logFile" 2>&1
   }
-  ExtractTar "boost.tar.gz" "."
+  ExtractTar "$workingBaseDir\boost.tar.gz" "$workingBaseDir"
   Step "Copying folder"
-  Move-Item "boost_1_67_0" "C:\Libraries\" >> "$logFile" 2>&1
+  Move-Item "$workingBaseDir\boost_1_77_0" "$outputLocation" >> "$logFile" 2>&1
 }
 
 function InstallQt() {
-  DownloadFile "http://download.qt.io/official_releases/online_installers/qt-unified-windows-x86-online.exe" "qt-installer.exe"
-  Step "Installing"
-  exec ".\qt-installer.exe" @("--script=`"$(split-path -parent $script:MyInvocation.MyCommand.Path)\qt-silent-install.qs`"")
+  Step "Installing aqtinstall"
+  exec "pip" @("install", "aqtinstall")
+  New-Item -Path $Env:QT_BASE_DIR -ItemType Directory
+  cd $Env:QT_BASE_DIR
+  # go up to the root of Qt folder to start installation
+  cd ..
+  cd ..
+  Step "Installing Qt"
+  exec "aqt" @("install-qt", "windows", "desktop", "5.14.2", "win32_mingw73")
+  Step "Installing Mingw 7.3.0 Win32 tools"
+  exec "aqt" @("install-tool", "windows", "desktop", "tools_mingw", "qt.tools.win32_mingw730")
 }
 
 function InstallPython() {
@@ -229,7 +245,8 @@ function InstallPython() {
 }
 
 function InstallOpenssl() {
-  DownloadFile "http://wiki.overbyte.eu/arch/openssl-1.0.2s-win32.zip" "openssl-win32.zip"
+  # needs to be from http://wiki.overbyte.eu/wiki/index.php/ICS_Download as it includes extra binaries not available on openssl.org
+  DownloadFile "http://wiki.overbyte.eu/arch/openssl-1.1.1n-win32.zip" "openssl-win32.zip"
   ExtractZip "openssl-win32.zip" "openssl"
   Step "installing"
   exec "XCOPY" @("/S", "/I", "/Q", "openssl", "$Env:MINGW_BASE_DIR\bin")
@@ -249,9 +266,9 @@ function InstallHunspell() {
 
 function InstallYajl() {
   $Env:Path = $NoShPath
-  DownloadFile "https://github.com/lloyd/yajl/tarball/2.1.0" "yajl-2.1.0.tar.gz"
+  DownloadFile "https://github.com/lloyd/yajl/archive/refs/tags/2.1.0.tar.gz" "yajl-2.1.0.tar.gz"
   ExtractTar "yajl-2.1.0.tar.gz" "yajl-2.1.0"
-  Set-Location "yajl-2.1.0\lloyd-yajl-66cb08c"
+  Set-Location "yajl-2.1.0\yajl-2.1.0"
   Step "changing CMakeLists.txt"
   (Get-Content CMakeLists.txt -Raw) -replace '\/W4' -replace '(?<=SET\(linkFlags)[^\)]+' -replace '\/wd4996 \/wd4255 \/wd4130 \/wd4100 \/wd4711' -replace '(?<=SET\(CMAKE_C_FLAGS_DEBUG .)\/D \DEBUG \/Od \/Z7', '-g' -replace '(?<=SET\(CMAKE_C_FLAGS_RELEASE .)\/D NDEBUG \/O2', '-O2' | Out-File -encoding ASCII CMakeLists.txt >> "$logFile" 2>&1
   if (!(Test-Path -Path "build" -PathType Container)) {
@@ -283,10 +300,10 @@ function InstallLua() {
 }
 
 function InstallPcre() {
-  DownloadFile "https://ftp.pcre.org/pub/pcre/pcre-8.43.zip" "pcre.zip"
+  DownloadFile "https://deac-fra.dl.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.zip" "pcre.zip"
   ExtractZip "pcre.zip" "pcre"
-  Set-Location pcre\pcre-8.43
-  RunConfigure "--enable-utf --enable-unicode-properties --enable-pcre16 --prefix=$Env:MINGW_BASE_DIR_BASH"
+  Set-Location pcre\pcre-8.45
+  RunConfigure "--enable-utf --enable-unicode-properties --prefix=$Env:MINGW_BASE_DIR_BASH"
   RunMake
   RunMakeInstall
 }
@@ -304,9 +321,9 @@ function InstallSqlite() {
 }
 
 function InstallZlib() {
-  DownloadFile "http://zlib.net/zlib-1.2.11.tar.gz" "zlib-1.2.11.tar.gz"
-  ExtractTar "zlib-1.2.11.tar.gz" "zlib"
-  Set-Location zlib\zlib-1.2.11
+  DownloadFile "http://zlib.net/fossils/zlib-1.2.13.tar.gz" "zlib-1.2.13.tar.gz"
+  ExtractTar "$workingBaseDir\zlib-1.2.13.tar.gz" "$workingBaseDir\zlib"
+  Set-Location "$workingBaseDir\zlib\zlib-1.2.13"
   RunMake "win32/Makefile.gcc"
   $Env:INCLUDE_PATH = "$Env:MINGW_BASE_DIR\include"
   $Env:LIBRARY_PATH = "$Env:MINGW_BASE_DIR\lib"
@@ -318,21 +335,22 @@ function InstallZlib() {
 
 function InstallLibzip() {
   $Env:Path = $NoShPath
-  DownloadFile "https://libzip.org/download/libzip-1.5.2.tar.gz" "libzip.tar.gz"
-  ExtractTar "libzip.tar.gz" "libzip"
-  Set-Location libzip\libzip-1.5.2
+  DownloadFile "https://libzip.org/download/libzip-1.7.3.tar.gz" "libzip.tar.gz"
+  ExtractTar "$workingBaseDir\libzip.tar.gz" "$workingBaseDir\libzip"
+  Set-Location "$workingBaseDir\libzip\libzip-1.7.3"
   if (!(Test-Path -Path "build" -PathType Container)) {
     Step "Creating libzip build path"
     New-Item build -ItemType Directory >> "$logFile" 2>&1
   }
   Set-Location build
   Step "running cmake"
-  exec "cmake" @("-G", "`"MinGW Makefiles`"", "-DCMAKE_INSTALL_PREFIX=`"$Env:MINGW_BASE_DIR`"", "-DENABLE_OPENSSL=OFF", "..")
+  exec "cmake" @("-G", "`"MinGW Makefiles`"", "-DCMAKE_INSTALL_PREFIX=`"$Env:MINGW_BASE_DIR`"", "-DENABLE_OPENSSL=OFF", "-DBUILD_REGRESS=OFF", "-DBUILD_EXAMPLES=OFF", "-DBUILD_DOC=OFF", "..")
   RunMake
   RunMakeInstall
   $Env:Path = $ShPath
 }
 
+# Shouldn't be needed now:
 function InstallZziplib() {
   DownloadFile "https://github.com/keneanung/zziplib/archive/FixZzipStrndup.tar.gz" "zziplib-FixZzipStrndup.tar.gz"
   ExtractTar "zziplib-FixZzipStrndup.tar.gz" "zziplib"
@@ -347,9 +365,9 @@ function InstallZziplib() {
 }
 
 function InstallLuarocks() {
-  DownloadFile "http://luarocks.github.io/luarocks/releases/luarocks-3.1.2-win32.zip" "luarocks.zip"
+  DownloadFile "http://luarocks.github.io/luarocks/releases/luarocks-3.8.0-win32.zip" "luarocks.zip"
   ExtractZip "luarocks.zip" "luarocks"
-  Set-Location luarocks\luarocks-3.1.2-win32
+  Set-Location luarocks\luarocks-3.8.0-win32
   Step "installing luarocks"
   exec ".\install.bat" @("/P", "C:\LuaRocks", "/MW", "/Q")
   Set-Location \LuaRocks\lua\luarocks\core
@@ -394,6 +412,16 @@ function InstallLuaUtf8() {
   exec ".\luarocks" @("--tree=`"$Env:MINGW_BASE_DIR`"", "install", "luautf8")
 }
 
+function InstallLuaLunajson() {
+  Set-Location \LuaRocks
+  exec ".\luarocks" @("--tree=`"$Env:MINGW_BASE_DIR`"", "install", "lunajson")
+}
+
+function InstallLuaArgparse() {
+  Set-Location \LuaRocks
+  exec ".\luarocks" @("--tree=`"$Env:MINGW_BASE_DIR`"", "install", "argparse")
+}
+
 function InstallLuaYajl() {
   Set-Location \LuaRocks
   $Env:LIBRARY_PATH = "$Env:LIBRARY_PATH;$Env:MINGW_BASE_DIR/bin"
@@ -403,12 +431,27 @@ function InstallLuaYajl() {
 function InstallLuaZip () {
   Set-Location "$workingBaseDir"
   DownloadFile "https://github.com/rjpcomputing/luazip/archive/master.zip" "luazip.zip"
+  # The above redirects to:
+  # "https://codeload.github.com/mpeterv/luazip/zip/master.zip"
+  # To avoid a dependency on zziplib we should switch to:
+  # "https://codeload.github.com/brimworks/lua-zip/zip/v0.2.0"
+  # TODO: it is not clear whether any extra tweaking, besides removing "-lzzip"
+  # is needed for the above alternative:
   ExtractZip "luazip.zip" "luazip"
   Set-Location luazip\luazip-master
   Step "installing luazip"
   exec "gcc" @("-O2", "-c", "-o", "src/luazip.o", "-I`"$Env:MINGW_BASE_DIR/include`"", "src/luazip.c")
   exec "gcc" @("-shared", "-o", "zip.dll", "src/luazip.o", "-L`"$Env:MINGW_BASE_DIR/lib`"", "-lzzip", "-lz", "`"$Env:MINGW_BASE_DIR/bin/lua51.dll`"", "-lm")
   Copy-Item "zip.dll" "$Env:MINGW_BASE_DIR\lib\lua\5.1"
+}
+
+function InstallCcache() {
+    Step "installing ccache"
+    DownloadFile "https://github.com/ccache/ccache/releases/download/v4.6.1/ccache-4.6.1-windows-x86_64.zip" "ccache.zip"
+    ExtractZip "ccache.zip" "ccache"
+    Set-Location "ccache/ccache-4.6.1-windows-x86_64"
+    New-Item "C:\Program Files\ccache" -ItemType "directory" -Force
+    Copy-Item "ccache.exe" "C:\Program Files\ccache\ccache.exe" -Force
 }
 
 function InstallLuaModules(){
@@ -418,6 +461,13 @@ function InstallLuaModules(){
   CheckAndInstall "lua-utf8" "$Env:MINGW_BASE_DIR\\lib\lua\5.1\lua-utf8.dll" { InstallLuaUtf8 }
   CheckAndInstall "lua-yajl" "$Env:MINGW_BASE_DIR\\lib\lua\5.1\yajl.dll" { InstallLuaYajl }
   CheckAndInstall "luazip" "$Env:MINGW_BASE_DIR\\lib\lua\5.1\zip.dll" { InstallLuaZip }
+  CheckAndInstall "argparse" "$Env:MINGW_BASE_DIR\\lib\lua\5.1\argparse" { InstallLuaArgparse }
+  CheckAndInstall "lunajson" "$Env:MINGW_BASE_DIR\\lib\luarocks\rocks-5.1\lunajson" { InstallLuaLunajson }
+}
+
+function CheckAndInstallCcache(){
+  CheckAndInstall "ccache" "C:\Program Files\ccache\ccache.exe" { InstallCcache }
+
 }
 
 function CheckAndInstall7z(){
@@ -437,7 +487,7 @@ function CheckAndInstallMsys(){
 }
 
 function CheckAndInstallBoost(){
-    CheckAndInstall "Boost" "C:\Libraries\boost_1_67_0\bootstrap.bat" { InstallBoost }
+    CheckAndInstall "Boost" "C:\Libraries\boost_1_77_0\bootstrap.bat" { InstallBoost }
 }
 
 function CheckAndInstallQt(){
@@ -449,7 +499,7 @@ function CheckAndInstallPython(){
 }
 
 function CheckAndInstallOpenSSL(){
-    CheckAndInstall "openssl" "$Env:MINGW_BASE_DIR\bin\ssleay32.dll" { InstallOpenssl }
+    CheckAndInstall "openssl" "$Env:MINGW_BASE_DIR\bin\libssl-1_1.dll" { InstallOpenssl }
 }
 
 function CheckAndInstallHunspell(){

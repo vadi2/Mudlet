@@ -9,10 +9,10 @@ $global:ErrorActionPreference = "Stop"
 
 SetQtBaseDir "$logFile"
 
-$Env:PATH = "$CMakePath;C:\MinGW\bin;C:\MinGW\msys\1.0\bin;C:\Program Files\7-Zip;$Env:PATH"
+$Env:PATH = "$CMakePath;C:\MinGW\bin;C:\MinGW\msys\1.0\bin;C:\Program Files\7-Zip;C:\Program Files\ccache;$Env:PATH"
 
 # install dependencies
-
+CheckAndInstallCcache
 CheckAndInstall7z
 CheckAndInstallCmake
 CheckAndInstallMingwGet
@@ -37,6 +37,9 @@ CheckAndInstallPcre
 CheckAndInstallSqlite
 CheckAndInstallZlib
 CheckAndInstallLibzip
+# Shouldn't be needed as it is only used for the luazip module from:
+# https://github.com/mpeterv/luazip and we can use lua-zip from:
+# https://github.com/brimworks/lua-zip :
 CheckAndInstallZziplib
 CheckAndInstallLuarocks
 CheckAndInstallPugixml

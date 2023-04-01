@@ -3,6 +3,7 @@
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
  *   Copyright (C) 2016 by Ian Adkins - ieadkins@gmail.com                 *
  *   Copyright (C) 2017 by Chris Reid - WackyWormer@hotmail.com            *
+ *   Copyright (C) 2020, 2023 by Stephen Lyons - slysven@virginmedia.com   *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -22,82 +23,83 @@
 
 
 #include "TLabel.h"
-#include "Host.h"
+#include "TConsole.h"
+#include "TDockWidget.h"
+#include "mudlet.h"
 
 #include "pre_guard.h"
-#include <QApplication>
 #include <QtEvents>
 #include "post_guard.h"
 
 
-TLabel::TLabel(QWidget* pW) : QLabel(pW), mpHost(nullptr), mouseInside()
+TLabel::TLabel(Host* pH, const QString& name, QWidget* pW)
+: QLabel(pW)
+, mpHost(pH)
+, mName(name)
 {
     setMouseTracking(true);
+    setObjectName(qsl("label_%1_%2").arg(pH->getName(), mName));
 }
 
-void TLabel::setClick(Host* pHost, const QString& func, const TEvent& args)
+TLabel::~TLabel()
 {
-    releaseParams(pHost, mClickParams);
-    mpHost = pHost;
-    mClick = func;
-    mClickParams = args;
+    if (mpMovie) {
+        mpMovie->deleteLater();
+        mpMovie = nullptr;
+    }
 }
 
-void TLabel::setDoubleClick(Host* pHost, const QString& func, const TEvent& args)
+void TLabel::setClick(const int func)
 {
-    releaseParams(pHost, mDoubleClickParams);
-    mpHost = pHost;
-    mDoubleClick = func;
-    mDoubleClickParams = args;
+    releaseFunc(mClickFunction, func);
+    mClickFunction = func;
 }
 
-void TLabel::setRelease(Host* pHost, const QString& func, const TEvent& args)
+void TLabel::setDoubleClick(const int func)
 {
-    releaseParams(pHost, mReleaseParams);
-    mpHost = pHost;
-    mRelease = func;
-    mReleaseParams = args;
+    releaseFunc(mDoubleClickFunction, func);
+    mDoubleClickFunction = func;
 }
 
-void TLabel::setMove(Host* pHost, const QString& func, const TEvent& args)
+void TLabel::setRelease(const int func)
 {
-    releaseParams(pHost, mMoveParams);
-    mpHost = pHost;
-    mMove = func;
-    mMoveParams = args;
+    releaseFunc(mReleaseFunction, func);
+    mReleaseFunction = func;
 }
 
-void TLabel::setWheel(Host* pHost, const QString& func, const TEvent& args)
+void TLabel::setMove(const int func)
 {
-    releaseParams(pHost, mWheelParams);
-    mpHost = pHost;
-    mWheel = func;
-    mWheelParams = args;
+    releaseFunc(mMoveFunction, func);
+    mMoveFunction = func;
 }
 
-void TLabel::setEnter(Host* pHost, const QString& func, const TEvent& args)
+void TLabel::setWheel(const int func)
 {
-    releaseParams(pHost, mEnterParams);
-    mpHost = pHost;
-    mEnter = func;
-    mEnterParams = args;
+    releaseFunc(mWheelFunction, func);
+    mWheelFunction = func;
 }
 
-void TLabel::setLeave(Host* pHost, const QString& func, const TEvent& args)
+void TLabel::setEnter(const int func)
 {
-    releaseParams(pHost, mLeaveParams);
-    mpHost = pHost;
-    mLeave = func;
-    mLeaveParams = args;
+    releaseFunc(mEnterFunction, func);
+    mEnterFunction = func;
+}
+
+void TLabel::setLeave(const int func)
+{
+    releaseFunc(mLeaveFunction, func);
+    mLeaveFunction = func;
 }
 
 void TLabel::mousePressEvent(QMouseEvent* event)
 {
-    if (forwardEventToMapper(event)) {
-        return;
-    } else if (mpHost && !mClick.isEmpty()) {
-        mpHost->getLuaInterpreter()->callEventHandler(mClick, mClickParams, event);
+
+    if (mpHost && mClickFunction) {
+        mpHost->getLuaInterpreter()->callLabelCallbackEvent(mClickFunction, event);
+        // The use of accept() here prevents the propagation of the event to
+        // any parent, e.g. the containing TConsole
         event->accept();
+        mudlet::self()->activateProfile(mpHost);
     } else {
         QWidget::mousePressEvent(event);
     }
@@ -105,10 +107,8 @@ void TLabel::mousePressEvent(QMouseEvent* event)
 
 void TLabel::mouseDoubleClickEvent(QMouseEvent* event)
 {
-    if (forwardEventToMapper(event)) {
-        return;
-    } else if (mpHost && !mDoubleClick.isEmpty()) {
-        mpHost->getLuaInterpreter()->callEventHandler(mDoubleClick, mDoubleClickParams, event);
+    if (mpHost && mDoubleClickFunction) {
+        mpHost->getLuaInterpreter()->callLabelCallbackEvent(mDoubleClickFunction, event);
         event->accept();
     } else {
         QWidget::mouseDoubleClickEvent(event);
@@ -117,10 +117,14 @@ void TLabel::mouseDoubleClickEvent(QMouseEvent* event)
 
 void TLabel::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (forwardEventToMapper(event)) {
-        return;
-    } else if (mpHost && !mRelease.isEmpty()) {
-        mpHost->getLuaInterpreter()->callEventHandler(mRelease, mReleaseParams, event);
+    auto labelParent = qobject_cast<TConsole*>(parent());
+    if (labelParent && labelParent->mpDockWidget && labelParent->mpDockWidget->isFloating()) {
+        // move focus back to the active console / command line:
+        mudlet::self()->activateProfile(mpHost);
+    }
+
+    if (mpHost && mReleaseFunction) {
+        mpHost->getLuaInterpreter()->callLabelCallbackEvent(mReleaseFunction, event);
         event->accept();
     } else {
         QWidget::mouseReleaseEvent(event);
@@ -129,10 +133,8 @@ void TLabel::mouseReleaseEvent(QMouseEvent* event)
 
 void TLabel::mouseMoveEvent(QMouseEvent* event)
 {
-    if (forwardEventToMapper(event)) {
-        return;
-    } else if (mpHost && !mMove.isEmpty()) {
-        mpHost->getLuaInterpreter()->callEventHandler(mMove, mMoveParams, event);
+    if (mpHost && mMoveFunction) {
+        mpHost->getLuaInterpreter()->callLabelCallbackEvent(mMoveFunction, event);
         event->accept();
     } else {
         QWidget::mouseMoveEvent(event);
@@ -141,10 +143,9 @@ void TLabel::mouseMoveEvent(QMouseEvent* event)
 
 void TLabel::wheelEvent(QWheelEvent* event)
 {
-    if (forwardEventToMapper(event))
-        return;
-    else if (mpHost && !mWheel.isEmpty()) {
-        mpHost->getLuaInterpreter()->callEventHandler(mWheel, mWheelParams, event);
+
+    if (mpHost && mWheelFunction) {
+        mpHost->getLuaInterpreter()->callLabelCallbackEvent(mWheelFunction, event);
         event->accept();
     } else {
         QWidget::wheelEvent(event);
@@ -153,100 +154,38 @@ void TLabel::wheelEvent(QWheelEvent* event)
 
 void TLabel::leaveEvent(QEvent* event)
 {
-    if (forwardEventToMapper(event)) {
-        return;
-    } else if (mpHost && !mLeave.isEmpty()) {
-        mpHost->getLuaInterpreter()->callEventHandler(mLeave, mLeaveParams, event);
+    if (mpHost && mLeaveFunction) {
+        mpHost->getLuaInterpreter()->callLabelCallbackEvent(mLeaveFunction, event);
         event->accept();
     } else {
         QWidget::leaveEvent(event);
     }
 }
 
-void TLabel::enterEvent(QEvent* event)
+void TLabel::enterEvent(TEnterEvent* event)
 {
-    if (forwardEventToMapper(event)) {
-        return;
-    } else if (mpHost && !mEnter.isEmpty()) {
-        mpHost->getLuaInterpreter()->callEventHandler(mEnter, mEnterParams, event);
+    if (mpHost && mEnterFunction) {
+        mpHost->getLuaInterpreter()->callLabelCallbackEvent(mEnterFunction, event);
         event->accept();
     } else {
         QWidget::enterEvent(event);
     }
 }
 
-bool TLabel::forwardEventToMapper(QEvent* event)
+void TLabel::resizeEvent(QResizeEvent* event)
 {
-    // This function implements a workaround to the issue of the mapper not receiving
-    //   mouse events while sharing space with labels, regardless of z-level. It works
-    //   by checking, when a label receives a mouse event, if the top-most widget at
-    //   the event's location is a child of the mapper object. If so, it redirects the
-    //   event there manually.
-
-    switch (event->type()) {
-    case (QEvent::MouseButtonPress):
-    case (QEvent::MouseButtonDblClick):
-    case (QEvent::MouseButtonRelease):
-    case (QEvent::MouseMove): {
-        auto mouseEvent = static_cast<QMouseEvent*>(event);
-        QWidget* qw = qApp->widgetAt(mouseEvent->globalPos());
-
-        if (qw && parentWidget()->findChild<QWidget*>(QStringLiteral("mapper")) && parentWidget()->findChild<QWidget*>(QStringLiteral("mapper"))->isAncestorOf(qw)) {
-            QMouseEvent newEvent(mouseEvent->type(), qw->mapFromGlobal(mouseEvent->globalPos()), mouseEvent->button(), mouseEvent->buttons(), mouseEvent->modifiers());
-            qApp->sendEvent(qw, &newEvent);
-            return true;
-        }
-        break;
-    }
-    case (QEvent::Enter):
-    case (QEvent::Leave): {
-        QWidget* qw = qApp->widgetAt(QCursor::pos());
-
-        if (qw && parentWidget()->findChild<QWidget*>(QStringLiteral("mapper")) && parentWidget()->findChild<QWidget*>(QStringLiteral("mapper"))->isAncestorOf(qw)) {
-            QEvent newEvent(event->type());
-            qApp->sendEvent(qw, &newEvent);
-            return true;
-        }
-        break;
-    }
-    case (QEvent::Wheel): {
-        auto wheelEvent = static_cast<QWheelEvent*>(event);
-        QWidget* qw = qApp->widgetAt(wheelEvent->globalPos());
-
-        if (qw && parentWidget()->findChild<QWidget*>(QStringLiteral("mapper")) && parentWidget()->findChild<QWidget*>(QStringLiteral("mapper"))->isAncestorOf(qw)) {
-            QWheelEvent newEvent(qw->mapFromGlobal(wheelEvent->globalPos()),
-                                 wheelEvent->globalPos(),
-                                 wheelEvent->pixelDelta(),
-                                 wheelEvent->angleDelta(),
-                                 wheelEvent->angleDelta().y() / 8,
-                                 Qt::Vertical,
-                                 wheelEvent->buttons(),
-                                 wheelEvent->modifiers(),
-                                 wheelEvent->phase());
-            qApp->sendEvent(qw, &newEvent);
-            return true;
-        }
-        break;
-    }
-    }
-    return false;
+    emit resized();
+    QWidget::resizeEvent(event);
 }
 
-// This function iterates through the provided event parameters,
-// searching for parameters that are references to values in the
-// Lua registry, and correctly dereferences them. This allows
-// the parameters to be safely overwritten.
-void TLabel::releaseParams(Host* pHost, TEvent& params) {
-    if (params.mArgumentList.isEmpty()) {
-        return;
-    }
 
-    for (int i = 0; i < params.mArgumentList.size(); i++) {
-        if ( params.mArgumentTypeList.at(i) == ARGUMENT_TYPE_TABLE || params.mArgumentTypeList.at(i) == ARGUMENT_TYPE_FUNCTION) {
-            pHost->getLuaInterpreter()->freeLuaRegistryIndex(i);
-        }
+// This function deferences previous functions in the Lua registry.
+// This allows the functions to be safely overwritten.
+void TLabel::releaseFunc(const int existingFunction, const int newFunction)
+{
+    if (newFunction != existingFunction) {
+        mpHost->getLuaInterpreter()->freeLuaRegistryIndex(existingFunction);
     }
-
 }
 
 void TLabel::setClickThrough(bool clickthrough)

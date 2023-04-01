@@ -4,7 +4,7 @@
 /***************************************************************************
  *   Copyright (C) 2008-2012 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2017 by Stephen Lyons - slysven@virginmedia.com         *
+ *   Copyright (C) 2017-2022 by Stephen Lyons - slysven@virginmedia.com    *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -35,6 +35,7 @@
 
 class Host;
 
+#define MAX_CAPTURE_GROUPS 33
 
 class TAlias : public Tree<TAlias>
 {
@@ -71,11 +72,12 @@ public:
     QSharedPointer<pcre> mpRegex;
     QString mScript;
     QPointer<Host> mpHost;
-    bool mNeedsToBeCompiled;
-    bool mModuleMember;
-    bool mModuleMasterFolder;
+    bool mNeedsToBeCompiled = true;
+    bool mModuleMember = false;
+    bool mModuleMasterFolder = false;
     QString mFuncName;
-    bool exportItem;
+    bool exportItem = true;
+    bool mRegisteredAnonymousLuaFunction = false;
 };
 
 #endif // MUDLET_TALIAS_H

@@ -4,7 +4,7 @@
 /***************************************************************************
  *   Copyright (C) 2008-2011 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2017 by Stephen Lyons - slysven@virginmedia.com         *
+ *   Copyright (C) 2017, 2022 by Stephen Lyons - slysven@virginmedia.com   *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -25,7 +25,6 @@
 
 #include "pre_guard.h"
 #include <QMap>
-#include <QMutex>
 #include <QPointer>
 #include <QString>
 #include "post_guard.h"
@@ -45,12 +44,18 @@ class ActionUnit
     friend class XMLimport;
 
 public:
-    ActionUnit(Host* pHost) : mpHost(pHost), mMaxID(0), mpToolBar(), mpEasyButtonBar(), mModuleMember() {}
+    explicit ActionUnit(Host* pHost)
+    : mpHost(pHost)
+    {}
 
     std::list<TAction*> getActionRootNodeList()
     {
-        QMutexLocker locker(&mActionUnitLock);
         return mActionRootNodeList;
+    }
+
+    QMap<int, TAction*> getActionList()
+    {
+        return mActionMap;
     }
 
     TAction* getAction(int id);
@@ -64,16 +69,16 @@ public:
     void uninstall(const QString&);
     void _uninstall(TAction* pChild, const QString& packageName);
     void updateToolbar();
-    std::list<QPointer<TToolBar>> getToolBarList();
-    std::list<QPointer<TEasyButtonBar>> getEasyButtonBarList();
+    std::list<QPointer<TToolBar>> getToolBarList() { return mToolBarList; }
     TAction* getHeadAction(TToolBar*);
     TAction* getHeadAction(TEasyButtonBar*);
+    void regenerateToolBars();
+    void regenerateEasyButtonBars();
     void constructToolbar(TAction*, TToolBar* pTB);
     void constructToolbar(TAction*, TEasyButtonBar* pTB);
     void showToolBar(const QString&);
     void hideToolBar(const QString&);
 
-    QMutex mActionUnitLock;
     QList<TAction*> uninstallList;
 
 private:
@@ -87,10 +92,8 @@ private:
     QPointer<Host> mpHost;
     QMap<int, TAction*> mActionMap;
     std::list<TAction*> mActionRootNodeList;
-    int mMaxID;
-    QPointer<TToolBar> mpToolBar;
-    QPointer<TEasyButtonBar> mpEasyButtonBar;
-    bool mModuleMember;
+    int mMaxID = 0;
+    bool mModuleMember = false;
     std::list<QPointer<TToolBar>> mToolBarList;
     std::list<QPointer<TEasyButtonBar>> mEasyButtonBarList;
 };

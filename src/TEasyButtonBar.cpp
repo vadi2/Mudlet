@@ -33,27 +33,21 @@
 
 
 TEasyButtonBar::TEasyButtonBar(TAction* pA, QString name, QWidget* pW)
-: QWidget( pW )
-, mpTAction( pA )
-, mVerticalOrientation( false )
-, mpWidget( new QWidget(this) )
-, mRecordMove( false )
-, mpLayout( nullptr )
-, mItemCount( 0 )
+: QWidget(pW)
+, mpTAction(pA)
+, mpWidget(new QWidget(this))
 {
     mButtonList.clear();
     auto hostName(pA->mpHost->getName());
     auto layout = new QVBoxLayout;
     setLayout(layout);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setMargin(0);
     layout->setSpacing(0);
     layout->addWidget(mpWidget);
     if (!mpTAction->mUseCustomLayout) {
         mpLayout = new QGridLayout(mpWidget);
         setContentsMargins(0, 0, 0, 0);
         mpLayout->setContentsMargins(0, 0, 0, 0);
-        mpLayout->setMargin(0);
         mpLayout->setSpacing(0);
         QSizePolicy sizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
         mpWidget->setSizePolicy(sizePolicy);
@@ -66,8 +60,8 @@ TEasyButtonBar::TEasyButtonBar(TAction* pA, QString name, QWidget* pW)
     }
     setStyleSheet(mpTAction->css);
     mpWidget->setStyleSheet(mpTAction->css);
-    setObjectName(QStringLiteral("easyButtonBar_%1_%2").arg(hostName, name));
-    mpWidget->setObjectName(QStringLiteral("easyButtonBar_Widget_%1_%2").arg(hostName, name));
+    setObjectName(qsl("easyButtonBar_%1_%2").arg(hostName, name));
+    mpWidget->setObjectName(qsl("easyButtonBar_Widget_%1_%2").arg(hostName, name));
     // It is not entirely clear if this is ever visible:
     setWindowTitle(tr("Easybutton Bar - %1 - %2").arg(hostName, name));
 }
@@ -206,12 +200,10 @@ void TEasyButtonBar::clear()
         mpWidget->setLayout(mpLayout);
         mpLayout->setContentsMargins(0, 0, 0, 0);
         mpLayout->setSpacing(0);
-        mpLayout->setMargin(0);
         QSizePolicy sizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         mpWidget->setSizePolicy(sizePolicy);
 
         mpWidget->setContentsMargins(0, 0, 0, 0);
-        mpLayout->setMargin(0);
     } else {
         mpLayout = nullptr;
         mpWidget->setMinimumHeight(mpTAction->mSizeY);

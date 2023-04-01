@@ -1,8 +1,9 @@
 /***************************************************************************
  *   Copyright (C) 2008-2013 by Heiko Koehn - KoehnHeiko@googlemail.com    *
- *   Copyright (C) 2013-2014, 2016-2019 by Stephen Lyons                   *
+ *   Copyright (C) 2013-2014, 2016-2021, 2023 by Stephen Lyons             *
  *                                            - slysven@virginmedia.com    *
  *   Copyright (C) 2014-2017 by Ahmed Charles - acharles@outlook.com       *
+ *   Copyright (C) 2022 by Thiago Jung Bauermann - bauermann@kolabnow.com  *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -26,14 +27,23 @@
 
 #include "pre_guard.h"
 #include <chrono>
-#include <QDesktopWidget>
+#include <QCommandLineParser>
 #include <QDir>
-#if defined(Q_OS_WIN32) && ! defined(INCLUDE_UPDATER)
+#if defined(Q_OS_WIN32) && !defined(INCLUDE_UPDATER)
 #include <QMessageBox>
-#endif // defined(Q_OS_WIN32) && ! defined(INCLUDE_UPDATER)
+#endif // defined(Q_OS_WIN32) && !defined(INCLUDE_UPDATER)
 #include <QPainter>
+#include <QPointer>
+#include <QScreen>
+#include <QSettings>
 #include <QSplashScreen>
+#include <QStringList>
+#include <QTranslator>
 #include "post_guard.h"
+#include "AltFocusMenuBarDisable.h"
+#include "TAccessibleConsole.h"
+#include "TAccessibleTextEdit.h"
+#include "Announcer.h"
 
 using namespace std::chrono_literals;
 
@@ -43,8 +53,6 @@ using namespace std::chrono_literals;
 #include <Windows.h>
 #include <pcre.h>
 #endif // _MSC_VER && _DEBUG
-
-TConsole* spDebugConsole = nullptr;
 
 #if defined(Q_OS_WIN32)
 bool runUpdate();
@@ -67,81 +75,79 @@ static void pcre_free_dbg(void* ptr)
 
 #endif // _DEBUG && _MSC_VER
 
-QCoreApplication* createApplication(int& argc, char* argv[], unsigned int& action)
-{
-    action = 0;
-
-// A crude and simplistic commandline options processor - note that Qt deals
-// with its options automagically!
-#if !(defined(Q_OS_LINUX) || defined(Q_OS_WIN32) || defined(Q_OS_MACOS) || defined(Q_OS_FREEBSD))
-    // Handle other currently unconsidered OSs - what are they - by returning the
-    // normal GUI type application handle.
-    return new QApplication(argc, argv);
-#endif
-
-    for (int i = 1; i < argc; ++i) {
-        if (qstrcmp(argv[i], "--") == 0) {
-            break; // Bail out on end of option type arguments
-        }
-
-        char argument = 0;
-        bool isOption = false;
-        if (strlen(argv[i]) > 2 && strncmp(argv[i], "--", 2) == 0) {
-            argument = argv[i][2];
-            isOption = true;
-        } else if (strlen(argv[i]) > 1 && strncmp(argv[i], "-", 1) == 0) {
-            argument = argv[i][1];
-            isOption = true;
-        }
-
-        if (isOption) {
-            if (tolower(argument) == 'v') {
-                action = 2; // Make this the only action to do and do it directly
-                break;
-            }
-
-            if (tolower(argument) == 'h' || argument == '?') {
-                action = 1; // Make this the only action to do and do it directly
-                break;
-            }
-
-            if (tolower(argument) == 'q') {
-                action |= 4;
-            }
-        }
-    }
-
-    if ((action) & (1 | 2)) {
-        return new QCoreApplication(argc, argv);
-    } else {
-#if defined(Q_OS_MACOS) && (QT_VERSION < QT_VERSION_CHECK(5, 12, 0))
-        // Workaround for horrible mac rendering issues once the mapper widget
-        // is open - see https://bugreports.qt.io/browse/QTBUG-41257
-        QApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
-#elif defined(Q_OS_FREEBSD)
-        // Cure for diagnostic:
-        // "Qt WebEngine seems to be initialized from a plugin. Please set
-        // Qt::AA_ShareOpenGLContexts using QCoreApplication::setAttribute
-        // before constructing QGuiApplication."
-        QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
-#elif defined(Q_OS_WIN32)
-        // Force OpenGL use as we use some functions that aren't provided by
-        // Qt's OpenGL layer on Windows (QOpenGLFunctions)
-        QApplication::setAttribute(Qt::AA_UseDesktopOpenGL);
-#endif
-        return new QApplication(argc, argv); // Normal course of events - (GUI), so: game on!
-    }
-}
-
 #if defined(INCLUDE_FONTS)
 void copyFont(const QString& externalPathName, const QString& resourcePathName, const QString& fileName)
 {
-    if (!QFile::exists(QStringLiteral("%1/%2").arg(externalPathName, fileName))) {
-        QFile fileToCopy(QStringLiteral(":/%1/%2").arg(resourcePathName,fileName));
-        fileToCopy.copy(QStringLiteral("%1/%2").arg(externalPathName, fileName));
+    if (!QFile::exists(qsl("%1/%2").arg(externalPathName, fileName))) {
+        QFile fileToCopy(qsl(":/%1/%2").arg(resourcePathName, fileName));
+        fileToCopy.copy(qsl("%1/%2").arg(externalPathName, fileName));
     }
 }
-#endif
+
+#if defined(Q_OS_LINUX)
+void removeOldNoteColorEmojiFonts()
+{
+    // PLACEMARKER: previous Noto Color Emoji font versions removal
+    // Identify old versions so that we can remove them and later on only try
+    // to load the latest (otherwise, as they all have the same family name
+    // only the first one found will be loaded by the FontManager class):
+    QStringList oldNotoFontDirectories;
+    // The directory name format is made by Mudlet and is based upon the
+    // release date of the version on upstream's Github site, currently:
+    // https://github.com/googlefonts/noto-emoji/releases
+    // Not all previously released versions have been carried by Mudlet only
+    // the ones listed here have been.
+    // When adding a later version, append the path and version comment of the
+    // replaced one comment to this area:
+    // Tag: "v2018-04-24-pistol-update"
+    oldNotoFontDirectories << qsl("%1/notocoloremoji-unhinted-2018-04-24-pistol-update").arg(mudlet::getMudletPath(mudlet::mainFontsPath));
+    // Release: "v2019-11-19-unicode12"
+    oldNotoFontDirectories << qsl("%1/noto-color-emoji-2019-11-19-unicode12").arg(mudlet::getMudletPath(mudlet::mainFontsPath));
+    // Release: "Noto Emoji v2.0238"
+    oldNotoFontDirectories << qsl("%1/noto-color-emoji-2021-07-15-v2.028").arg(mudlet::getMudletPath(mudlet::mainFontsPath));
+    // Release: "Unicode 14.0"
+    oldNotoFontDirectories << qsl("%1/noto-color-emoji-2021-11-01-v2.034").arg(mudlet::getMudletPath(mudlet::mainFontsPath));
+
+    QListIterator<QString> itOldNotoFontDirectory(oldNotoFontDirectories);
+    while (itOldNotoFontDirectory.hasNext()) {
+        auto oldNotoFontDirectory = itOldNotoFontDirectory.next();
+        QDir oldDir{oldNotoFontDirectory};
+        if (oldDir.exists()) {
+            // This can fail but we do not worry about that too much, as long
+            // as it nukes any "NotoColorEmoji.ttf" files:
+            if (!oldDir.removeRecursively()) {
+                qDebug().nospace().noquote() << "main::removeOldNoteColorEmojiFonts() INFO - failed to remove old Noto Color Emoji font located at: " << oldDir.absolutePath();
+            }
+        }
+    }
+}
+#endif // defined(Q_OS_LINUX)
+#endif // defined(INCLUDE_FONTS)
+
+QTranslator* loadTranslationsForCommandLine()
+{
+    QSettings settings_new(QLatin1String("mudlet"), QLatin1String("Mudlet"));
+    auto pSettings = new QSettings((settings_new.contains(QLatin1String("pos")) ? QLatin1String("mudlet") : QLatin1String("Mudlet")),
+                                   (settings_new.contains(QLatin1String("pos")) ? QLatin1String("Mudlet") : QLatin1String("Mudlet 1.0")));
+    auto interfaceLanguage = pSettings->value(QLatin1String("interfaceLanguage")).toString();
+    auto userLocale = interfaceLanguage.isEmpty() ? QLocale::system() : QLocale(interfaceLanguage);
+    if (userLocale == QLocale::c()) {
+        // nothing found
+        return nullptr;
+    }
+    // We only need the Mudlet translations for the Command Line texts, no need
+    // for any Qt ones:
+    QTranslator* pMudletTranslator = new QTranslator;
+    // If we allow the translations to be outside of the resource file inside
+    // the application executable then this will have to be revised to handle
+    // it:
+    bool isOk = pMudletTranslator->load(userLocale, qsl("mudlet"), QString("_"), qsl(":/lang"), qsl(".qm"));
+    if (!isOk) {
+        return nullptr;
+    }
+    QCoreApplication::installTranslator(pMudletTranslator);
+    return pMudletTranslator;
+}
 
 int main(int argc, char* argv[])
 {
@@ -184,96 +190,27 @@ int main(int argc, char* argv[])
         pcre_stack_free = pcre_free_dbg;
     }
 #endif // _MSC_VER && _DEBUG
-    spDebugConsole = nullptr;
-    unsigned int startupAction = 0;
 
-    // due to a Qt bug, this only safely works for both non- and HiDPI displays on 5.12+
-    // 5.6 - 5.11 make the application blow up in size on non-HiDPI displays
-#if defined (Q_OS_UNIX) && (QT_VERSION >= QT_VERSION_CHECK(5, 12, 0))
-    QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+#if defined(Q_OS_MACOS)
+    // Workaround for horrible mac rendering issues once the mapper widget
+    // is open - see https://bugreports.qt.io/browse/QTBUG-41257
+    QApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
+#elif defined(Q_OS_FREEBSD)
+    // Cure for diagnostic:
+    // "Qt WebEngine seems to be initialized from a plugin. Please set
+    // Qt::AA_ShareOpenGLContexts using QCoreApplication::setAttribute
+    // before constructing QGuiApplication."
+    QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 #endif
 
-    QScopedPointer<QCoreApplication> initApp(createApplication(argc, argv, startupAction));
-    auto * app = qobject_cast<QApplication*>(initApp.data());
+    auto app = qobject_cast<QApplication*>(new QApplication(argc, argv));
 
-    // Non-GUI actions --help and --version as suggested by GNU coding standards,
-    // section 4.7: http://www.gnu.org/prep/standards/standards.html#Command_002dLine-Interfaces
-    QStringList texts;
-    if (startupAction & 2) {
-        // Do "version" action - wording and format is quite tightly specified by the coding standards
-#if defined(QT_DEBUG)
-        texts << QCoreApplication::translate("main", "%1 %2%3 (with debug symbols, without optimisations)\n",
-         "%1 is the name of the application like mudlet or Mudlet.exe, %2 is the version number like 3.20 and %3 is a build suffix like -dev")
-                 .arg(QLatin1String(APP_TARGET), QLatin1String(APP_VERSION), QLatin1String(APP_BUILD));
-#else // ! defined(QT_DEBUG)
-        texts << QLatin1String(APP_TARGET " " APP_VERSION APP_BUILD " \n");
-#endif // ! defined(QT_DEBUG)
-        texts << QCoreApplication::translate("main", "Qt libraries %1 (compilation) %2 (runtime)\n",
-             "%1 and %2 are version numbers").arg(QLatin1String(QT_VERSION_STR), qVersion());
-        texts << QCoreApplication::translate("main", "Copyright © 2008-%1  Mudlet developers\n").arg(QStringLiteral(__DATE__).mid(7, 4));
-        texts << QCoreApplication::translate("main", "Licence GPLv2+: GNU GPL version 2 or later - http://gnu.org/licenses/gpl.html\n");
-        texts << QCoreApplication::translate("main", "This is free software: you are free to change and redistribute it.\n"
-                                                     "There is NO WARRANTY, to the extent permitted by law.\n");
-        std::cout << texts.join(QString()).toStdString();
-        return 0;
-    } else if (startupAction & 1) {
-        // Do "help" action
-        texts << QCoreApplication::translate("main", "Usage: %1 [OPTION...]\n"
-                                                     "       -h, --help      displays this message.\n"
-                                                     "       -v, --version   displays version information.\n"
-                                                     "       -q, --quiet     no splash screen on startup.\n\n"
-                                                     "There are other inherited options that arise from the Qt Libraries which are\n"
-                                                     "less likely to be useful for normal use of this application:\n")
-                 .arg(QLatin1String(APP_TARGET));
-        // From documentation and from http://qt-project.org/doc/qt-5/qapplication.html:
-        texts << QStringLiteral("       --dograb        ignore any implicit or explicit -nograb.\n"
-                                "                       --dograb wins over --nograb even when --nograb is last on\n"
-                                "                       the command line.\n");
+    QAccessible::installFactory(TAccessibleConsole::consoleFactory);
+    QAccessible::installFactory(TAccessibleTextEdit::textEditFactory);
+
 #if defined(Q_OS_LINUX)
-        texts << QStringLiteral("       --nograb        the application should never grab the mouse or the\n"
-                                "                       keyboard. This option is set by default when Mudlet is\n"
-                                "                       running in the gdb debugger under Linux.\n");
-#else // ! defined(Q_OS_LINUX)
-        texts << QStringLiteral("       --nograb        the application should never grab the mouse or the\n"
-                                "                       keyboard.\n");
-#endif // ! defined(Q_OS_LINUX)
-        texts << QStringLiteral("       --reverse       sets the application's layout direction to right to left.\n"
-                                "       --style= style  sets the application GUI style. Possible values depend on\n"
-                                "                       your system configuration. If Qt was compiled with\n"
-                                "                       additional styles or has additional styles as plugins\n"
-                                "                       these will be available to the -style command line\n"
-                                "                       option. You can also set the style for all Qt\n"
-                                "                       applications by setting the QT_STYLE_OVERRIDE environment\n"
-                                "                       variable.\n"
-                                "       --style style   is the same as listed above.\n"
-                                "       --stylesheet= stylesheet  sets the application styleSheet.\n"
-                                "                       The value must be a path to a file that contains the\n"
-                                "                       Style Sheet. Note: Relative URLs in the Style Sheet file\n"
-                                "                       are relative to the Style Sheet file's path.\n"
-                                "       --stylesheet stylesheet  is the same as listed above.\n");
-// Not sure about MacOS case as that does not use X
-#if defined(Q_OS_UNIX) && (! defined(Q_OS_MACOS))
-        texts << QStringLiteral("       --sync          forces the X server to perform each X client request\n"
-                                "                       immediately and not use buffer optimization. It makes the\n"
-                                "                       program easier to debug and often much slower. The --sync\n"
-                                "                       option is only valid for the X11 version of Qt.\n");
-#endif // defined(Q_OS_UNIX) and not defined(Q_OS_MACOS)
-        texts << QStringLiteral("       --widgetcount   prints debug message at the end about number of widgets\n"
-                                "                       left undestroyed and maximum number of widgets existing\n"
-                                "                       at the same time.\n"
-                                "       --qmljsdebugger=1234[,block]  activates the QML/JS debugger with a\n"
-                                "                       specified port. The number is the port value and block is\n"
-                                "                       optional and will make the application wait until a\n"
-                                "                       debugger connects to it.\n\n");
-        texts << QCoreApplication::translate("main", "Report bugs to: https://github.com/Mudlet/Mudlet/issues\n");
-        texts << QCoreApplication::translate("main", "Project home page: http://www.mudlet.org/\n");
-        std::cout << texts.join(QString()).toStdString();
-        return 0;
-    }
-
-    /*******************************************************************
-     * If we get to HERE then we are going to run a GUI application... *
-     *******************************************************************/
+    QAccessible::installFactory(Announcer::accessibleFactory);
+#endif
 
 #if defined(Q_OS_WIN32) && defined(INCLUDE_UPDATER)
     auto abortLaunch = runUpdate();
@@ -285,19 +222,161 @@ int main(int argc, char* argv[])
     // Turn the cursor into the waiting one during startup, so something shows
     // activity even if the quiet, no splashscreen startup has been used
     app->setOverrideCursor(QCursor(Qt::WaitCursor));
-    app->setOrganizationName(QStringLiteral("Mudlet"));
-    app->setApplicationVersion(APP_VERSION);
+    app->setOrganizationName(qsl("Mudlet"));
 
     if (mudlet::scmIsPublicTestVersion) {
-        app->setApplicationName(QStringLiteral("Mudlet Public Test Build"));
+        app->setApplicationName(qsl("Mudlet Public Test Build"));
     } else {
-        app->setApplicationName(QStringLiteral("Mudlet"));
+        app->setApplicationName(qsl("Mudlet"));
+    }
+    if (mudlet::scmIsReleaseVersion) {
+        app->setApplicationVersion(APP_VERSION);
+    } else {
+        app->setApplicationVersion(APP_VERSION APP_BUILD);
     }
 
+    QPointer<QTranslator> commandLineTranslator(loadTranslationsForCommandLine());
+    QCommandLineParser parser;
+    // The third (and fourth if provided) arguments are used to populate the
+    // help text that the QCommandLineParser::showHelp(...) would produce
+    // however we do the -h/--help option ourself so these texts are unused
+    // other than that a non-null fourth argument maybe responsible for
+    // making the option take a value that follows it - as such they do not
+    // need to be passed to the translation system.
+    QCommandLineOption profileToOpen(QStringList() << qsl("p") << qsl("profile"), qsl("Profile to open automatically"), qsl("profile"));
+    parser.addOption(profileToOpen);
 
-    bool show_splash = !(startupAction & 4); // Not --quiet.
+    QCommandLineOption showHelp(QStringList() << qsl("h") << qsl("help"), qsl("Display help and exit"));
+    parser.addOption(showHelp);
 
-    QImage splashImage(":/Mudlet_splashscreen_main.png");
+    QCommandLineOption showVersion(QStringList() << qsl("v") << qsl("version"), qsl("Display version and exit"));
+    parser.addOption(showVersion);
+
+    QCommandLineOption beQuiet(QStringList() << qsl("q") << qsl("quiet"), qsl("Don't show the splash screen when starting"));
+    parser.addOption(beQuiet);
+
+    QCommandLineOption mirrorToStdout(QStringList() << qsl("m") << qsl("mirror"), qsl("Mirror output of all consoles to STDOUT"));
+    parser.addOption(mirrorToStdout);
+
+    QCommandLineOption onlyPredefinedProfileToShow(QStringList() << qsl("o") << qsl("only"),
+                                                   qsl("Set Mudlet to only show this predefined MUD profile and hide all other predefined ones."),
+                                                   qsl("predefined_game"));
+    parser.addOption(onlyPredefinedProfileToShow);
+
+    bool parsedCommandLineOk = parser.parse(app->arguments());
+
+    const QString appendLF{qsl("%1\n")};
+    const QString append2LF{qsl("%1\n\n")};
+
+    // Non-GUI actions --help and --version as suggested by GNU coding standards,
+    // section 4.7: http://www.gnu.org/prep/standards/standards.html#Command_002dLine-Interfaces
+    QStringList texts;
+
+    if (!parsedCommandLineOk) {
+        // Warn of unknown options but tolerate them.
+        // We want the message to be visible for someone launching from command prompt
+        // and will have standard output left on their screen, but still allow program
+        // to start when launched by installer.
+        // --squirrel-firstrun for example is given for launch at end of install process.
+        std::cout << QCoreApplication::translate("main", "Warning: %1\n").arg(parser.errorText()).toStdString();
+    }
+
+    if (parser.isSet(showHelp)) {
+        // Do "help" action
+        texts << appendLF.arg(QCoreApplication::translate("main", "Usage: %1 [OPTION...]",
+                                                          // Comment to separate arguments
+                                                          "%1 is the name of the executable as it is on this OS.")
+                                         .arg(QLatin1String(APP_TARGET)));
+        texts << appendLF.arg(QCoreApplication::translate("main", "       -h, --help                   displays this message."));
+        texts << appendLF.arg(QCoreApplication::translate("main", "       -v, --version                displays version information."));
+        texts << appendLF.arg(QCoreApplication::translate("main", "       -q, --quiet                  no splash screen on startup."));
+        texts << appendLF.arg(QCoreApplication::translate("main", "       -p, --profile=<profile>      additional profile to open, may be\n"
+                                                                  "                                    repeated."));
+        texts << appendLF.arg(QCoreApplication::translate("main", "       -o, --only=<predefined>      make Mudlet only show the specific\n"
+                                                                  "                                    predefined game, may be repeated."));
+        texts << appendLF.arg(QCoreApplication::translate("main", "There are other inherited options that arise from the Qt Libraries which are\n"
+                                                                  "less likely to be useful for normal use of this application:"));
+        // From documentation and from http://qt-project.org/doc/qt-5/qapplication.html:
+        texts << appendLF.arg(QCoreApplication::translate("main", "       --dograb                     ignore any implicit or explicit -nograb.\n"
+                                                                  "                                    --dograb wins over --nograb even when --nograb is last on\n"
+                                                                  "                                    the command line."));
+#if defined(Q_OS_LINUX)
+        texts << appendLF.arg(QCoreApplication::translate("main", "       --nograb                     the application should never grab the mouse or the\n"
+                                                                  "                                    keyboard. This option is set by default when Mudlet is\n"
+                                                                  "                                    running in the gdb debugger under Linux."));
+#else // ! defined(Q_OS_LINUX)
+        texts << appendLF.arg(QCoreApplication::translate("main", "       --nograb                     the application should never grab the mouse or the\n"
+                                                                  "                                    keyboard."));
+#endif // ! defined(Q_OS_LINUX)
+        texts << appendLF.arg(QCoreApplication::translate("main", "       --reverse                    sets the application's layout direction to right to left."));
+        texts << appendLF.arg(QCoreApplication::translate("main", "       --style=style                sets the application GUI style. Possible values depend on\n"
+                                                                  "                                    your system configuration. If Qt was compiled with\n"
+                                                                  "                                    additional styles or has additional styles as plugins\n"
+                                                                  "                                    these will be available to the -style command line\n"
+                                                                  "                                    option. You can also set the style for all Qt\n"
+                                                                  "                                    applications by setting the QT_STYLE_OVERRIDE environment\n"
+                                                                  "                                    variable."));
+        texts << appendLF.arg(QCoreApplication::translate("main", "       --style style                is the same as listed above."));
+        texts << appendLF.arg(QCoreApplication::translate("main", "       --stylesheet=stylesheet      sets the application styleSheet.\n"
+                                                                  "                                    The value must be a path to a file that contains the\n"
+                                                                  "                                    Style Sheet. Note: Relative URLs in the Style Sheet file\n"
+                                                                  "                                    are relative to the Style Sheet file's path."));
+        texts << appendLF.arg(QCoreApplication::translate("main", "       --stylesheet stylesheet      is the same as listed above."));
+// Not sure about MacOS case as that does not use X
+#if defined(Q_OS_UNIX) && (! defined(Q_OS_MACOS))
+        texts << appendLF.arg(QCoreApplication::translate("main", "       --sync                       forces the X server to perform each X client request\n"
+                                                                  "                                    immediately and not use buffer optimization. It makes the\n"
+                                                                  "                                    program easier to debug and often much slower. The --sync\n"
+                                                                  "                                    option is only valid for the X11 version of Qt."));
+#endif // defined(Q_OS_UNIX) and not defined(Q_OS_MACOS)
+        texts << appendLF.arg(QCoreApplication::translate("main", "       --widgetcount                prints debug message at the end about number of widgets\n"
+                                                                  "                                    left undestroyed and maximum number of widgets existing\n"
+                                                                  "                                    at the same time."));
+        texts << append2LF.arg(QCoreApplication::translate("main", "       --qmljsdebugger=1234[,block] activates the QML/JS debugger with a\n"
+                                                                   "                                    specified port. The number is the port value and block is\n"
+                                                                   "                                    optional and will make the application wait until a\n"
+                                                                   "                                    debugger connects to it."));
+        texts << appendLF.arg(QCoreApplication::translate("main", "Report bugs to: https://github.com/Mudlet/Mudlet/issues"));
+        texts << appendLF.arg(QCoreApplication::translate("main", "Project home page: http://www.mudlet.org/"));
+        std::cout << texts.join(QString()).toStdString();
+        return 0;
+    }
+
+    if (parser.isSet(showVersion)) {
+        // Do "version" action - wording and format is quite tightly specified by the coding standards
+#if defined(QT_DEBUG)
+        texts << appendLF.arg(QCoreApplication::translate("main", "%1 %2%3 (with debug symbols, without optimisations)",
+                                                          "%1 is the name of the application like mudlet or Mudlet.exe, %2 is the version number like 3.20 and %3 is a build suffix like -dev")
+                 .arg(QLatin1String(APP_TARGET), QLatin1String(APP_VERSION), QLatin1String(APP_BUILD)));
+#else // ! defined(QT_DEBUG)
+        texts << QLatin1String(APP_TARGET " " APP_VERSION APP_BUILD " \n");
+#endif // ! defined(QT_DEBUG)
+        texts << appendLF.arg(QCoreApplication::translate("main", "Qt libraries %1 (compilation) %2 (runtime)",
+             "%1 and %2 are version numbers").arg(QLatin1String(QT_VERSION_STR), qVersion()));
+        // PLACEMARKER: Date-stamp needing annual update
+        texts << appendLF.arg(QCoreApplication::translate("main", "Copyright © 2008-2023  Mudlet developers"));
+        texts << appendLF.arg(QCoreApplication::translate("main", "Licence GPLv2+: GNU GPL version 2 or later - http://gnu.org/licenses/gpl.html"));
+        texts << appendLF.arg(QCoreApplication::translate("main", "This is free software: you are free to change and redistribute it.\n"
+                                                                  "There is NO WARRANTY, to the extent permitted by law."));
+        std::cout << texts.join(QString()).toStdString();
+        return 0;
+    }
+
+    /*******************************************************************
+     * If we get to HERE then we are going to run a GUI application... *
+     *******************************************************************/
+    // Unload translator so we can use main application translation system;
+    if (!commandLineTranslator.isNull()) {
+        QCoreApplication::removeTranslator(commandLineTranslator);
+        commandLineTranslator.clear();
+    }
+
+    QStringList cliProfiles = parser.values(profileToOpen);
+    QStringList onlyProfiles = parser.values(onlyPredefinedProfileToShow);
+
+    bool show_splash = !(parser.isSet(beQuiet)); // Not --quiet.
+    QImage splashImage = mudlet::getSplashScreen();
+
     if (show_splash) {
         QPainter painter(&splashImage);
         unsigned fontSize = 16;
@@ -339,8 +418,8 @@ int main(int argc, char* argv[])
 
         // Repeat for other text, but we know it will fit at given size
         // PLACEMARKER: Date-stamp needing annual update
-        QString sourceCopyrightText = QStringLiteral("©️ Mudlet makers 2008-2019");
-        QFont font(QStringLiteral("DejaVu Serif"), 16, QFont::Bold | QFont::Serif | QFont::PreferMatch | QFont::PreferAntialias);
+        QString sourceCopyrightText = qsl("©️ Mudlet makers 2008-2023");
+        QFont font(qsl("DejaVu Serif"), 16, QFont::Bold | QFont::Serif | QFont::PreferMatch | QFont::PreferAntialias);
         QTextLayout copyrightTextLayout(sourceCopyrightText, font, painter.device());
         copyrightTextLayout.beginLayout();
         QTextLine copyrightTextline = copyrightTextLayout.createLine();
@@ -353,30 +432,19 @@ int main(int argc, char* argv[])
         copyrightTextLayout.draw(&painter, QPointF(0, 0));
     }
     QPixmap pixmap = QPixmap::fromImage(splashImage);
+#if (QT_VERSION) >= (QT_VERSION_CHECK(5, 15, 0))
+    // Specifying the screen here seems to help to put the splash screen on the
+    // same monitor that the main application window will be put upon on first
+    // run, in some situations the two can otherwise get to be different which
+    // is misleading unhelpful to a new user...!
+    QSplashScreen splash(qApp->primaryScreen(), pixmap);
+#else
     QSplashScreen splash(pixmap);
+#endif
     if (show_splash) {
         splash.show();
     }
     app->processEvents();
-
-    QString splash_message;
-    if (show_splash) {
-        splash_message.append(QLatin1String("\n\n"));
-        splash_message.append(QCoreApplication::translate("main",
-                              "Mudlet comes with\n"
-                              "ABSOLUTELY NO WARRANTY!\n"
-                              "This is free software, and you are\n"
-                              "welcome to redistribute it under\n"
-                              "certain conditions; select the\n"
-                              "'About' item for details."));
-        splash_message.append(QLatin1String("\n\n"));
-        splash_message.append(QCoreApplication::translate("main", "Locating profiles..."));
-        splash.showMessage(splash_message, Qt::AlignHCenter | Qt::AlignTop);
-        app->processEvents();
-    }
-
-    // seed random number generator (should be done once per lifetime)
-    qsrand(static_cast<quint64>(QTime::currentTime().msecsSinceStartOfDay()));
 
     QString homeDirectory = mudlet::getMudletPath(mudlet::mainPath);
     QDir dir;
@@ -386,25 +454,25 @@ int main(int argc, char* argv[])
         first_launch = true;
     }
 
-    if (show_splash) {
-        splash_message.append(QCoreApplication::translate("main", "Done.\n\nLoading font files..."));
-        splash.showMessage(splash_message, Qt::AlignHCenter | Qt::AlignTop);
-        app->processEvents();
-    }
-
 #if defined(INCLUDE_FONTS)
-    QString bitstreamVeraFontDirectory(QStringLiteral("%1/ttf-bitstream-vera-1.10").arg(mudlet::getMudletPath(mudlet::mainFontsPath)));
+    QString bitstreamVeraFontDirectory(qsl("%1/ttf-bitstream-vera-1.10").arg(mudlet::getMudletPath(mudlet::mainFontsPath)));
     if (!dir.exists(bitstreamVeraFontDirectory)) {
         dir.mkpath(bitstreamVeraFontDirectory);
     }
-    QString ubuntuFontDirectory(QStringLiteral("%1/ubuntu-font-family-0.83").arg(mudlet::getMudletPath(mudlet::mainFontsPath)));
+    QString ubuntuFontDirectory(qsl("%1/ubuntu-font-family-0.83").arg(mudlet::getMudletPath(mudlet::mainFontsPath)));
     if (!dir.exists(ubuntuFontDirectory)) {
         dir.mkpath(ubuntuFontDirectory);
     }
-    QString notoFontDirectory(QStringLiteral("%1/notocoloremoji-unhinted-2018-04-24-pistol-update").arg(mudlet::getMudletPath(mudlet::mainFontsPath)));
+#if defined(Q_OS_LINUX)
+    // Only needed/works on Linux to provide color emojis:
+    removeOldNoteColorEmojiFonts();
+    // PLACEMARKER: current Noto Color Emoji font directory specification:
+    // Release: "Unicode 15.0"
+    QString notoFontDirectory{qsl("%1/noto-color-emoji-2022-09-16-v2.038").arg(mudlet::getMudletPath(mudlet::mainFontsPath))};
     if (!dir.exists(notoFontDirectory)) {
         dir.mkpath(notoFontDirectory);
     }
+#endif
 
     // The original code plonks the fonts AND the Copyright into the MAIN mudlet
     // directory - but the Copyright statement is specifically for the fonts
@@ -454,22 +522,15 @@ int main(int argc, char* argv[])
     copyFont(ubuntuFontDirectory, QLatin1String("fonts/ubuntu-font-family-0.83"), QLatin1String("UbuntuMono-R.ttf"));
     copyFont(ubuntuFontDirectory, QLatin1String("fonts/ubuntu-font-family-0.83"), QLatin1String("UbuntuMono-RI.ttf"));
 
-    copyFont(notoFontDirectory, QStringLiteral("fonts/notocoloremoji-unhinted-2018-04-24-pistol-update"), QStringLiteral("NotoColorEmoji.ttf"));
-    copyFont(notoFontDirectory, QStringLiteral("fonts/notocoloremoji-unhinted-2018-04-24-pistol-update"), QStringLiteral("LICENSE_OFL.txt"));
-#endif
+#if defined(Q_OS_LINUX)
+    // PLACEMARKER: current Noto Color Emoji font version file extraction
+    copyFont(notoFontDirectory, qsl("fonts/noto-color-emoji-2022-09-16-v2.038"), qsl("NotoColorEmoji.ttf"));
+    copyFont(notoFontDirectory, qsl("fonts/noto-color-emoji-2022-09-16-v2.038"), qsl("LICENSE"));
+#endif // defined(Q_OS_LINUX)
+#endif // defined(INCLUDE_FONTS)
 
-    mudlet::debugMode = false;
-
-    if (show_splash) {
-        splash_message.append(QCoreApplication::translate("main", "Done.\n\n"
-                              "All data has been loaded successfully.\n\n"
-                              "Starting... Have fun!\n\n"));
-        splash.showMessage(splash_message, Qt::AlignHCenter | Qt::AlignTop);
-        app->processEvents();
-    }
-
-    QString homeLink = QStringLiteral("%1/mudlet-data").arg(QDir::homePath());
-#ifdef Q_OS_WIN32
+    QString homeLink = qsl("%1/mudlet-data").arg(QDir::homePath());
+#if defined(Q_OS_WIN32)
     /*
      * From Qt Documentation for:
      * bool QFile::link(const QString &linkName)
@@ -482,7 +543,7 @@ int main(int argc, char* argv[])
      * does not mention this particular restriction it is not unreasonable to
      * assume the same condition applies...
      */
-    QString homeLinkWindows = QStringLiteral("%1/mudlet-data.lnk").arg(QDir::homePath());
+    QString homeLinkWindows = qsl("%1/mudlet-data.lnk").arg(QDir::homePath());
     QFile oldLinkFile(homeLink);
     if (oldLinkFile.exists()) {
         // A One-time fix up past error that did not include the ".lnk" extension
@@ -503,20 +564,33 @@ int main(int argc, char* argv[])
     mudlet::start();
 
     if (first_launch) {
-        // give Mudlet window decent size - most of the screen on non-HiDPI displays
-        auto desktop = qApp->desktop();
-        auto initialSpace = desktop->availableGeometry(desktop->screenNumber());
-        mudlet::self()->resize(initialSpace.width() * 3 / 4, initialSpace.height() * 3 / 4);
-        mudlet::self()->move(initialSpace.width() / 8, initialSpace.height() / 8);
+        // give Mudlet window decent size - most of the screen on non-HiDPI
+        // displays, on which ever screen it is started up on if it is a virtual
+        // multi-screen setup:
+        auto pScreen = qApp->primaryScreen();
+        // This is the coordinates of the WHOLE of the screen in pixels, for a
+        // virtual desktop - this is likely to be a subset of the virtual
+        // desktop. However it may also include parts that are used by the OS
+        // for taskbars, etc.
+        const QRect geometry = pScreen->geometry();
+        // The available size within the above that does not include the
+        // reserved parts:
+        const QSize availableSize = pScreen->availableSize();
+        mudlet::self()->resize(availableSize.width() * 3 / 4, availableSize.height() * 3 / 4);
+        mudlet::self()->move(geometry.left() + (availableSize.width() / 8), geometry.top() + availableSize.height() / 8);
     }
 
     if (show_splash) {
         splash.finish(mudlet::self());
     }
 
+    mudlet::self()->smMirrorToStdOut = parser.isSet(mirrorToStdout);
+    if (!onlyProfiles.isEmpty()) {
+        mudlet::self()->onlyShowProfiles(onlyProfiles);
+    }
     mudlet::self()->show();
 
-    mudlet::self()->startAutoLogin();
+    mudlet::self()->startAutoLogin(cliProfiles);
 
 #if defined(INCLUDE_UPDATER)
     mudlet::self()->checkUpdatesOnStart();
@@ -530,8 +604,6 @@ int main(int argc, char* argv[])
         if (mudlet::self()->storingPasswordsSecurely()) {
             mudlet::self()->migratePasswordsToSecureStorage();
         }
-
-        mudlet::self()->updateMudletDiscordInvite();
     });
 
     app->restoreOverrideCursor();
@@ -551,23 +623,23 @@ int main(int argc, char* argv[])
 // return true if we should abort the current launch since the updater got started
 bool runUpdate()
 {
-    QFileInfo updatedInstaller(QCoreApplication::applicationDirPath() + QStringLiteral("/new-mudlet-setup.exe"));
-    QFileInfo seenUpdatedInstaller(QCoreApplication::applicationDirPath() + QStringLiteral("/new-mudlet-setup-seen.exe"));
+    QFileInfo updatedInstaller(QCoreApplication::applicationDirPath() + qsl("/new-mudlet-setup.exe"));
+    QFileInfo seenUpdatedInstaller(QCoreApplication::applicationDirPath() + qsl("/new-mudlet-setup-seen.exe"));
     QDir updateDir;
     if (updatedInstaller.exists() && updatedInstaller.isFile() && updatedInstaller.isExecutable()) {
-        if (!updateDir.remove(seenUpdatedInstaller.absoluteFilePath())) {
-            qWarning() << "Couldn't delete previous installer";
+        if (seenUpdatedInstaller.exists() && !updateDir.remove(seenUpdatedInstaller.absoluteFilePath())) {
+            qWarning() << "Couldn't delete previous installer: " << seenUpdatedInstaller;
         }
 
         if (!updateDir.rename(updatedInstaller.absoluteFilePath(), seenUpdatedInstaller.absoluteFilePath())) {
-            qWarning() << "Failed to prep installer: couldn't rename it";
+            qWarning() << "Failed to prep installer: couldn't move" << updatedInstaller.absoluteFilePath() << "to" << seenUpdatedInstaller.absoluteFilePath();
         }
 
         QProcess::startDetached(seenUpdatedInstaller.absoluteFilePath());
         return true;
     } else if (seenUpdatedInstaller.exists() && !updateDir.remove(seenUpdatedInstaller.absoluteFilePath())) {
-         // no new updater and only the old one? Then we're restarting from an update: delete the old installer
-        qWarning() << "Couldn't delete old uninstaller";
+        // no new updater and only the old one? Then we're restarting from an update: delete the old installer
+        qWarning() << "Couldn't delete old uninstaller: " << seenUpdatedInstaller;
     }
     return false;
 }

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>883</width>
-    <height>808</height>
+    <width>777</width>
+    <height>666</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -54,8 +54,8 @@
       <attribute name="title">
        <string>General</string>
       </attribute>
-      <layout class="QGridLayout" name="gridLayout_tab_general">
-       <item row="0" column="0">
+      <layout class="QVBoxLayout" name="vBoxLayout_tab_general">
+       <item>
         <widget class="QGroupBox" name="groupBox_iconsAndToolbars">
          <property name="title">
           <string>Icon sizes</string>
@@ -165,7 +165,7 @@
          </layout>
         </widget>
        </item>
-       <item row="1" column="0">
+       <item>
         <widget class="QGroupBox" name="groupBox_encoding">
          <property name="title">
           <string>Language &amp;&amp; data encoding</string>
@@ -198,11 +198,11 @@
              <bool>true</bool>
             </property>
             <property name="toolTip">
-             <string>&lt;p&gt;If you are playing a non-English game and seeing � instead of text, or special letters like &lt;span style=&quot; font-weight:600;&quot;&gt;ñ&lt;/span&gt; aren't showing right - try changing the encoding to UTF-8 or to one suggested by your game.&lt;/p&gt;</string>
+             <string>&lt;p&gt;If you are playing a non-English game and seeing � instead of text, or special letters like &lt;span style=&quot; font-weight:600;&quot;&gt;ñ&lt;/span&gt; aren't showing right - try changing the encoding to UTF-8 or to one suggested by your game.&lt;/p&gt;&lt;p&gt;For some encodings on some Operating Systems Mudlet itself has to provide the codec needed; if that is the case for this Mudlet then there will be a &lt;tt&gt;m &lt;/tt&gt; prefixed applied to those encoding names (so if they have errors the blame can be applied correctly!)&lt;/p&gt;</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="0" colspan="4">
+          <item row="1" column="0" colspan="2">
            <widget class="QLabel" name="label_languageChangeWarning">
             <property name="font">
              <font>
@@ -217,37 +217,91 @@
          </layout>
         </widget>
        </item>
-       <item row="2" column="0">
+       <item>
         <widget class="QGroupBox" name="groupBox_miscellaneous">
          <property name="title">
           <string>Miscellaneous</string>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_groupBox_miscellaneous">
-          <item>
+         <layout class="QGridLayout" name="gridLayout_groupBox_miscellaneous">
+          <item row="0" column="1">
+           <widget class="QComboBox" name="comboBox_appearance">
+            <item>
+             <property name="text">
+              <string>System setting</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Light</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Dark</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="3" column="0">
            <widget class="QCheckBox" name="mAlertOnNewData">
+            <property name="toolTip">
+             <string>&lt;p&gt;Show a toolbar notification if Mudlet is minimized and new data arrives.&lt;/p&gt;</string>
+            </property>
             <property name="text">
-             <string>Toolbar notification if Mudlet is minimized and new data arrives</string>
+             <string>Notify on new data</string>
             </property>
            </widget>
           </item>
-          <item>
+          <item row="4" column="0">
            <widget class="QCheckBox" name="mFORCE_SAVE_ON_EXIT">
             <property name="text">
-             <string>Force auto save on exit</string>
+             <string>Auto save on exit</string>
             </property>
            </widget>
           </item>
-          <item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_appearance">
+            <property name="text">
+             <string>Appearance</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QCheckBox" name="acceptServerMedia">
+            <property name="toolTip">
+             <string>&lt;p&gt;This also needs GMCP to be enabled in the next group below.&lt;/p&gt;</string>
+            </property>
+            <property name="text">
+             <string>Allow server to download and play media</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
            <widget class="QCheckBox" name="acceptServerGUI">
             <property name="text">
              <string>Allow server to install script packages</string>
             </property>
            </widget>
           </item>
+          <item row="2" column="0" colspan="2">
+           <widget class="QLabel" name="label_darkEditorPrompt">
+            <property name="font">
+             <font>
+              <pointsize>8</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Set dark theme in &lt;a href=&quot;dark-code-editor&quot;&gt;code editor&lt;/a&gt; as well?</string>
+            </property>
+            <property name="textFormat">
+             <enum>Qt::RichText</enum>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>
-       <item row="3" column="0">
+       <item>
         <widget class="QGroupBox" name="groupBox_protocols">
          <property name="title">
           <string>Game protocols</string>
@@ -259,7 +313,17 @@
              <string>&lt;p&gt;Enables GMCP - note that if you have MSDP enabled as well, some servers will prefer one over the other&lt;/p&gt;</string>
             </property>
             <property name="text">
-             <string>Enable GMCP</string>
+             <string>Enable GMCP  (Generic Mud Communication Protocol)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QCheckBox" name="mEnableMSSP">
+            <property name="toolTip">
+             <string>&lt;p&gt;Enables MSSP - provides Mud Server Status Protocol information upon connection for supported games&lt;/p&gt;</string>
+            </property>
+            <property name="text">
+             <string>Enable MSSP  (Mud Server Status Protocol)</string>
             </property>
            </widget>
           </item>
@@ -269,21 +333,21 @@
              <string>&lt;p&gt;Enables MSDP - note that if you have GMCP enabled as well, some servers will prefer one over the other&lt;/p&gt;</string>
             </property>
             <property name="text">
-             <string>Enable MSDP</string>
+             <string>Enable MSDP  (Mud Server Data Protocol)</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
-           <widget class="QCheckBox" name="mEnableMSSP">
+          <item row="1" column="1">
+           <widget class="QCheckBox" name="mEnableMSP">
             <property name="toolTip">
-             <string>&lt;p&gt;Enables MSSP - provides Mud Server Status Protocol information upon connection for supported games&lt;/p&gt;</string>
+             <string>&lt;p&gt;Enables MSP - provides Mud Sound Protocol messages during game play for supported games&lt;/p&gt;</string>
             </property>
             <property name="text">
-             <string>Enable MSSP</string>
+             <string>Enable MSP  (Mud Sound Protocol)</string>
             </property>
            </widget>
           </item>
-          <item row="3" column="0">
+          <item row="2" column="0" colspan="2">
            <widget class="QLabel" name="need_reconnect_for_data_protocol">
             <property name="enabled">
              <bool>true</bool>
@@ -310,30 +374,30 @@
          </layout>
         </widget>
        </item>
-       <item row="4" column="0">
+       <item>
         <widget class="QGroupBox" name="groupBox_logOptions">
          <property name="title">
           <string>Log options</string>
          </property>
-         <layout class="QGridLayout" name="gridLayout_groupBox_logOptions">
-          <item row="0" column="0" colspan="4">
+         <layout class="QGridLayout" name="gridLayout_groupBox_logOptions" columnstretch="1,3,2,2">
+          <item row="0" column="0" colspan="2">
            <widget class="QCheckBox" name="mIsToLogInHtml">
             <property name="toolTip">
-             <string>&lt;p&gt;When checked will cause the date-stamp named log file to be HTML (file extention '.html') which can convey color, font and other formatting information rather than a plain text (file extension '.txt') format.  If changed whilst logging is already in progress it is necessary to stop and restart logging for this setting to take effect in a new log file.&lt;/p&gt;</string>
+             <string>&lt;p&gt;When checked will cause the date-stamp named log file to be HTML (file extension '.html') which can convey color, font and other formatting information rather than a plain text (file extension '.txt') format.  If changed while logging is already in progress it is necessary to stop and restart logging for this setting to take effect in a new log file.&lt;/p&gt;</string>
             </property>
             <property name="text">
              <string>Save log files in HTML format instead of plain text</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="0" colspan="4">
+          <item row="0" column="2" colspan="2">
            <widget class="QCheckBox" name="mIsLoggingTimestamps">
             <property name="text">
              <string>Add timestamps at the beginning of log lines</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="0" alignment="Qt::AlignRight">
+          <item row="1" column="0" alignment="Qt::AlignRight">
            <widget class="QLabel" name="label_whereToLog">
             <property name="text">
              <string>Save log files in:</string>
@@ -343,28 +407,28 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="1">
+          <item row="1" column="1">
            <widget class="QLineEdit" name="lineEdit_logFileFolder">
             <property name="readOnly">
              <bool>true</bool>
             </property>
            </widget>
           </item>
-          <item row="2" column="2">
+          <item row="1" column="2">
            <widget class="QPushButton" name="pushButton_whereToLog">
             <property name="text">
              <string>Browse...</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="3">
+          <item row="1" column="3">
            <widget class="QPushButton" name="pushButton_resetLogDir">
             <property name="text">
              <string>Reset</string>
             </property>
            </widget>
           </item>
-          <item row="3" column="0" alignment="Qt::AlignRight">
+          <item row="2" column="0" alignment="Qt::AlignRight">
            <widget class="QLabel" name="label_logFileNameFormat">
             <property name="text">
              <string>Log format:</string>
@@ -374,10 +438,10 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="1" colspan="3">
+          <item row="2" column="1" colspan="3">
            <widget class="QComboBox" name="comboBox_logFileNameFormat"/>
           </item>
-          <item row="4" column="0" alignment="Qt::AlignRight">
+          <item row="3" column="0" alignment="Qt::AlignRight">
            <widget class="QLabel" name="label_logFileName">
             <property name="text">
              <string>Log name:</string>
@@ -387,14 +451,14 @@
             </property>
            </widget>
           </item>
-          <item row="4" column="1" colspan="2">
+          <item row="3" column="1" colspan="2">
            <widget class="QLineEdit" name="lineEdit_logFileName">
             <property name="alignment">
              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
             </property>
            </widget>
           </item>
-          <item row="4" column="3">
+          <item row="3" column="3">
            <widget class="QLabel" name="label_logFileNameExtension">
             <property name="enabled">
              <bool>true</bool>
@@ -410,7 +474,7 @@
          </layout>
         </widget>
        </item>
-       <item row="5" column="0">
+       <item>
         <spacer name="verticalSpacer_general">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -435,8 +499,8 @@
       <attribute name="title">
        <string>Input line</string>
       </attribute>
-      <layout class="QGridLayout" name="gridLayout_tab_inputline" rowstretch="0,1,0">
-       <item row="0" column="0">
+      <layout class="QVBoxLayout" name="vBoxLayout_tab_inputline" stretch="0,1,0">
+       <item>
         <widget class="QGroupBox" name="groupBox_input">
          <property name="enabled">
           <bool>true</bool>
@@ -473,6 +537,16 @@
            </widget>
           </item>
           <item row="1" column="1">
+           <widget class="QCheckBox" name="checkBox_highlightHistory">
+            <property name="toolTip">
+             <string>Highlights your input line text when scrolling through your history for easy cancellation</string>
+            </property>
+            <property name="text">
+             <string>Highlight history</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
            <widget class="QCheckBox" name="checkBox_runAllKeyBindings">
             <property name="toolTip">
              <string>&lt;p&gt;Check all Key-bindings against key-presses.&lt;/p&gt;&lt;p&gt;&lt;i&gt;Versions of Mudlet prior to &lt;b&gt;3.9.0&lt;/b&gt; would stop checking after the first matching combination of&lt;/i&gt; KeyCode &lt;i&gt;and&lt;/i&gt; KeyModifier &lt;i&gt;was found and then send the command and/or run the script of that Key-binding only.  This&lt;/i&gt; per-profile &lt;i&gt;option tells Mudlet to check and run the remaining matches; but, to retain compatibility with previous versions, defaults to the &lt;b&gt;un&lt;/b&gt;-checked state.&lt;/i&gt;&lt;/p&gt;</string>
@@ -482,7 +556,7 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="0" alignment="Qt::AlignRight">
+          <item row="3" column="0" alignment="Qt::AlignRight">
            <widget class="QLabel" name="label_commandSeparator">
             <property name="toolTip">
              <string/>
@@ -495,14 +569,14 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="1">
+          <item row="3" column="1">
            <widget class="QLineEdit" name="command_separator_lineedit">
             <property name="placeholderText">
              <string>Enter text to separate commands with or leave blank to disable</string>
             </property>
            </widget>
           </item>
-          <item row="3" column="0" alignment="Qt::AlignRight">
+          <item row="4" column="0" alignment="Qt::AlignRight">
            <widget class="QLabel" name="label_commandLineMinimumHeight">
             <property name="text">
              <string>Command line minimum height in pixels:</string>
@@ -512,7 +586,7 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="1" alignment="Qt::AlignLeft">
+          <item row="4" column="1" alignment="Qt::AlignLeft">
            <widget class="QSpinBox" name="commandLineMinimumHeight">
             <property name="alignment">
              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -525,7 +599,7 @@
          </layout>
         </widget>
        </item>
-       <item row="1" column="0">
+       <item>
         <widget class="QGroupBox" name="groupBox_spellCheck">
          <property name="toolTip">
           <string notr="true"/>
@@ -604,7 +678,7 @@
          </layout>
         </widget>
        </item>
-       <item row="2" column="0">
+       <item>
         <spacer name="verticalSpacer_inputLine">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -629,11 +703,11 @@
       <attribute name="title">
        <string>Main display</string>
       </attribute>
-      <layout class="QGridLayout" name="gridLayout_tab_display">
-       <item row="0" column="0">
+      <layout class="QVBoxLayout" name="vBoxLayout_tab_display">
+       <item>
         <widget class="QGroupBox" name="groupBox_font">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
@@ -641,7 +715,7 @@
          <property name="title">
           <string>Font</string>
          </property>
-         <layout class="QGridLayout" name="gridLayout">
+         <layout class="QGridLayout" name="gridLayout_groupBox_font">
           <item row="0" column="0">
            <widget class="QLabel" name="label_30">
             <property name="text">
@@ -663,9 +737,6 @@
             <property name="maxVisibleItems">
              <number>20</number>
             </property>
-            <property name="fontFilters">
-             <set>QFontComboBox::MonospacedFonts</set>
-            </property>
            </widget>
           </item>
           <item row="0" column="2">
@@ -678,7 +749,7 @@
           <item row="0" column="3">
            <widget class="QComboBox" name="fontSize"/>
           </item>
-          <item row="1" column="0" colspan="4">
+          <item row="1" column="0" colspan="2">
            <widget class="QLabel" name="label_invalidFontError">
             <property name="font">
              <font>
@@ -691,6 +762,19 @@
            </widget>
           </item>
           <item row="2" column="0" colspan="4">
+           <widget class="QLabel" name="label_variableWidthFontWarning">
+            <property name="font">
+             <font>
+              <pointsize>8</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string comment="Note that this text is split into two lines so that the message is not too wide in English, please do the same for other locales where the text is the same or longer">This font is not monospace, which may not be ideal for playing some text games:
+you can use it but there could be issues with aligning columns of text</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
            <widget class="QCheckBox" name="mNoAntiAlias">
             <property name="toolTip">
              <string>Use anti aliasing on fonts. Smoothes fonts if you have a high screen resolution and you can use larger fonts. Note that on low resolutions and small font sizes, the font gets blurry. </string>
@@ -703,10 +787,10 @@
          </layout>
         </widget>
        </item>
-       <item row="1" column="0">
+       <item>
         <widget class="QGroupBox" name="groupBox_borders">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
@@ -894,10 +978,10 @@
          </layout>
         </widget>
        </item>
-       <item row="2" column="0">
+       <item>
         <widget class="QGroupBox" name="groupBox_wrapping">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
@@ -914,7 +998,7 @@
             <property name="frameShape">
              <enum>QFrame::NoFrame</enum>
             </property>
-            <layout class="QHBoxLayout" name="horizontalLayout_wrap_at">
+            <layout class="QHBoxLayout" name="horizontalLayout_frame_wrap_at">
              <item>
               <widget class="QLabel" name="label_wrap_at_spinBox">
                <property name="sizePolicy">
@@ -1008,7 +1092,7 @@
          </layout>
         </widget>
        </item>
-       <item row="3" column="0">
+       <item>
         <widget class="QGroupBox" name="groupBox_doubleClick">
          <property name="title">
           <string>Double-click</string>
@@ -1037,7 +1121,7 @@
          </layout>
         </widget>
        </item>
-       <item row="4" column="0">
+       <item>
         <widget class="QGroupBox" name="groupBox_displayOptions">
          <property name="title">
           <string>Display options</string>
@@ -1066,7 +1150,7 @@
           <item row="1" column="0">
            <widget class="QCheckBox" name="checkBox_USE_SMALL_SCREEN">
             <property name="toolTip">
-             <string>&lt;p&gt;Select this option for better compatability if you are using a netbook, or some other computer model that has a small screen.&lt;/p&gt;</string>
+             <string>&lt;p&gt;Select this option for better compatibility if you are using a netbook, or some other computer model that has a small screen.&lt;/p&gt;</string>
             </property>
             <property name="text">
              <string>Use Mudlet on a netbook with a small screen</string>
@@ -1110,75 +1194,42 @@
             </property>
            </widget>
           </item>
-          <item row="4" column="0" colspan="2">
-           <widget class="QWidget" name="widget_timerDebugOutputMinimumInterval" native="true">
-            <layout class="QHBoxLayout" name="horizontalLayout_timerDebugOutputMinimumInterval" stretch="0,1">
-             <property name="leftMargin">
-              <number>0</number>
+          <item row="4" column="0">
+           <widget class="QLabel" name="label_controlCharacterHandling">
+            <property name="text">
+             <string>Display control characters as:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QComboBox" name="comboBox_controlCharacterHandling">
+            <property name="currentIndex">
+             <number>0</number>
+            </property>
+            <property name="sizeAdjustPolicy">
+             <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
+            </property>
+            <item>
+             <property name="text">
+              <string>nothing</string>
              </property>
-             <property name="topMargin">
-              <number>0</number>
+            </item>
+            <item>
+             <property name="text">
+              <string>Unicode Control Pictures</string>
              </property>
-             <property name="rightMargin">
-              <number>0</number>
+            </item>
+            <item>
+             <property name="text">
+              <string>CP437 (OEM Font)- like</string>
              </property>
-             <property name="bottomMargin">
-              <number>0</number>
-             </property>
-             <item>
-              <widget class="QLabel" name="label_timerDebugOutputMinimumInterval">
-               <property name="sizePolicy">
-                <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                 <horstretch>1</horstretch>
-                 <verstretch>0</verstretch>
-                </sizepolicy>
-               </property>
-               <property name="text">
-                <string comment="The terms in italics refer to Mudlet specific things and ought to match translations in the glossary - assuming they have been put in there!">Show 'LUA OK' messages for Timers with minimum interval of (h:mm:ss.zzz):</string>
-               </property>
-               <property name="buddy">
-                <cstring>timeEdit_timerDebugOutputMinimumInterval</cstring>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QTimeEdit" name="timeEdit_timerDebugOutputMinimumInterval">
-               <property name="sizePolicy">
-                <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-                 <horstretch>0</horstretch>
-                 <verstretch>0</verstretch>
-                </sizepolicy>
-               </property>
-               <property name="wrapping">
-                <bool>true</bool>
-               </property>
-               <property name="alignment">
-                <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-               </property>
-               <property name="buttonSymbols">
-                <enum>QAbstractSpinBox::PlusMinus</enum>
-               </property>
-               <property name="accelerated">
-                <bool>true</bool>
-               </property>
-               <property name="showGroupSeparator" stdset="0">
-                <bool>true</bool>
-               </property>
-               <property name="currentSection">
-                <enum>QDateTimeEdit::HourSection</enum>
-               </property>
-               <property name="displayFormat">
-                <string comment="Used to set a time interval only">h:mm:ss.zzz</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
+            </item>
            </widget>
           </item>
          </layout>
         </widget>
        </item>
-       <item row="5" column="0">
+       <item>
         <spacer name="verticalSpacer_mainDisplay">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -1197,7 +1248,7 @@
       <attribute name="title">
        <string>Editor</string>
       </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout_3">
+      <layout class="QVBoxLayout" name="verticalLayout_tab_codeEditor">
        <item>
         <widget class="QGroupBox" name="groupbox_codeEditorThemeSelection">
          <property name="title">
@@ -1218,7 +1269,10 @@
             <property name="frameShadow">
              <enum>QFrame::Raised</enum>
             </property>
-            <layout class="QGridLayout" name="gridLayout_frame_edbeePreviewWidget">
+            <layout class="QVBoxLayout" name="verticalLayout_frame_edbeePreviewWidget">
+             <property name="spacing">
+              <number>0</number>
+             </property>
              <property name="leftMargin">
               <number>0</number>
              </property>
@@ -1231,15 +1285,10 @@
              <property name="bottomMargin">
               <number>0</number>
              </property>
-             <property name="spacing">
-              <number>0</number>
-             </property>
-             <item row="0" column="0">
+             <item>
               <widget class="edbee::TextEditorWidget" name="edbeePreviewWidget" native="true">
                <property name="font">
-                <font>
-                 <family>Bitstream Vera Sans Mono</family>
-                </font>
+                <font/>
                </property>
               </widget>
              </item>
@@ -1259,7 +1308,7 @@
              <bool>true</bool>
             </property>
             <property name="sizeAdjustPolicy">
-             <enum>QComboBox::AdjustToMinimumContentsLength</enum>
+             <enum>QComboBox::AdjustToContents</enum>
             </property>
            </widget>
           </item>
@@ -1279,15 +1328,34 @@
         </widget>
        </item>
        <item>
-        <widget class="QGroupBox" name="groupBox">
+        <widget class="QGroupBox" name="groupBox_autoComplete">
          <property name="title">
           <string>Autocomplete</string>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_4">
+         <layout class="QVBoxLayout" name="verticalLayout_groupBox_autoComplete">
           <item>
            <widget class="QCheckBox" name="checkBox_autocompleteLuaCode">
             <property name="text">
              <string>Autocomplete Lua functions in code editor</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox_advancedEditor">
+         <property name="title">
+          <string>Advanced</string>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_groupBox_advancedEditor">
+          <item>
+           <widget class="QCheckBox" name="checkBox_showBidi">
+            <property name="toolTip">
+             <string>Shows bidirection Unicode characters which can be used to change the meaning of source code while remaining invisible to the eye</string>
+            </property>
+            <property name="text">
+             <string>Show invisible Unicode control characters</string>
             </property>
            </widget>
           </item>
@@ -1313,8 +1381,8 @@
       <attribute name="title">
        <string>Color view</string>
       </attribute>
-      <layout class="QGridLayout" name="gridLayout_tab_displayColors">
-       <item row="0" column="0">
+      <layout class="QVBoxLayout" name="vBoxLayout_tab_displayColors">
+       <item>
         <widget class="QGroupBox" name="groupBox_displayColors">
          <property name="title">
           <string>Select your color preferences</string>
@@ -1438,6 +1506,13 @@
            </widget>
           </item>
           <item row="3" column="0" colspan="4">
+           <widget class="Line" name="line_colorsSeparator">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0" colspan="4">
            <widget class="QLabel" name="label_ANSI_color_buttons_introduction">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
@@ -1453,14 +1528,14 @@
             </property>
            </widget>
           </item>
-          <item row="4" column="0">
+          <item row="5" column="0">
            <widget class="QLabel" name="label_black">
             <property name="text">
              <string>Black:</string>
             </property>
            </widget>
           </item>
-          <item row="4" column="1">
+          <item row="5" column="1">
            <widget class="QPushButton" name="pushButton_black">
             <property name="toolTip">
              <string>ANSI Color Number 0</string>
@@ -1473,14 +1548,14 @@
             </property>
            </widget>
           </item>
-          <item row="4" column="2">
+          <item row="5" column="2">
            <widget class="QLabel" name="label_lBlack">
             <property name="text">
              <string>Light black:</string>
             </property>
            </widget>
           </item>
-          <item row="4" column="3">
+          <item row="5" column="3">
            <widget class="QPushButton" name="pushButton_lBlack">
             <property name="toolTip">
              <string>ANSI Color Number 8</string>
@@ -1493,14 +1568,14 @@
             </property>
            </widget>
           </item>
-          <item row="5" column="0">
+          <item row="6" column="0">
            <widget class="QLabel" name="label_red">
             <property name="text">
              <string>Red:</string>
             </property>
            </widget>
           </item>
-          <item row="5" column="1">
+          <item row="6" column="1">
            <widget class="QPushButton" name="pushButton_red">
             <property name="toolTip">
              <string>ANSI Color Number 1</string>
@@ -1513,14 +1588,14 @@
             </property>
            </widget>
           </item>
-          <item row="5" column="2">
+          <item row="6" column="2">
            <widget class="QLabel" name="label_lRed">
             <property name="text">
              <string>Light red:</string>
             </property>
            </widget>
           </item>
-          <item row="5" column="3">
+          <item row="6" column="3">
            <widget class="QPushButton" name="pushButton_lRed">
             <property name="toolTip">
              <string>ANSI Color Number 9</string>
@@ -1533,14 +1608,14 @@
             </property>
            </widget>
           </item>
-          <item row="6" column="0">
+          <item row="7" column="0">
            <widget class="QLabel" name="label_green">
             <property name="text">
              <string>Green:</string>
             </property>
            </widget>
           </item>
-          <item row="6" column="1">
+          <item row="7" column="1">
            <widget class="QPushButton" name="pushButton_green">
             <property name="toolTip">
              <string>ANSI Color Number 2</string>
@@ -1553,14 +1628,14 @@
             </property>
            </widget>
           </item>
-          <item row="6" column="2">
+          <item row="7" column="2">
            <widget class="QLabel" name="label_lGreen">
             <property name="text">
              <string>Light green:</string>
             </property>
            </widget>
           </item>
-          <item row="6" column="3">
+          <item row="7" column="3">
            <widget class="QPushButton" name="pushButton_lGreen">
             <property name="toolTip">
              <string>ANSI Color Number 10</string>
@@ -1573,14 +1648,14 @@
             </property>
            </widget>
           </item>
-          <item row="7" column="0">
+          <item row="8" column="0">
            <widget class="QLabel" name="label_yellow">
             <property name="text">
              <string>Yellow:</string>
             </property>
            </widget>
           </item>
-          <item row="7" column="1">
+          <item row="8" column="1">
            <widget class="QPushButton" name="pushButton_yellow">
             <property name="toolTip">
              <string>ANSI Color Number 3</string>
@@ -1593,14 +1668,14 @@
             </property>
            </widget>
           </item>
-          <item row="7" column="2">
+          <item row="8" column="2">
            <widget class="QLabel" name="label_lYellow">
             <property name="text">
              <string>Light yellow:</string>
             </property>
            </widget>
           </item>
-          <item row="7" column="3">
+          <item row="8" column="3">
            <widget class="QPushButton" name="pushButton_lYellow">
             <property name="toolTip">
              <string>ANSI Color Number 11</string>
@@ -1613,14 +1688,14 @@
             </property>
            </widget>
           </item>
-          <item row="8" column="0">
+          <item row="9" column="0">
            <widget class="QLabel" name="label_blue">
             <property name="text">
              <string>Blue:</string>
             </property>
            </widget>
           </item>
-          <item row="8" column="1">
+          <item row="9" column="1">
            <widget class="QPushButton" name="pushButton_blue">
             <property name="toolTip">
              <string>ANSI Color Number 4</string>
@@ -1633,14 +1708,14 @@
             </property>
            </widget>
           </item>
-          <item row="8" column="2">
+          <item row="9" column="2">
            <widget class="QLabel" name="label_lBlue">
             <property name="text">
              <string>Light blue:</string>
             </property>
            </widget>
           </item>
-          <item row="8" column="3">
+          <item row="9" column="3">
            <widget class="QPushButton" name="pushButton_lBlue">
             <property name="toolTip">
              <string>ANSI Color Number 12</string>
@@ -1653,14 +1728,14 @@
             </property>
            </widget>
           </item>
-          <item row="9" column="0">
+          <item row="10" column="0">
            <widget class="QLabel" name="label_magenta">
             <property name="text">
              <string>Magenta:</string>
             </property>
            </widget>
           </item>
-          <item row="9" column="1">
+          <item row="10" column="1">
            <widget class="QPushButton" name="pushButton_magenta">
             <property name="toolTip">
              <string>ANSI Color Number 5</string>
@@ -1673,14 +1748,14 @@
             </property>
            </widget>
           </item>
-          <item row="9" column="2">
+          <item row="10" column="2">
            <widget class="QLabel" name="label_lMagenta">
             <property name="text">
              <string>Light magenta:</string>
             </property>
            </widget>
           </item>
-          <item row="9" column="3">
+          <item row="10" column="3">
            <widget class="QPushButton" name="pushButton_lMagenta">
             <property name="toolTip">
              <string>ANSI Color Number 13</string>
@@ -1693,14 +1768,14 @@
             </property>
            </widget>
           </item>
-          <item row="10" column="0">
+          <item row="11" column="0">
            <widget class="QLabel" name="label_cyan">
             <property name="text">
              <string>Cyan:</string>
             </property>
            </widget>
           </item>
-          <item row="10" column="1">
+          <item row="11" column="1">
            <widget class="QPushButton" name="pushButton_cyan">
             <property name="toolTip">
              <string>ANSI Color Number 6</string>
@@ -1713,14 +1788,14 @@
             </property>
            </widget>
           </item>
-          <item row="10" column="2">
+          <item row="11" column="2">
            <widget class="QLabel" name="label_lCyan">
             <property name="text">
              <string>Light cyan:</string>
             </property>
            </widget>
           </item>
-          <item row="10" column="3">
+          <item row="11" column="3">
            <widget class="QPushButton" name="pushButton_lCyan">
             <property name="toolTip">
              <string>ANSI Color Number 14</string>
@@ -1733,14 +1808,14 @@
             </property>
            </widget>
           </item>
-          <item row="11" column="0">
+          <item row="12" column="0">
            <widget class="QLabel" name="label_white">
             <property name="text">
              <string>White:</string>
             </property>
            </widget>
           </item>
-          <item row="11" column="1">
+          <item row="12" column="1">
            <widget class="QPushButton" name="pushButton_white">
             <property name="toolTip">
              <string>ANSI Color Number 7</string>
@@ -1753,14 +1828,14 @@
             </property>
            </widget>
           </item>
-          <item row="11" column="2">
+          <item row="12" column="2">
            <widget class="QLabel" name="label_lWhite">
             <property name="text">
              <string>Light white:</string>
             </property>
            </widget>
           </item>
-          <item row="11" column="3">
+          <item row="12" column="3">
            <widget class="QPushButton" name="pushButton_lWhite">
             <property name="toolTip">
              <string>ANSI Color Number 15</string>
@@ -1773,14 +1848,14 @@
             </property>
            </widget>
           </item>
-          <item row="12" column="2" colspan="2">
+          <item row="13" column="2" colspan="2">
            <widget class="QPushButton" name="pushButton_resetColors">
             <property name="text">
              <string>Reset all colors to default</string>
             </property>
            </widget>
           </item>
-          <item row="12" column="0" colspan="2">
+          <item row="13" column="0" colspan="2">
            <widget class="QCheckBox" name="checkBox_allowServerToRedefineColors">
             <property name="toolTip">
              <string>&lt;p&gt;If this option is checked the Mud Server may send codes to change the above 16 colors or to reset them to their defaults by using standard ANSI &lt;tt&gt;OSC&lt;/tt&gt; Escape codes.&lt;/p&gt;&lt;p&gt;Specifically &lt;tt&gt;&amp;lt;OSC&amp;gt;Pirrggbb&amp;lt;ST&amp;gt;&lt;/tt&gt; will set the color with index &lt;i&gt;i&lt;/i&gt; to have the color with the given &lt;i&gt;rr&lt;/i&gt; red, &lt;i&gt;gg&lt;/i&gt; green and &lt;i&gt;bb&lt;/i&gt;  blue components where i is a single hex-digit ('0' to '9' or 'a' to 'f' or 'A' to 'F' to give a number between 0 an d15) and rr, gg and bb are two digit hex-digits numbers (between 0 to 255); &amp;lt;OSC&amp;gt; is &lt;i&gt;Operating System Command&lt;/i&gt; which is normally encoded as the ASCII &amp;lt;ESC&amp;gt; character followed by &lt;tt&gt;[&lt;/tt&gt; and &amp;lt;ST&amp;gt; is the &lt;i&gt;String Terminator&lt;/i&gt; which is normally encoded as the ASCII &amp;lt;ESC&amp;gt; character followed by &lt;tt&gt;\&lt;tt&gt;.&lt;/p&gt;&lt;p&gt;Conversely &lt;tt&gt;&amp;lt;OSC&amp;gt;R&amp;lt;ST&amp;gt;&lt;/tt&gt; will reset the colors to the defaults like the button to the right does.&lt;/p&gt;</string>
@@ -1793,7 +1868,7 @@
          </layout>
         </widget>
        </item>
-       <item row="1" column="0">
+       <item>
         <spacer name="verticalSpacer_displayColors">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -1812,8 +1887,8 @@
       <attribute name="title">
        <string>Mapper</string>
       </attribute>
-      <layout class="QGridLayout" name="gridLayout_tab_mapper">
-       <item row="0" column="0">
+      <layout class="QVBoxLayout" name="vBoxLayout_tab_mapper">
+       <item>
         <widget class="QGroupBox" name="groupBox_mapFiles">
          <property name="title">
           <string>Map files</string>
@@ -1836,6 +1911,16 @@
             </property>
            </widget>
           </item>
+          <item row="0" column="2">
+           <widget class="QCheckBox" name="checkBox_reportMapIssuesOnScreen">
+            <property name="toolTip">
+             <string>&lt;p&gt;Mudlet now does some sanity checking and repairing to clean up issues that may have arisen in previous version due to faulty code or badly documented commands. However if significant problems are found the report can be quite extensive, in particular for larger maps.&lt;/p&gt;&lt;p&gt;Unless this option is set, Mudlet will reduce the amount of on-screen messages by hiding many texts and showing a suggestion to review the report file instead.&lt;/p&gt;</string>
+            </property>
+            <property name="text">
+             <string>Report map issues on screen</string>
+            </property>
+           </widget>
+          </item>
           <item row="1" column="0">
            <widget class="QLabel" name="label_loadMap">
             <property name="text">
@@ -1853,24 +1938,41 @@
             </property>
            </widget>
           </item>
-          <item row="1" column="2">
-           <widget class="QCheckBox" name="checkBox_reportMapIssuesOnScreen">
-            <property name="toolTip">
-             <string>&lt;p&gt;Mudlet now does some sanity checking and repairing to clean up issues that may have arisen in previous version due to faulty code or badly documented commands. However if significant problems are found the report can be quite extensive, in particular for larger maps.&lt;/p&gt;&lt;p&gt;Unless this option is set, Mudlet will reduce the amount of on-screen messages by hiding many texts and showing a suggestion to review the report file instead.&lt;/p&gt;</string>
-            </property>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_deleteMap">
             <property name="text">
-             <string>Report map issues on screen</string>
+             <string>Delete map:</string>
+            </property>
+            <property name="buddy">
+             <cstring>checkBox_enablMapDeleteButton</cstring>
             </property>
            </widget>
           </item>
-          <item row="2" column="1" colspan="2">
+          <item row="2" column="1">
+           <widget class="QPushButton" name="pushButton_deleteMap">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>Press to delete map</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="2">
+           <widget class="QCheckBox" name="checkBox_enablMapDeleteButton">
+            <property name="text">
+             <string>Enable 'Delete map' button</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1" colspan="2">
            <widget class="Line" name="line_aboveCopyMap">
             <property name="orientation">
              <enum>Qt::Horizontal</enum>
             </property>
            </widget>
           </item>
-          <item row="3" column="0">
+          <item row="4" column="0">
            <widget class="QLabel" name="label_copyMap">
             <property name="text">
              <string>Copy map to other profile(s):</string>
@@ -1880,7 +1982,7 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="1">
+          <item row="4" column="1">
            <widget class="QPushButton" name="pushButton_chooseProfiles">
             <property name="enabled">
              <bool>false</bool>
@@ -1893,7 +1995,7 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="2">
+          <item row="4" column="2">
            <widget class="QPushButton" name="pushButton_copyMap">
             <property name="enabled">
              <bool>false</bool>
@@ -1906,22 +2008,13 @@
             </property>
            </widget>
           </item>
-          <item row="4" column="0" colspan="3">
-           <widget class="QLabel" name="label_mapFileActionResult">
-            <property name="font">
-             <font>
-              <pointsize>8</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>An action above happened</string>
-            </property>
-           </widget>
-          </item>
           <item row="5" column="0">
            <widget class="QLabel" name="label_mapFileSaveFormatVersion">
             <property name="text">
              <string>Map format version:</string>
+            </property>
+            <property name="buddy">
+             <cstring>comboBox_mapFileSaveFormatVersion</cstring>
             </property>
            </widget>
           </item>
@@ -1955,10 +2048,22 @@
             </item>
            </widget>
           </item>
+          <item row="6" column="0" colspan="3">
+           <widget class="QLabel" name="label_mapFileActionResult">
+            <property name="font">
+             <font>
+              <pointsize>8</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>An action above happened</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>
-       <item row="1" column="0">
+       <item>
         <widget class="QGroupBox" name="groupBox_downloadMapOptions">
          <property name="title">
           <string>Map download</string>
@@ -1990,51 +2095,12 @@
          </layout>
         </widget>
        </item>
-       <item row="2" column="0">
-        <widget class="QGroupBox" name="groupBox_mapBackups">
-         <property name="enabled">
-          <bool>false</bool>
-         </property>
-         <property name="title">
-          <string>Map backups</string>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_groupBox_mapBackups">
-          <item row="0" column="0">
-           <widget class="QLabel" name="label_13">
-            <property name="text">
-             <string>Delete map backups older than:</string>
-            </property>
-            <property name="buddy">
-             <cstring>comboBox</cstring>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QComboBox" name="comboBox">
-            <property name="frame">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="2">
-           <widget class="QLabel" name="label_14">
-            <property name="text">
-             <string>days since today, keeping newer and monthly backups</string>
-            </property>
-            <property name="buddy">
-             <cstring>comboBox</cstring>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QGroupBox" name="groupBox_mapOptions">
+       <item>
+        <widget class="QGroupBox" name="groupBox_mapViewOptions">
          <property name="title">
           <string>Map view</string>
          </property>
-         <layout class="QGridLayout" name="gridLayout_groupBox_mapOptions">
+         <layout class="QGridLayout" name="gridLayout_groupBox_mapViewOptions">
           <item row="0" column="0">
            <widget class="QCheckBox" name="mMapperUseAntiAlias">
             <property name="toolTip">
@@ -2058,34 +2124,182 @@
             </property>
            </widget>
           </item>
-          <item row="1" column="0" alignment="Qt::AlignRight">
+          <item row="1" column="0">
+           <widget class="QCheckBox" name="checkbox_mMapperShowRoomBorders">
+            <property name="toolTip">
+             <string>&lt;p&gt;This enables borders around room. Color can be set in Mapper colors tab&lt;/p&gt;</string>
+            </property>
+            <property name="text">
+             <string>Show room borders</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QCheckBox" name="checkBox_largeAreaExitArrows">
+            <property name="text">
+             <string>Use large area exit arrows in 2D view</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0" alignment="Qt::AlignRight">
            <widget class="QLabel" name="label_mapSymbolsFont">
             <property name="text">
              <string>2D Map Room Symbol Font</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="1" alignment="Qt::AlignLeft">
+          <item row="2" column="1" alignment="Qt::AlignLeft">
            <widget class="QFontComboBox" name="fontComboBox_mapSymbols"/>
           </item>
-          <item row="2" column="0">
+          <item row="3" column="0">
            <widget class="QCheckBox" name="checkBox_isOnlyMapSymbolFontToBeUsed">
             <property name="text">
              <string>Only use symbols (glyphs) from chosen font</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="1">
+          <item row="3" column="1">
            <widget class="QPushButton" name="pushButton_showGlyphUsage">
             <property name="text">
              <string>Show symbol usage...</string>
             </property>
            </widget>
           </item>
+          <item row="4" column="0" colspan="2">
+           <widget class="QWidget" name="widget_playerRoomStyle" native="true">
+            <layout class="QGridLayout" name="gridLayout_widget_playerRoomStyle">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_playerRoomStyle">
+               <property name="text">
+                <string>2D map player room marker style:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QPushButton" name="pushButton_playerRoomPrimaryColor">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="text">
+                <string>Outer ring color</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <widget class="QPushButton" name="pushButton_playerRoomSecondaryColor">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="text">
+                <string>Inner ring color</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QComboBox" name="comboBox_playerRoomStyle">
+               <property name="currentIndex">
+                <number>0</number>
+               </property>
+               <property name="sizeAdjustPolicy">
+                <enum>QComboBox::AdjustToContents</enum>
+               </property>
+               <item>
+                <property name="text">
+                 <string>Original</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Red ring</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Blue/Yellow ring</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Custom ring</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QSpinBox" name="spinBox_playerRoomOuterDiameter">
+               <property name="toolTip">
+                <string>&lt;p&gt;Percentage ratio (&lt;i&gt;the default is 120%&lt;/i&gt;) of the marker symbol to the space available for the room.&lt;/p&gt;</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <property name="suffix">
+                <string>%</string>
+               </property>
+               <property name="prefix">
+                <string>Outer diameter: </string>
+               </property>
+               <property name="minimum">
+                <number>50</number>
+               </property>
+               <property name="maximum">
+                <number>200</number>
+               </property>
+               <property name="value">
+                <number>120</number>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="2">
+              <widget class="QSpinBox" name="spinBox_playerRoomInnerDiameter">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="toolTip">
+                <string>&lt;p&gt;Percentage ratio of the inner diameter of the marker symbol to the outer one (&lt;i&gt;the default is 70%&lt;/i&gt;).&lt;/p&gt;</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <property name="suffix">
+                <string>%</string>
+               </property>
+               <property name="prefix">
+                <string>Inner diameter: </string>
+               </property>
+               <property name="maximum">
+                <number>83</number>
+               </property>
+               <property name="value">
+                <number>70</number>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>
-       <item row="4" column="0">
+       <item>
         <spacer name="verticalSpacer_mapper">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -2104,21 +2318,24 @@
       <attribute name="title">
        <string>Mapper colors</string>
       </attribute>
-      <layout class="QGridLayout" name="gridLayout_tab_mapperColors">
-       <item row="0" column="0">
+      <layout class="QVBoxLayout" name="vBoxLayout_tab_mapperColors">
+       <item>
         <widget class="QGroupBox" name="groupBox_mapperColors">
          <property name="title">
           <string>Select your color preferences for the map display</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_groupBox_mapperColors">
-          <item row="0" column="0" colspan="2">
+          <item row="0" column="0">
            <widget class="QLabel" name="label_39">
             <property name="text">
              <string>Link color</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_foreground_color_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="0" column="2" colspan="2">
+          <item row="0" column="1">
            <widget class="QPushButton" name="pushButton_foreground_color_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2131,14 +2348,17 @@
             </property>
            </widget>
           </item>
-          <item row="1" column="0" colspan="2">
+          <item row="0" column="2">
            <widget class="QLabel" name="label_40">
             <property name="text">
              <string>Background color:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_background_color_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="1" column="2" colspan="2">
+          <item row="0" column="3">
            <widget class="QPushButton" name="pushButton_background_color_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2148,14 +2368,61 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>Room border color:</string>
+            </property>
+            <property name="buddy">
+             <cstring>pushButton_roomBorderColor</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QPushButton" name="pushButton_roomBorderColor">
+            <property name="autoFillBackground">
+             <bool>true</bool>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="label_mapInfoBg">
+            <property name="text">
+             <string>Map info background:</string>
+            </property>
+            <property name="buddy">
+             <cstring>pushButton_mapInfoBg</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
+           <widget class="QPushButton" name="pushButton_mapInfoBg">
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="4">
+           <widget class="Line" name="line_mapperColorsSeparator">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
            <widget class="QLabel" name="label_17">
             <property name="text">
              <string>Black:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_black_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="2" column="1">
+          <item row="3" column="1">
            <widget class="QPushButton" name="pushButton_black_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2165,14 +2432,17 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="2">
+          <item row="3" column="2">
            <widget class="QLabel" name="label_49">
             <property name="text">
              <string>Light black:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_Lblack_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="2" column="3">
+          <item row="3" column="3">
            <widget class="QPushButton" name="pushButton_Lblack_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2182,14 +2452,17 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="0">
+          <item row="4" column="0">
            <widget class="QLabel" name="label_42">
             <property name="text">
              <string>Red:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_red_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="3" column="1">
+          <item row="4" column="1">
            <widget class="QPushButton" name="pushButton_red_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2199,14 +2472,17 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="2">
+          <item row="4" column="2">
            <widget class="QLabel" name="label_50">
             <property name="text">
              <string>Light red:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_Lred_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="3" column="3">
+          <item row="4" column="3">
            <widget class="QPushButton" name="pushButton_Lred_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2216,14 +2492,17 @@
             </property>
            </widget>
           </item>
-          <item row="4" column="0">
+          <item row="5" column="0">
            <widget class="QLabel" name="label_43">
             <property name="text">
              <string>Green:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_green_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="4" column="1">
+          <item row="5" column="1">
            <widget class="QPushButton" name="pushButton_green_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2233,14 +2512,17 @@
             </property>
            </widget>
           </item>
-          <item row="4" column="2">
+          <item row="5" column="2">
            <widget class="QLabel" name="label_51">
             <property name="text">
              <string>Light green:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_Lgreen_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="4" column="3">
+          <item row="5" column="3">
            <widget class="QPushButton" name="pushButton_Lgreen_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2250,14 +2532,17 @@
             </property>
            </widget>
           </item>
-          <item row="5" column="0">
+          <item row="6" column="0">
            <widget class="QLabel" name="label_48">
             <property name="text">
              <string>Yellow:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_yellow_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="5" column="1">
+          <item row="6" column="1">
            <widget class="QPushButton" name="pushButton_yellow_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2267,14 +2552,17 @@
             </property>
            </widget>
           </item>
-          <item row="5" column="2">
+          <item row="6" column="2">
            <widget class="QLabel" name="label_52">
             <property name="text">
              <string>Light yellow:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_Lyellow_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="5" column="3">
+          <item row="6" column="3">
            <widget class="QPushButton" name="pushButton_Lyellow_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2284,14 +2572,17 @@
             </property>
            </widget>
           </item>
-          <item row="6" column="0">
+          <item row="7" column="0">
            <widget class="QLabel" name="label_44">
             <property name="text">
              <string>Blue:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_blue_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="6" column="1">
+          <item row="7" column="1">
            <widget class="QPushButton" name="pushButton_blue_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2301,14 +2592,17 @@
             </property>
            </widget>
           </item>
-          <item row="6" column="2">
+          <item row="7" column="2">
            <widget class="QLabel" name="label_53">
             <property name="text">
              <string>Light blue:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_Lblue_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="6" column="3">
+          <item row="7" column="3">
            <widget class="QPushButton" name="pushButton_Lblue_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2318,14 +2612,17 @@
             </property>
            </widget>
           </item>
-          <item row="7" column="0">
+          <item row="8" column="0">
            <widget class="QLabel" name="label_45">
             <property name="text">
              <string>Magenta:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_magenta_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="7" column="1">
+          <item row="8" column="1">
            <widget class="QPushButton" name="pushButton_magenta_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2335,14 +2632,17 @@
             </property>
            </widget>
           </item>
-          <item row="7" column="2">
+          <item row="8" column="2">
            <widget class="QLabel" name="label_54">
             <property name="text">
              <string>Light magenta:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_Lmagenta_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="7" column="3">
+          <item row="8" column="3">
            <widget class="QPushButton" name="pushButton_Lmagenta_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2352,14 +2652,17 @@
             </property>
            </widget>
           </item>
-          <item row="8" column="0">
+          <item row="9" column="0">
            <widget class="QLabel" name="label_46">
             <property name="text">
              <string>Cyan:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_cyan_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="8" column="1">
+          <item row="9" column="1">
            <widget class="QPushButton" name="pushButton_cyan_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2369,14 +2672,17 @@
             </property>
            </widget>
           </item>
-          <item row="8" column="2">
+          <item row="9" column="2">
            <widget class="QLabel" name="label_55">
             <property name="text">
              <string>Light cyan:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_Lcyan_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="8" column="3">
+          <item row="9" column="3">
            <widget class="QPushButton" name="pushButton_Lcyan_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2386,14 +2692,17 @@
             </property>
            </widget>
           </item>
-          <item row="9" column="0">
+          <item row="10" column="0">
            <widget class="QLabel" name="label_47">
             <property name="text">
              <string>White:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_white_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="9" column="1">
+          <item row="10" column="1">
            <widget class="QPushButton" name="pushButton_white_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2403,14 +2712,17 @@
             </property>
            </widget>
           </item>
-          <item row="9" column="2">
+          <item row="10" column="2">
            <widget class="QLabel" name="label_56">
             <property name="text">
              <string>Light white:</string>
             </property>
+            <property name="buddy">
+             <cstring>pushButton_Lwhite_2</cstring>
+            </property>
            </widget>
           </item>
-          <item row="9" column="3">
+          <item row="10" column="3">
            <widget class="QPushButton" name="pushButton_Lwhite_2">
             <property name="autoFillBackground">
              <bool>true</bool>
@@ -2420,7 +2732,7 @@
             </property>
            </widget>
           </item>
-          <item row="10" column="2" colspan="2">
+          <item row="11" column="2" colspan="2">
            <widget class="QPushButton" name="reset_colors_button_2">
             <property name="text">
              <string>Reset all colors to default</string>
@@ -2430,7 +2742,7 @@
          </layout>
         </widget>
        </item>
-       <item row="1" column="0">
+       <item>
         <spacer name="verticalSpacer_mapperColors">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -2445,77 +2757,110 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="tab_specialOptions">
+     <widget class="QWidget" name="tab_chat">
       <attribute name="title">
-       <string>Special Options</string>
+       <string>Chat</string>
       </attribute>
-      <layout class="QGridLayout" name="gridLayout_tab_specialOptions">
-       <item row="0" column="0" colspan="2">
-        <widget class="QGroupBox" name="groupBox_specialOptions">
+      <layout class="QVBoxLayout" name="verticalLayout_tab_chat">
+       <item>
+        <widget class="QGroupBox" name="groupBox_ircOptions">
          <property name="title">
-          <string>Special options needed for some older game drivers (needs client restart to take effect)</string>
+          <string>IRC client options</string>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_older_game_options">
-          <item>
-           <widget class="QCheckBox" name="mFORCE_MCCP_OFF">
+         <layout class="QGridLayout" name="gridLayout_groupBox_ircOptions" rowstretch="0,0,0,0">
+          <item row="0" column="0">
+           <widget class="QLabel" name="lblIrcHostName">
             <property name="text">
-             <string>Force compression off</string>
+             <string>Server address:</string>
             </property>
            </widget>
           </item>
-          <item>
-           <widget class="QCheckBox" name="mFORCE_GA_OFF">
-            <property name="text">
-             <string>Force telnet GA signal interpretation off</string>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="ircHostName">
+            <property name="inputMethodHints">
+             <set>Qt::ImhUrlCharactersOnly</set>
+            </property>
+            <property name="placeholderText">
+             <string>irc.example.net</string>
             </property>
            </widget>
           </item>
-          <item>
-           <widget class="QCheckBox" name="checkBox_mUSE_FORCE_LF_AFTER_PROMPT">
+          <item row="0" column="2">
+           <widget class="QLabel" name="lblIrcHostPort">
+            <property name="text">
+             <string>Port:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="3">
+           <widget class="QLineEdit" name="ircHostPort">
+            <property name="inputMethodHints">
+             <set>Qt::ImhDigitsOnly</set>
+            </property>
+            <property name="placeholderText">
+             <string>6667</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="lblIrcNick">
+            <property name="text">
+             <string>Nickname:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="ircNick">
+            <property name="placeholderText">
+             <string>MudletUser123</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="lblIrcChannels">
+            <property name="text">
+             <string>Auto-join channels: </string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
+           <widget class="QLineEdit" name="ircChannels">
+            <property name="placeholderText">
+             <string>#channel1 #channel2 #etc...</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="lblIrcPassword">
+            <property name="text">
+             <string>Server password: </string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="ircPassword">
+            <property name="echoMode">
+             <enum>QLineEdit::Password</enum>
+            </property>
+            <property name="placeholderText">
+             <string>password (optional)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0" colspan="2">
+           <widget class="QCheckBox" name="ircHostSecure">
             <property name="toolTip">
-             <string>This option adds a line line break &lt;LF&gt; or &quot;
-&quot; to your command input on empty commands. This option will rarely be necessary.</string>
+             <string>&lt;p&gt;TLS/SSL is usually on port 6697. IRC networks often use a &lt;b&gt;+&lt;/b&gt; when listing secure ports offered.&lt;/p&gt;</string>
             </property>
             <property name="text">
-             <string>Force new line on empty commands</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QCheckBox" name="mFORCE_MXP_NEGOTIATION_OFF">
-            <property name="text">
-             <string>Force MXP negotiation off</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLabel" name="need_reconnect_for_specialoption">
-            <property name="enabled">
-             <bool>true</bool>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>8</pointsize>
-             </font>
-            </property>
-            <property name="mouseTracking">
-             <bool>false</bool>
-            </property>
-            <property name="text">
-             <string>Please reconnect to your game for the change to take effect</string>
-            </property>
-            <property name="textFormat">
-             <enum>Qt::AutoText</enum>
-            </property>
-            <property name="wordWrap">
-             <bool>true</bool>
+             <string>Use a secure connection</string>
             </property>
            </widget>
           </item>
          </layout>
         </widget>
        </item>
-       <item row="1" column="0" colspan="2">
+       <item>
         <widget class="QGroupBox" name="groupBox_discordPrivacy">
          <property name="title">
           <string>Discord privacy</string>
@@ -2608,7 +2953,7 @@
             <property name="toolTip">
              <string>&lt;p&gt;Mudlet will only show Rich Presence information while you use this Discord username (useful if you have multiple Discord accounts). Leave empty to show it for any Discord account you log in to.&lt;/p&gt;</string>
             </property>
-            <layout class="QHBoxLayout" name="horizontalLayout_discordUser">
+            <layout class="QHBoxLayout" name="horizontalLayout_widget_discordUser">
              <item>
               <widget class="QLabel" name="label_discordUserName">
                <property name="text">
@@ -2673,177 +3018,13 @@
          </layout>
         </widget>
        </item>
-       <item row="2" column="0" colspan="2">
-        <widget class="QGroupBox" name="groupBox_ircOptions">
-         <property name="title">
-          <string>IRC client options</string>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_groupBox_ircOptions" rowstretch="0,0">
-          <item row="0" column="0">
-           <widget class="QLabel" name="lblIrcHostName">
-            <property name="text">
-             <string>Server address:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QLineEdit" name="ircHostName">
-            <property name="inputMethodHints">
-             <set>Qt::ImhUrlCharactersOnly</set>
-            </property>
-            <property name="placeholderText">
-             <string>irc.example.net</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="2">
-           <widget class="QLabel" name="lblIrcHostPort">
-            <property name="text">
-             <string>Port:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="3">
-           <widget class="QLineEdit" name="ircHostPort">
-            <property name="inputMethodHints">
-             <set>Qt::ImhDigitsOnly</set>
-            </property>
-            <property name="placeholderText">
-             <string>6667</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="lblIrcNick">
-            <property name="text">
-             <string>Nickname:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QLineEdit" name="ircNick">
-            <property name="placeholderText">
-             <string>MudletUser123</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="2">
-           <widget class="QLabel" name="lblIrcChannels">
-            <property name="text">
-             <string>Auto-join channels: </string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="3">
-           <widget class="QLineEdit" name="ircChannels">
-            <property name="placeholderText">
-             <string>#channel1 #channel2 #etc...</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QGroupBox" name="groupBox_updates">
-         <property name="title">
-          <string>Mudlet updates</string>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_groupBox_updates">
-          <item row="0" column="0">
-           <widget class="QCheckBox" name="checkbox_noAutomaticUpdates">
-            <property name="text">
-             <string>Disable automatic updates</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="3" column="1">
-        <widget class="QGroupBox" name="groupbox_searchEngineSelection">
-         <property name="title">
-          <string>Search Engine</string>
-         </property>
-         <layout class="QVBoxLayout" name="verticalLayout_searchEngineSelection">
-          <item>
-           <widget class="QComboBox" name="search_engine_combobox"/>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="4" column="0" colspan="2">
-        <widget class="QGroupBox" name="groupBox_debug">
-         <property name="title">
-          <string>Other Special options</string>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_groupBox_debug">
-          <item row="1" column="1">
-           <widget class="QComboBox" name="comboBox_store_passwords_in">
-            <item>
-             <property name="text">
-              <string>the computer's password manager (secure)</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>plaintext with the profile (portable)</string>
-             </property>
-            </item>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QCheckBox" name="checkBox_expectCSpaceIdInColonLessMColorCode">
-            <property name="toolTip">
-             <string>&lt;p&gt;Some MUDs use a flawed interpretation of the ANSI Set Graphics Rendition (&lt;b&gt;SGR&lt;/b&gt;) code sequences for 16M color mode which only uses semi-colons and not colons to separate parameter elements i.e. instead of using a code in the form: &lt;br&gt;&lt;tt&gt;\e[&lt;/tt&gt;...&lt;tt&gt;38:2:&lt;/tt&gt;&amp;lt;Color Space Id&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Red&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Green&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Blue&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Unused&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Tolerance&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Tolerance Color Space (0=CIELUV; 1=CIELAB)&amp;gt;&lt;tt&gt;;&lt;/tt&gt;...&lt;tt&gt;m&lt;/tt&gt;&lt;br&gt;where the &lt;i&gt;Color Space Id&lt;/i&gt; is expected to be an empty string to specify the usual (default) case and all of the &lt;i&gt;Parameter Elements&lt;/i&gt; (the &quot;2&quot; and the values in the &lt;tt&gt;&amp;lt;...&amp;gt;&lt;/tt&gt;s) may, technically, be omitted; they use: &lt;br&gt;&lt;tt&gt;\e[&lt;/tt&gt;...&lt;tt&gt;38;2;&lt;/tt&gt;&amp;lt;Red&amp;gt;&lt;tt&gt;;&lt;/tt&gt;&amp;lt;Green&amp;gt;&lt;tt&gt;;&lt;/tt&gt;&amp;lt;Blue&amp;gt;&lt;tt&gt;;&lt;/tt&gt;...&lt;tt&gt;m&lt;/tt&gt;&lt;br&gt;or: &lt;br&gt;&lt;tt&gt;\e[&lt;/tt&gt;...&lt;tt&gt;38;2;&lt;/tt&gt;&amp;lt;Color Space Id&amp;gt;&lt;tt&gt;;&lt;/tt&gt;&amp;lt;Red&amp;gt;&lt;tt&gt;;&lt;/tt&gt;&amp;lt;Green&amp;gt;&lt;tt&gt;;&lt;/tt&gt;&amp;lt;Blue&amp;gt;&lt;tt&gt;;&lt;/tt&gt;...&lt;tt&gt;m&lt;/tt&gt;&lt;/p&gt;&lt;p&gt;It is not possible to reliably detect the difference between these two so checking this option causes Mudlet to expect the last one with the additional (but empty!) parameter.&lt;/p&gt;</string>
-            </property>
-            <property name="text">
-             <string>Expect Color Space Id in SGR...(3|4)8;2;...m codes</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="0">
-           <widget class="QCheckBox" name="checkBox_showIconsOnMenus">
-            <property name="text">
-             <string>Show icons on menus</string>
-            </property>
-            <property name="checkable">
-             <bool>true</bool>
-            </property>
-            <property name="checked">
-             <bool>false</bool>
-            </property>
-            <property name="tristate">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="label_store_passwords_in">
-            <property name="text">
-             <string>Store character login passwords in:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0" colspan="2">
-           <widget class="QLabel" name="label_password_migration_notification">
-            <property name="font">
-             <font>
-              <pointsize>8</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>TextLabel</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="5" column="0">
-        <spacer name="verticalSpacer_specialOptions">
+       <item>
+        <spacer name="verticalSpacer_connection">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -2958,8 +3139,38 @@
             </layout>
            </widget>
           </item>
+          <item row="1" column="0">
+           <widget class="QCheckBox" name="checkBox_self_signed">
+            <property name="toolTip">
+             <string extracomment="Accept secure certificates from the game even if they have expired. This presents a security risk"/>
+            </property>
+            <property name="text">
+             <string>Accept self-signed certificates</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QCheckBox" name="checkBox_expired">
+            <property name="toolTip">
+             <string extracomment="Accept secure certificates from the game even if they have expired. This presents a security risk"/>
+            </property>
+            <property name="text">
+             <string>Accept expired certificates</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="2">
+           <widget class="QCheckBox" name="checkBox_ignore_all">
+            <property name="toolTip">
+             <string extracomment="Ignore all SSL/TLS errors - this negates the point of a secure connection, use carefully"/>
+            </property>
+            <property name="text">
+             <string>Accept all certificate errors       (unsecure)</string>
+            </property>
+           </widget>
+          </item>
           <item row="3" column="0" colspan="2">
-           <widget class="QFrame" name="notificationArea">
+           <widget class="QFrame" name="frame_notificationArea">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -2978,73 +3189,8 @@
               <height>16777215</height>
              </size>
             </property>
-            <property name="palette">
-             <palette>
-              <active>
-               <colorrole role="Base">
-                <brush brushstyle="SolidPattern">
-                 <color alpha="255">
-                  <red>255</red>
-                  <green>255</green>
-                  <blue>255</blue>
-                 </color>
-                </brush>
-               </colorrole>
-               <colorrole role="Window">
-                <brush brushstyle="SolidPattern">
-                 <color alpha="255">
-                  <red>255</red>
-                  <green>254</green>
-                  <blue>215</blue>
-                 </color>
-                </brush>
-               </colorrole>
-              </active>
-              <inactive>
-               <colorrole role="Base">
-                <brush brushstyle="SolidPattern">
-                 <color alpha="255">
-                  <red>255</red>
-                  <green>255</green>
-                  <blue>255</blue>
-                 </color>
-                </brush>
-               </colorrole>
-               <colorrole role="Window">
-                <brush brushstyle="SolidPattern">
-                 <color alpha="255">
-                  <red>255</red>
-                  <green>254</green>
-                  <blue>215</blue>
-                 </color>
-                </brush>
-               </colorrole>
-              </inactive>
-              <disabled>
-               <colorrole role="Base">
-                <brush brushstyle="SolidPattern">
-                 <color alpha="255">
-                  <red>255</red>
-                  <green>254</green>
-                  <blue>215</blue>
-                 </color>
-                </brush>
-               </colorrole>
-               <colorrole role="Window">
-                <brush brushstyle="SolidPattern">
-                 <color alpha="255">
-                  <red>255</red>
-                  <green>254</green>
-                  <blue>215</blue>
-                 </color>
-                </brush>
-               </colorrole>
-              </disabled>
-             </palette>
-            </property>
             <property name="font">
              <font>
-              <family>Arial Black</family>
               <pointsize>16</pointsize>
               <stylestrategy>PreferAntialias</stylestrategy>
              </font>
@@ -3067,7 +3213,7 @@
             <property name="midLineWidth">
              <number>3</number>
             </property>
-            <layout class="QHBoxLayout" name="horizontalLayout_notificationArea">
+            <layout class="QHBoxLayout" name="horizontalLayout_frame_notificationArea">
              <property name="spacing">
               <number>0</number>
              </property>
@@ -3090,421 +3236,6 @@
                  <horstretch>0</horstretch>
                  <verstretch>0</verstretch>
                 </sizepolicy>
-               </property>
-               <property name="palette">
-                <palette>
-                 <active>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </active>
-                 <inactive>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </inactive>
-                 <disabled>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </disabled>
-                </palette>
                </property>
                <property name="autoFillBackground">
                 <bool>true</bool>
@@ -3540,421 +3271,6 @@
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
-               <property name="palette">
-                <palette>
-                 <active>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </active>
-                 <inactive>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </inactive>
-                 <disabled>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </disabled>
-                </palette>
-               </property>
                <property name="autoFillBackground">
                 <bool>true</bool>
                </property>
@@ -3988,421 +3304,6 @@
                  <horstretch>0</horstretch>
                  <verstretch>0</verstretch>
                 </sizepolicy>
-               </property>
-               <property name="palette">
-                <palette>
-                 <active>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </active>
-                 <inactive>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </inactive>
-                 <disabled>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </disabled>
-                </palette>
                </property>
                <property name="autoFillBackground">
                 <bool>true</bool>
@@ -4438,425 +3339,10 @@
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
-               <property name="palette">
-                <palette>
-                 <active>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </active>
-                 <inactive>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </inactive>
-                 <disabled>
-                  <colorrole role="WindowText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Button">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Light">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Midlight">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>235</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Dark">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Mid">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>170</red>
-                     <green>169</green>
-                     <blue>143</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Text">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="BrightText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>255</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ButtonText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>127</red>
-                     <green>127</green>
-                     <blue>107</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Base">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Window">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="Shadow">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="AlternateBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>254</green>
-                     <blue>215</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipBase">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>255</red>
-                     <green>255</green>
-                     <blue>220</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                  <colorrole role="ToolTipText">
-                   <brush brushstyle="SolidPattern">
-                    <color alpha="255">
-                     <red>0</red>
-                     <green>0</green>
-                     <blue>0</blue>
-                    </color>
-                   </brush>
-                  </colorrole>
-                 </disabled>
-                </palette>
-               </property>
                <property name="font">
                 <font>
-                 <family>Arial</family>
                  <pointsize>8</pointsize>
+                 <stylestrategy>PreferAntialias</stylestrategy>
                 </font>
                </property>
                <property name="autoFillBackground">
@@ -4885,37 +3371,23 @@
             </layout>
            </widget>
           </item>
-          <item row="1" column="0">
-           <widget class="QCheckBox" name="checkBox_self_signed">
-            <property name="toolTip">
-             <string extracomment="Accept secure certificates from the game even if they have expired. This presents a security risk"/>
-            </property>
-            <property name="text">
-             <string>Accept self-signed certificates</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QCheckBox" name="checkBox_expired">
-            <property name="toolTip">
-             <string extracomment="Accept secure certificates from the game even if they have expired. This presents a security risk"/>
-            </property>
-            <property name="text">
-             <string>Accept expired certificates</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0" colspan="2">
-           <widget class="QCheckBox" name="checkBox_ignore_all">
-            <property name="toolTip">
-             <string extracomment="Ignore all SSL/TLS errors - this negates the point of a secure connection, use carefully"/>
-            </property>
-            <property name="text">
-             <string>Accept all certificate errors       (unsecure)</string>
-            </property>
-           </widget>
-          </item>
          </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="checkBox_askTlsAvailable">
+         <property name="text">
+          <string>Allow secure connection reminder</string>
+         </property>
+         <property name="toolTip">
+           <string>&lt;p&gt;To encourage enhanced data transfer protection and privacy, be prompted for a choice to switch to an encrypted port when advertised via Mud Server Status Protocol (MSSP).&lt;/p&gt;</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
         </widget>
        </item>
        <item>
@@ -4966,7 +3438,7 @@
           <item row="0" column="3">
            <widget class="QLineEdit" name="lineEdit_proxyUsername">
             <property name="toolTip">
-             <string>Username for logging into the proxy if requred</string>
+             <string>Username for logging into the proxy if required</string>
             </property>
             <property name="text">
              <string/>
@@ -4982,7 +3454,7 @@
           <item row="0" column="4">
            <widget class="QLineEdit" name="lineEdit_proxyPassword">
             <property name="toolTip">
-             <string>Password for logging into the proxy if requred</string>
+             <string>Password for logging into the proxy if required</string>
             </property>
             <property name="echoMode">
              <enum>QLineEdit::Password</enum>
@@ -4996,12 +3468,500 @@
         </widget>
        </item>
        <item>
-        <spacer name="verticalSpacer_connection">
+        <spacer name="verticalSpacer_chat">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
          </property>
          <property name="sizeType">
           <enum>QSizePolicy::Expanding</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tab_shortcuts">
+      <attribute name="title">
+       <string>Shortcuts</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="vBoxLayout_tab_shortcuts">
+       <item>
+        <widget class="QGroupBox" name="groupBox_main_window_shortcuts">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="layoutDirection">
+          <enum>Qt::LeftToRight</enum>
+         </property>
+         <property name="title">
+          <string>Main window shortcuts</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_groupBox_mainWindowShortcuts">
+          <property name="sizeConstraint">
+           <enum>QLayout::SetMinimumSize</enum>
+          </property>
+          <item>
+           <widget class="QLabel" name="label_shortcutsInstructions">
+            <property name="text">
+             <string>To disable shortcut input 'Esc' key.</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QFrame" name="frame_shortcuts">
+            <layout class="QGridLayout" name="gridLayout_groupBox_shortcuts">
+             <property name="horizontalSpacing">
+              <number>20</number>
+             </property>
+            </layout>
+           </widget>
+          </item>
+          <item alignment="Qt::AlignRight">
+           <widget class="QToolButton" name="toolButton_resetMainWindowShortcuts">
+            <property name="text">
+             <string>Reset to defaults</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_shortcuts">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tab_specialOptions">
+      <attribute name="title">
+       <string>Special Options</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="vBoxLayout_tab_specialOptions">
+       <item>
+        <widget class="QGroupBox" name="groupBox_specialOptions">
+         <property name="title">
+          <string>Special options needed for some older game drivers (needs client restart to take effect)</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_groupBox_specialOptions">
+          <item row="0" column="0">
+           <widget class="QCheckBox" name="mFORCE_MCCP_OFF">
+            <property name="text">
+             <string>Force compression off</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QCheckBox" name="checkBox_mUSE_FORCE_LF_AFTER_PROMPT">
+            <property name="toolTip">
+             <string>This option adds a line line break &lt;LF&gt; or &quot;
+&quot; to your command input on empty commands. This option will rarely be necessary.</string>
+            </property>
+            <property name="text">
+             <string>Force new line on empty commands</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QCheckBox" name="mFORCE_GA_OFF">
+            <property name="text">
+             <string>Force telnet GA signal interpretation off</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QCheckBox" name="mFORCE_MXP_NEGOTIATION_OFF">
+            <property name="text">
+             <string>Force MXP negotiation off</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QCheckBox" name="mFORCE_CHARSET_NEGOTIATION_OFF">
+            <property name="text">
+             <string>Force CHARSET negotiation off</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0" colspan="2">
+           <widget class="QLabel" name="need_reconnect_for_specialoption">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="font">
+             <font>
+              <pointsize>8</pointsize>
+             </font>
+            </property>
+            <property name="mouseTracking">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>Please reconnect to your game for the change to take effect</string>
+            </property>
+            <property name="textFormat">
+             <enum>Qt::AutoText</enum>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox_purgeMediaCache">
+         <property name="title">
+          <string>Clear stored media</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_groupBox_purgeMediaCache">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_purgeMediaCache">
+            <property name="toolTip">
+             <string>&lt;p&gt;Media files used with Mudlet's Lua API, Mud Client Media Protocol (MCMP), and Mud Sound Protocol (MSP) are cached with the game profile. You can press this button to clear the media cache. For many games the media will get downloaded again upon demand.&lt;/p&gt;</string>
+            </property>
+            <property name="text">
+             <string>Purge stored media files for the current profile:</string>
+            </property>
+            <property name="buddy">
+             <cstring>buttonPurgeMediaCache</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QPushButton" name="buttonPurgeMediaCache">
+            <property name="toolTip">
+             <string>&lt;p&gt;Media files used with Mudlet's Lua API, Mud Client Media Protocol (MCMP), and Mud Sound Protocol (MSP) are cached with the game profile. You can press this button to clear the media cache. For many games the media will get downloaded again upon demand.&lt;/p&gt;</string>
+            </property>
+            <property name="text">
+             <string>Clear</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox_updates">
+         <property name="title">
+          <string>Mudlet updates</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_groupBox_updates">
+          <item row="0" column="0">
+           <widget class="QCheckBox" name="checkbox_noAutomaticUpdates">
+            <property name="text">
+             <string>Disable automatic updates</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupbox_searchEngineSelection">
+         <property name="title">
+          <string>Search Engine</string>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_searchEngineSelection">
+          <item>
+           <widget class="QComboBox" name="search_engine_combobox"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox_debug">
+         <property name="title">
+          <string>Other Special options</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_groupBox_debug">
+          <item row="0" column="0">
+           <widget class="QCheckBox" name="checkBox_showIconsOnMenus">
+            <property name="text">
+             <string>Show icons on menus</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+            <property name="tristate">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QCheckBox" name="checkBox_expectCSpaceIdInColonLessMColorCode">
+            <property name="toolTip">
+             <string>&lt;p&gt;Some MUDs use a flawed interpretation of the ANSI Set Graphics Rendition (&lt;b&gt;SGR&lt;/b&gt;) code sequences for 16M color mode which only uses semi-colons and not colons to separate parameter elements i.e. instead of using a code in the form: &lt;br&gt;&lt;tt&gt;\e[&lt;/tt&gt;...&lt;tt&gt;38:2:&lt;/tt&gt;&amp;lt;Color Space Id&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Red&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Green&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Blue&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Unused&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Tolerance&amp;gt;&lt;tt&gt;:&lt;/tt&gt;&amp;lt;Tolerance Color Space (0=CIELUV; 1=CIELAB)&amp;gt;&lt;tt&gt;;&lt;/tt&gt;...&lt;tt&gt;m&lt;/tt&gt;&lt;br&gt;where the &lt;i&gt;Color Space Id&lt;/i&gt; is expected to be an empty string to specify the usual (default) case and all of the &lt;i&gt;Parameter Elements&lt;/i&gt; (the &quot;2&quot; and the values in the &lt;tt&gt;&amp;lt;...&amp;gt;&lt;/tt&gt;s) may, technically, be omitted; they use: &lt;br&gt;&lt;tt&gt;\e[&lt;/tt&gt;...&lt;tt&gt;38;2;&lt;/tt&gt;&amp;lt;Red&amp;gt;&lt;tt&gt;;&lt;/tt&gt;&amp;lt;Green&amp;gt;&lt;tt&gt;;&lt;/tt&gt;&amp;lt;Blue&amp;gt;&lt;tt&gt;;&lt;/tt&gt;...&lt;tt&gt;m&lt;/tt&gt;&lt;br&gt;or: &lt;br&gt;&lt;tt&gt;\e[&lt;/tt&gt;...&lt;tt&gt;38;2;&lt;/tt&gt;&amp;lt;Color Space Id&amp;gt;&lt;tt&gt;;&lt;/tt&gt;&amp;lt;Red&amp;gt;&lt;tt&gt;;&lt;/tt&gt;&amp;lt;Green&amp;gt;&lt;tt&gt;;&lt;/tt&gt;&amp;lt;Blue&amp;gt;&lt;tt&gt;;&lt;/tt&gt;...&lt;tt&gt;m&lt;/tt&gt;&lt;/p&gt;&lt;p&gt;It is not possible to reliably detect the difference between these two so checking this option causes Mudlet to expect the last one with the additional (but empty!) parameter.&lt;/p&gt;</string>
+            </property>
+            <property name="text">
+             <string>Expect Color Space Id in SGR...(3|4)8;2;...m codes</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_store_passwords_in">
+            <property name="text">
+             <string>Store character login passwords in:</string>
+            </property>
+            <property name="buddy">
+             <cstring>comboBox_store_passwords_in</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QComboBox" name="comboBox_store_passwords_in">
+            <item>
+             <property name="text">
+              <string>the computer's password manager (secure)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>plaintext with the profile (portable)</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="2">
+           <widget class="QLabel" name="label_password_migration_notification">
+            <property name="font">
+             <font>
+              <pointsize>8</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string notr="true" extracomment="This text does not need to be translated as it is overwritten when used by the associated C++ class dlgProfilePreferences">{Password migration message to be inserted here}</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0" colspan="2">
+           <widget class="QWidget" name="widget_timerDebugOutputMinimumInterval" native="true">
+            <layout class="QHBoxLayout" name="horizontalLayout_timerDebugOutputMinimumInterval" stretch="0,1">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_timerDebugOutputMinimumInterval">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                 <horstretch>1</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="toolTip">
+                <string comment="The term in '...' refer to a Mudlet specific thing and ought to match the corresponding translation elsewhere.">&lt;p&gt;Show 'LUA OK' messages for Timers with the specified minimum interval (h:mm:ss.zzz), the minimum value (the default) shows all such messages but can render the &lt;i&gt;Central Debug Console&lt;/i&gt; useless if there is a very small interval timer running.&lt;/p&gt;</string>
+               </property>
+               <property name="text">
+                <string>Show debug messages for timers not smaller than:</string>
+               </property>
+               <property name="buddy">
+                <cstring>timeEdit_timerDebugOutputMinimumInterval</cstring>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QTimeEdit" name="timeEdit_timerDebugOutputMinimumInterval">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="wrapping">
+                <bool>true</bool>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+               </property>
+               <property name="buttonSymbols">
+                <enum>QAbstractSpinBox::PlusMinus</enum>
+               </property>
+               <property name="accelerated">
+                <bool>true</bool>
+               </property>
+               <property name="showGroupSeparator" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="currentSection">
+                <enum>QDateTimeEdit::HourSection</enum>
+               </property>
+               <property name="displayFormat">
+                <string comment="Used to set a time interval only">h:mm:ss.zzz</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item row="5" column="0">
+           <widget class="QCheckBox" name="checkBox_debugShowAllCodepointProblems">
+            <property name="toolTip">
+             <string>&lt;p&gt;If checked this will cause all problem Unicode codepoints to be reported in the debug output as they occur; if cleared then each different one will only be reported once and summarized in as a table when the console in which they occurred is finally destroyed (when the profile is closed).&lt;/p&gt;</string>
+            </property>
+            <property name="text">
+             <string>Report all Codepoint problems immediately</string>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="0">
+           <widget class="QLabel" name="label_networkPacketTimeout">
+            <property name="text">
+             <string>Additional text wait time:</string>
+            </property>
+            <property name="buddy">
+             <cstring>doubleSpinBox_networkPacketTimeout</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="1">
+           <widget class="QDoubleSpinBox" name="doubleSpinBox_networkPacketTimeout">
+            <property name="toolTip">
+             <string>&lt;p&gt;&lt;i&gt;Go-Ahead&lt;/i&gt; (&lt;tt&gt;GA&lt;/tt&gt;) and &lt;i&gt;End-of-record&lt;/i&gt; (&lt;tt&gt;EOR&lt;/tt&gt;) signalling tells Mudlet when the game server is done sending text. On games that do not provide &lt;tt&gt;GA&lt;/tt&gt; or &lt;tt&gt;EOR&lt;/tt&gt;, this option controls how long Mudlet will wait for more text to arrive. Greater values will help reduce the risk that Mudlet will split a large piece of text (with unintended line-breaks in the middle) which can stop some triggers from working. Lesser values increases the risk of text getting broken up, but may make the game feel more responsive.&lt;/p&gt;&lt;p&gt;&lt;i&gt;The default value, which was what Mudlet used before this control was added, is 0.300 Seconds.&lt;/i&gt;&lt;/p&gt;</string>
+            </property>
+            <property name="suffix">
+             <string extracomment="For most locales a space should be included so that the text is separated from the number!"> seconds</string>
+            </property>
+            <property name="decimals">
+             <number>3</number>
+            </property>
+            <property name="minimum">
+             <double>0.010000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>0.500000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.010000000000000</double>
+            </property>
+            <property name="value">
+             <double>0.300000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox">
+         <property name="title">
+          <string>Accessibility</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout">
+          <item row="0" column="0" colspan="2">
+           <widget class="QCheckBox" name="checkBox_announceIncomingText">
+            <property name="toolTip">
+             <string>On some platforms, like macOS, the screen reader tool has issues announcing incoming text fully, without skipping. You can opt into disabling announcing new text from the game with this option to use a custom TTS instead which avoids such issues</string>
+            </property>
+            <property name="text">
+             <string>Announce incoming text in screen reader</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QComboBox" name="comboBox_blankLinesBehaviour">
+            <item>
+             <property name="text">
+              <string>show them</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>hide them</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>replace with a space</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_blankLinesBehaviour">
+            <property name="text">
+             <string>When the game sends blank lines:</string>
+            </property>
+            <property name="buddy">
+             <cstring>comboBox_blankLinesBehaviour</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_caretModeKey">
+            <property name="text">
+             <string>Switch between input line and main window using:</string>
+            </property>
+            <property name="buddy">
+             <cstring>comboBox_caretModeKey</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QComboBox" name="comboBox_caretModeKey">
+            <item>
+             <property name="text">
+              <string>no key</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Tab</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Ctrl+Tab</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>F6</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_specialOptions">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -5068,145 +4028,168 @@
   </customwidget>
  </customwidgets>
  <tabstops>
-  <tabstop>show_sent_text_checkbox</tabstop>
-  <tabstop>command_separator_lineedit</tabstop>
   <tabstop>tabWidget</tabstop>
   <tabstop>closeButton</tabstop>
   <tabstop>MainIconSize</tabstop>
-  <tabstop>TEFolderIconSize</tabstop>
   <tabstop>comboBox_menuBarVisibility</tabstop>
+  <tabstop>TEFolderIconSize</tabstop>
   <tabstop>comboBox_toolBarVisibility</tabstop>
   <tabstop>comboBox_guiLanguage</tabstop>
   <tabstop>comboBox_encoding</tabstop>
   <tabstop>mAlertOnNewData</tabstop>
   <tabstop>mFORCE_SAVE_ON_EXIT</tabstop>
+  <tabstop>comboBox_appearance</tabstop>
   <tabstop>acceptServerGUI</tabstop>
+  <tabstop>acceptServerMedia</tabstop>
   <tabstop>mEnableGMCP</tabstop>
   <tabstop>mEnableMSDP</tabstop>
   <tabstop>mEnableMSSP</tabstop>
+  <tabstop>mEnableMSP</tabstop>
   <tabstop>mIsToLogInHtml</tabstop>
-  <tabstop>mIsLoggingTimestamps</tabstop>
   <tabstop>lineEdit_logFileFolder</tabstop>
-  <tabstop>pushButton_whereToLog</tabstop>
-  <tabstop>pushButton_resetLogDir</tabstop>
   <tabstop>comboBox_logFileNameFormat</tabstop>
   <tabstop>lineEdit_logFileName</tabstop>
+  <tabstop>mIsLoggingTimestamps</tabstop>
+  <tabstop>pushButton_whereToLog</tabstop>
+  <tabstop>pushButton_resetLogDir</tabstop>
   <tabstop>USE_UNIX_EOL</tabstop>
   <tabstop>auto_clear_input_line_checkbox</tabstop>
+  <tabstop>show_sent_text_checkbox</tabstop>
+  <tabstop>checkBox_highlightHistory</tabstop>
   <tabstop>checkBox_runAllKeyBindings</tabstop>
+  <tabstop>command_separator_lineedit</tabstop>
   <tabstop>commandLineMinimumHeight</tabstop>
   <tabstop>checkBox_spellCheck</tabstop>
   <tabstop>dictList</tabstop>
   <tabstop>radioButton_userDictionary_profile</tabstop>
   <tabstop>radioButton_userDictionary_common</tabstop>
   <tabstop>fontComboBox</tabstop>
-  <tabstop>fontSize</tabstop>
   <tabstop>mNoAntiAlias</tabstop>
+  <tabstop>fontSize</tabstop>
   <tabstop>topBorderHeight</tabstop>
-  <tabstop>leftBorderWidth</tabstop>
   <tabstop>bottomBorderHeight</tabstop>
+  <tabstop>leftBorderWidth</tabstop>
   <tabstop>rightBorderWidth</tabstop>
   <tabstop>wrap_at_spinBox</tabstop>
   <tabstop>indent_wrapped_spinBox</tabstop>
   <tabstop>doubleclick_ignore_lineedit</tabstop>
   <tabstop>checkBox_USE_IRE_DRIVER_BUGFIX</tabstop>
-  <tabstop>checkBox_showSpacesAndTabs</tabstop>
   <tabstop>checkBox_USE_SMALL_SCREEN</tabstop>
-  <tabstop>checkBox_showLineFeedsAndParagraphs</tabstop>
   <tabstop>checkBox_echoLuaErrors</tabstop>
-  <tabstop>checkBox_useWideAmbiguousEastAsianGlyphs</tabstop>
   <tabstop>checkBox_enableTextAnalyzer</tabstop>
-  <tabstop>timeEdit_timerDebugOutputMinimumInterval</tabstop>
+  <tabstop>checkBox_showSpacesAndTabs</tabstop>
+  <tabstop>checkBox_showLineFeedsAndParagraphs</tabstop>
+  <tabstop>checkBox_useWideAmbiguousEastAsianGlyphs</tabstop>
+  <tabstop>comboBox_controlCharacterHandling</tabstop>
   <tabstop>code_editor_theme_selection_combobox</tabstop>
   <tabstop>script_preview_combobox</tabstop>
   <tabstop>checkBox_autocompleteLuaCode</tabstop>
+  <tabstop>checkBox_showBidi</tabstop>
   <tabstop>pushButton_foreground_color</tabstop>
-  <tabstop>pushButton_background_color</tabstop>
   <tabstop>pushButton_command_line_foreground_color</tabstop>
-  <tabstop>pushButton_command_line_background_color</tabstop>
   <tabstop>pushButton_command_foreground_color</tabstop>
-  <tabstop>pushButton_command_background_color</tabstop>
   <tabstop>pushButton_black</tabstop>
-  <tabstop>pushButton_lBlack</tabstop>
   <tabstop>pushButton_red</tabstop>
-  <tabstop>pushButton_lRed</tabstop>
   <tabstop>pushButton_green</tabstop>
-  <tabstop>pushButton_lGreen</tabstop>
   <tabstop>pushButton_yellow</tabstop>
-  <tabstop>pushButton_lYellow</tabstop>
   <tabstop>pushButton_blue</tabstop>
-  <tabstop>pushButton_lBlue</tabstop>
   <tabstop>pushButton_magenta</tabstop>
-  <tabstop>pushButton_lMagenta</tabstop>
   <tabstop>pushButton_cyan</tabstop>
-  <tabstop>pushButton_lCyan</tabstop>
   <tabstop>pushButton_white</tabstop>
+  <tabstop>checkBox_allowServerToRedefineColors</tabstop>
+  <tabstop>pushButton_background_color</tabstop>
+  <tabstop>pushButton_command_line_background_color</tabstop>
+  <tabstop>pushButton_command_background_color</tabstop>
+  <tabstop>pushButton_lBlack</tabstop>
+  <tabstop>pushButton_lRed</tabstop>
+  <tabstop>pushButton_lGreen</tabstop>
+  <tabstop>pushButton_lYellow</tabstop>
+  <tabstop>pushButton_lBlue</tabstop>
+  <tabstop>pushButton_lMagenta</tabstop>
+  <tabstop>pushButton_lCyan</tabstop>
   <tabstop>pushButton_lWhite</tabstop>
   <tabstop>pushButton_resetColors</tabstop>
-  <tabstop>checkBox_allowServerToRedefineColors</tabstop>
   <tabstop>pushButton_saveMap</tabstop>
   <tabstop>pushButton_loadMap</tabstop>
-  <tabstop>checkBox_reportMapIssuesOnScreen</tabstop>
+  <tabstop>pushButton_deleteMap</tabstop>
   <tabstop>pushButton_chooseProfiles</tabstop>
-  <tabstop>pushButton_copyMap</tabstop>
   <tabstop>comboBox_mapFileSaveFormatVersion</tabstop>
+  <tabstop>checkBox_reportMapIssuesOnScreen</tabstop>
+  <tabstop>checkBox_enablMapDeleteButton</tabstop>
+  <tabstop>pushButton_copyMap</tabstop>
   <tabstop>buttonDownloadMap</tabstop>
-  <tabstop>comboBox</tabstop>
   <tabstop>mMapperUseAntiAlias</tabstop>
-  <tabstop>checkBox_showDefaultArea</tabstop>
-  <tabstop>fontComboBox_mapSymbols</tabstop>
+  <tabstop>checkbox_mMapperShowRoomBorders</tabstop>
   <tabstop>checkBox_isOnlyMapSymbolFontToBeUsed</tabstop>
+  <tabstop>comboBox_playerRoomStyle</tabstop>
+  <tabstop>checkBox_showDefaultArea</tabstop>
+  <tabstop>checkBox_largeAreaExitArrows</tabstop>
+  <tabstop>fontComboBox_mapSymbols</tabstop>
   <tabstop>pushButton_showGlyphUsage</tabstop>
+  <tabstop>pushButton_playerRoomPrimaryColor</tabstop>
+  <tabstop>spinBox_playerRoomOuterDiameter</tabstop>
+  <tabstop>pushButton_playerRoomSecondaryColor</tabstop>
+  <tabstop>spinBox_playerRoomInnerDiameter</tabstop>
   <tabstop>pushButton_foreground_color_2</tabstop>
+  <tabstop>pushButton_roomBorderColor</tabstop>
   <tabstop>pushButton_background_color_2</tabstop>
+  <tabstop>pushButton_mapInfoBg</tabstop>
   <tabstop>pushButton_black_2</tabstop>
-  <tabstop>pushButton_Lblack_2</tabstop>
   <tabstop>pushButton_red_2</tabstop>
-  <tabstop>pushButton_Lred_2</tabstop>
   <tabstop>pushButton_green_2</tabstop>
-  <tabstop>pushButton_Lgreen_2</tabstop>
   <tabstop>pushButton_yellow_2</tabstop>
-  <tabstop>pushButton_Lyellow_2</tabstop>
   <tabstop>pushButton_blue_2</tabstop>
-  <tabstop>pushButton_Lblue_2</tabstop>
   <tabstop>pushButton_magenta_2</tabstop>
-  <tabstop>pushButton_Lmagenta_2</tabstop>
   <tabstop>pushButton_cyan_2</tabstop>
-  <tabstop>pushButton_Lcyan_2</tabstop>
   <tabstop>pushButton_white_2</tabstop>
+  <tabstop>pushButton_Lblack_2</tabstop>
+  <tabstop>pushButton_Lred_2</tabstop>
+  <tabstop>pushButton_Lgreen_2</tabstop>
+  <tabstop>pushButton_Lyellow_2</tabstop>
+  <tabstop>pushButton_Lblue_2</tabstop>
+  <tabstop>pushButton_Lmagenta_2</tabstop>
+  <tabstop>pushButton_Lcyan_2</tabstop>
   <tabstop>pushButton_Lwhite_2</tabstop>
   <tabstop>reset_colors_button_2</tabstop>
-  <tabstop>mFORCE_MCCP_OFF</tabstop>
-  <tabstop>mFORCE_GA_OFF</tabstop>
-  <tabstop>checkBox_mUSE_FORCE_LF_AFTER_PROMPT</tabstop>
-  <tabstop>mFORCE_MXP_NEGOTIATION_OFF</tabstop>
+  <tabstop>ircHostName</tabstop>
+  <tabstop>ircNick</tabstop>
+  <tabstop>ircPassword</tabstop>
+  <tabstop>ircHostSecure</tabstop>
+  <tabstop>ircHostPort</tabstop>
+  <tabstop>ircChannels</tabstop>
   <tabstop>comboBox_discordLargeIconPrivacy</tabstop>
-  <tabstop>checkBox_discordServerAccessToDetail</tabstop>
   <tabstop>comboBox_discordSmallIconPrivacy</tabstop>
-  <tabstop>checkBox_discordServerAccessToState</tabstop>
   <tabstop>checkBox_discordServerAccessToPartyInfo</tabstop>
-  <tabstop>checkBox_discordServerAccessToTimerInfo</tabstop>
   <tabstop>checkBox_discordLuaAPI</tabstop>
   <tabstop>lineEdit_discordUserName</tabstop>
+  <tabstop>checkBox_discordServerAccessToDetail</tabstop>
+  <tabstop>checkBox_discordServerAccessToState</tabstop>
+  <tabstop>checkBox_discordServerAccessToTimerInfo</tabstop>
   <tabstop>lineEdit_discordUserDiscriminator</tabstop>
-  <tabstop>ircHostName</tabstop>
-  <tabstop>ircHostPort</tabstop>
-  <tabstop>ircNick</tabstop>
-  <tabstop>ircChannels</tabstop>
-  <tabstop>checkbox_noAutomaticUpdates</tabstop>
-  <tabstop>search_engine_combobox</tabstop>
-  <tabstop>checkBox_showIconsOnMenus</tabstop>
-  <tabstop>checkBox_expectCSpaceIdInColonLessMColorCode</tabstop>
-  <tabstop>comboBox_store_passwords_in</tabstop>
   <tabstop>groupBox_ssl</tabstop>
   <tabstop>checkBox_self_signed</tabstop>
-  <tabstop>checkBox_expired</tabstop>
   <tabstop>checkBox_ignore_all</tabstop>
+  <tabstop>checkBox_expired</tabstop>
+  <tabstop>checkBox_askTlsAvailable</tabstop>
   <tabstop>groupBox_proxy</tabstop>
   <tabstop>lineEdit_proxyAddress</tabstop>
   <tabstop>lineEdit_proxyPort</tabstop>
   <tabstop>lineEdit_proxyUsername</tabstop>
   <tabstop>lineEdit_proxyPassword</tabstop>
+  <tabstop>toolButton_resetMainWindowShortcuts</tabstop>
+  <tabstop>mFORCE_MCCP_OFF</tabstop>
+  <tabstop>mFORCE_GA_OFF</tabstop>
+  <tabstop>mFORCE_CHARSET_NEGOTIATION_OFF</tabstop>
+  <tabstop>checkBox_mUSE_FORCE_LF_AFTER_PROMPT</tabstop>
+  <tabstop>mFORCE_MXP_NEGOTIATION_OFF</tabstop>
+  <tabstop>checkbox_noAutomaticUpdates</tabstop>
+  <tabstop>search_engine_combobox</tabstop>
+  <tabstop>checkBox_showIconsOnMenus</tabstop>
+  <tabstop>checkBox_debugShowAllCodepointProblems</tabstop>
+  <tabstop>checkBox_expectCSpaceIdInColonLessMColorCode</tabstop>
+  <tabstop>comboBox_store_passwords_in</tabstop>
+  <tabstop>timeEdit_timerDebugOutputMinimumInterval</tabstop>
+  <tabstop>doubleSpinBox_networkPacketTimeout</tabstop>
  </tabstops>
  <resources>
   <include location="../mudlet.qrc"/>

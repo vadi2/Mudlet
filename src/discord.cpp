@@ -1,6 +1,7 @@
 /***************************************************************************
  *   Copyright (C) 2018 by Vadim Peretokin - vperetokin@gmail.com          *
- *   Copyright (C) 2018 by Stephen Lyons - slysven@virginmedia.com         *
+ *   Copyright (C) 2018-2019, 2022 by Stephen Lyons                        *
+ *                                               - slysven@virginmedia.com *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -27,20 +28,20 @@
 #include <string.h>
 #include "post_guard.h"
 
-QReadWriteLock Discord::smReadWriteLock;
+// Uncomment this to provide some additional qDebug() output:
+// #define DEBUG_DISCORD 1
 
 QString Discord::smUserName;
 QString Discord::smUserId;
 QString Discord::smDiscriminator;
 QString Discord::smAvatar;
-const QString Discord::mMudletApplicationId = QStringLiteral("450571881909583884");
+const QString Discord::mMudletApplicationId = qsl("450571881909583884");
 
 Discord::Discord(QObject* parent)
 : QObject(parent)
-, mLoaded{}
-// For details see https://discordapp.com/developers/docs/rich-presence/how-to#initialization
+// For details see https://discord.com/developers/docs/rich-presence/how-to#initialization
 // Initialise with a nullptr one with Mudlet's own ID
-// N. B. for testing the following MUDs have registered:
+// NB: for testing the following MUDs have registered:
 // "midmud"  is "460618737712889858", has "server-icon", "exventure" and "mudlet" icons
 // "carinus" is "438335628942376960", has "server-icon" and "mudlet" icons
 // "wotmud"  is "464945517156106240", has "mudlet", "ajar_(red|green|yellow|blue|white|grey|brown)"
@@ -52,14 +53,27 @@ Discord::Discord(QObject* parent)
               {"luminari", {"luminarimud.com"}},
               {"achaea", {"achaea.com", "iron-ach.ironrealms.com"}},
               {"aetolia", {"aetolia.com", "iron-aet.ironrealms.com"}},
-              {"imperian", {"imperian.com", " iron-imp.ironrealms.com"}},
+              {"imperian", {"imperian.com", "iron-imp.ironrealms.com"}},
               {"lusternia", {"lusternia.com", "iron-lus.ironrealms.com"}},
               {"starmourn", {"starmourn.com"}},
-              {"stickmud", {"stickmud.com"}}}
+              {"stickmud", {"stickmud.com"}},
+              {"clessidra", {"clessidra.it", "mud.clessidra.it"}},
+              {"mume", {"mume.org"}},
+              {"asteria", {"asteriamud.com"}},
+            }
 {
-    mpLibrary.reset(new QLibrary(QStringLiteral("discord-rpc")));
+#if defined(Q_OS_WIN64)
+    // Only defined on 64 bit Windows
+    mpLibrary.reset(new QLibrary(qsl("discord-rpc64")));
+#elif defined(Q_OS_WIN32)
+    // Defined on both 32 and 64 bit Windows
+    mpLibrary.reset(new QLibrary(qsl("discord-rpc32")));
+#else
+    // All other OSes
+    mpLibrary.reset(new QLibrary(qsl("discord-rpc")));
+#endif
 
-    using Discord_InitializePrototype = void (*)(const char*, DiscordEventHandlers*, int);
+    using Discord_InitializePrototype = void (*)(const char*, DiscordEventHandlers*, int, const char*);
     using Discord_UpdatePresencePrototype = void (*)(const DiscordRichPresence*);
     using Discord_RunCallbacksPrototype = void (*)();
     using Discord_ShutdownPrototype = void (*)();
@@ -69,10 +83,15 @@ Discord::Discord(QObject* parent)
     Discord_RunCallbacks = reinterpret_cast<Discord_RunCallbacksPrototype>(mpLibrary->resolve("Discord_RunCallbacks"));
     Discord_Shutdown = reinterpret_cast<Discord_ShutdownPrototype>(mpLibrary->resolve("Discord_Shutdown"));
 
-    if (!Discord_Initialize || !Discord_UpdatePresence || !Discord_RunCallbacks || !Discord_Shutdown) {
-        qDebug() << "Could not find Discord library - searched in:";
-        for (auto& libraryPath : qApp->libraryPaths()) {
+    if (!mpLibrary->isLoaded() || !Discord_Initialize || !Discord_UpdatePresence || !Discord_RunCallbacks || !Discord_Shutdown) {
+        const auto msg = mpLibrary->errorString();
+        auto notFound = msg.contains(qsl("not found")) || msg.contains(qsl("No such file or directory"));
+        qDebug().nospace() << "Could not " << (notFound ? "find" : "load") << " Discord library - searched in:";
+        for (const auto& libraryPath : qApp->libraryPaths()) {
             qDebug() << "    " << libraryPath;
+        }
+        if (!msg.isEmpty() && !notFound) {
+            qDebug().noquote().nospace() << "  error: \"" << msg << "\".";
         }
         return;
     }
@@ -90,7 +109,7 @@ Discord::Discord(QObject* parent)
     mpHandlers->joinRequest = handleDiscordJoinRequest;
 
     // Initialise the default Mudlet presence
-    Discord_Initialize(mHostApplicationIDs.value(nullptr).toUtf8().constData(), mpHandlers, 0);
+    Discord_Initialize(mHostApplicationIDs.value(nullptr).toUtf8().constData(), mpHandlers, 0, nullptr);
 
     // mudlet instance is not available in this constructor as it's still being initialised, so postpone the connection
     QTimer::singleShot(0, [this]() {
@@ -249,13 +268,14 @@ void Discord::timerEvent(QTimerEvent* event)
 
 void Discord::handleDiscordReady(const DiscordUser* request)
 {
-    Discord::smReadWriteLock.lockForWrite(); // Will block until gets lock
-    Discord::smUserName = QString::fromUtf8(request->username);
-    Discord::smUserId = QString::fromUtf8(request->userId);
-    Discord::smDiscriminator = QString::fromUtf8(request->discriminator);
-    Discord::smAvatar = QString::fromUtf8(request->avatar);
-    Discord::smReadWriteLock.unlock();
+    Discord::smUserName = request->username;
+    Discord::smUserId = request->userId;
+    Discord::smDiscriminator = request->discriminator;
+    Discord::smAvatar = request->avatar;
 
+#if defined(DEBUG_DISCORD)
+    qDebug().noquote().nospace() << "Discord Ready callback received - for UserName: \"" << smUserName << "\", ID: \"" << smUserId << "#" << smDiscriminator << "\".";
+#endif
     // don't call UpdatePresence from here - freezes Mudlet deep in the Discord API
     // when profile autostart is enabled
 }
@@ -263,14 +283,8 @@ void Discord::handleDiscordReady(const DiscordUser* request)
 QStringList Discord::getDiscordUserDetails() const
 {
     QStringList results;
-    if (Discord::smReadWriteLock.tryLockForRead()) {
-        results << Discord::smUserName << Discord::smUserId << Discord::smDiscriminator << Discord::smAvatar;
-        // Make a deep copy whilst we hold a lock on the details to avoid the
-        // writer {handleDiscordReady(...)} having to invoking the C-o-W itself.
-        results.detach();
-        Discord::smReadWriteLock.unlock();
-    }
-
+    results << Discord::smUserName << Discord::smUserId << Discord::smDiscriminator << Discord::smAvatar;
+    results.detach();
     return results;
 }
 
@@ -309,7 +323,11 @@ void Discord::UpdatePresence()
     auto pHost = mudlet::self()->getActiveHost();
     if (!pHost) {
         localDiscordPresence tempPresence;
-        tempPresence.setLargeImageKey(QStringLiteral("mudlet"));
+        tempPresence.setLargeImageKey(qsl("mudlet"));
+        tempPresence.setDetailText(qsl("www.mudlet.org"));
+#if defined(DEBUG_DISCORD)
+        qDebug().nospace().noquote() << "Discord::UpdatePresence() INFO - no current active Host instance, sending update using built-in Mudlet ApplicationID:\n" << tempPresence;
+#endif
         DiscordRichPresence convertedPresence(tempPresence.convert());
         Discord_UpdatePresence(&convertedPresence);
 
@@ -319,6 +337,9 @@ void Discord::UpdatePresence()
     if (!pHost->discordUserIdMatch(Discord::smUserName, Discord::smDiscriminator)) {
         // Oh dear - the current Discord User does not match the required user
         // details (if set) - must abort
+#if defined(DEBUG_DISCORD)
+        qDebug().nospace().noquote() << "Discord::UpdatePresence() INFO - Discord UserName/Discriminator does not match, not sending this update!";
+#endif
         return;
     }
 
@@ -355,10 +376,20 @@ void Discord::UpdatePresence()
     if (mCurrentApplicationId != applicationID) {
         // It has changed - must shutdown and reopen the library instance with
         // the alternate application id:
+#if defined(DEBUG_DISCORD)
+        qDebug().nospace().noquote() << "Discord::UpdatePresence() INFO - mCurrentApplicationId (\"" << mCurrentApplicationId << "\") does not match the one for this Host instance (\"" << applicationID << "\"), restarting RPC library with the latter.";
+#endif
         Discord_Shutdown();
 
-        Discord_Initialize(applicationID.toUtf8().constData(), mpHandlers, 0);
+        Discord_Initialize(applicationID.toUtf8().constData(), mpHandlers, 0, nullptr);
         mCurrentApplicationId = applicationID;
+    }
+
+    // Coverity thinks that pDiscordPresence could be a nullptr here, which
+    // would be bad {CID 1473922} so let's test for that and abort:
+    if (!pDiscordPresence) {
+        qCritical().noquote() << "Discord::UpdatePresence() CRITICAL - pDiscordPresence is unexpectedly a nullptr, unable to proceed with this procedure, please report this to Mudlet Makers!";
+        return;
     }
 
     if (pHost->mDiscordAccessFlags & Host::DiscordSetDetail) {
@@ -376,7 +407,7 @@ void Discord::UpdatePresence()
     if (pHost->mDiscordAccessFlags & Host::DiscordSetLargeIcon) {
         auto image = mLargeImages.value(pHost);
         if (image.isEmpty() && applicationID == mMudletApplicationId) {
-            image = QStringLiteral("mudlet");
+            image = qsl("mudlet");
         }
         pDiscordPresence->setLargeImageKey(image);
     } else {
@@ -422,6 +453,9 @@ void Discord::UpdatePresence()
         pDiscordPresence->setStartTimeStamp(0);
     }
 
+#if defined(DEBUG_DISCORD)
+    qDebug().nospace().noquote() << "Discord::UpdatePresence() INFO - sending update:\n" << *pDiscordPresence;
+#endif
     // Convert our stored presence into the format that the RPC library wants:
     DiscordRichPresence convertedPresence(pDiscordPresence->convert());
     Discord_UpdatePresence(&convertedPresence);
@@ -431,7 +465,7 @@ QString Discord::deduceGameName(const QString& address)
 {
     // Handle using localhost as an off-line testing case
     if (address == QLatin1String("localhost") || address == QLatin1String("127.0.0.1") || address == QLatin1String("::1")) {
-        return QStringLiteral("localhost");
+        return qsl("localhost");
     }
 
     // Handle the cases where the server url contains the "well-known" Server
@@ -454,7 +488,7 @@ QString Discord::deduceGameName(const QString& address)
         fragments.removeLast();
         otherName = fragments.join(QLatin1String("."));
         if (otherName.startsWith(QLatin1String("game."))) {
-            // WoTMUD type case - so take remaing term in the middle of original
+            // WoTMUD type case - so take remaining term in the middle of original
             otherName = otherName.split(QChar('.')).last();
             break;
         } else if (otherName.startsWith(QLatin1String("www."))) {
@@ -475,9 +509,9 @@ QString Discord::deduceGameName(const QString& address)
         break;
     }
 
-    if (address.endsWith(QStringLiteral(".com"))) {
+    if (address.endsWith(qsl(".com"))) {
         otherName = address.left(address.length() - 4);
-    } else if (address.endsWith(QStringLiteral(".de"))) {
+    } else if (address.endsWith(qsl(".de"))) {
         // Handle avalon.de case
         otherName = address.left(address.length() - 4);
     }
@@ -553,6 +587,21 @@ bool Discord::setApplicationID(Host* pHost, const QString& text)
     } else {
         return false;
     }
+}
+
+void Discord::resetData(Host* pHost){
+    mStartTimes.remove(pHost);
+    mEndTimes.remove(pHost);
+    mDetailTexts[pHost] = qsl("www.mudlet.org");
+    mStateTexts.remove(pHost);
+    mLargeImages.remove(pHost);
+    mLargeImageTexts.remove(pHost);
+    mSmallImages.remove(pHost);
+    mSmallImageTexts.remove(pHost);
+    mPartySize.remove(pHost);
+    mPartyMax.remove(pHost);
+    mHostApplicationIDs.remove(pHost);
+    UpdatePresence();
 }
 
 // Returns Host set app ID or the default Mudlet one if none set for the

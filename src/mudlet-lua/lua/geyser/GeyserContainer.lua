@@ -43,8 +43,8 @@
 -- @field windows This is an ordered list of the names of the window held by this container.
 -- @field fontSize The default size font used when calculating dimensions
 --                 based on the character constraint. Default is 8.
--- @field h_policy This sets if this widget should be stretched/shrinked horizontally or not
--- @field v_policy This sets if this widget should be stretched/shrinked vertically or not
+-- @field h_policy This sets if this widget should be stretched/shrunk horizontally or not
+-- @field v_policy This sets if this widget should be stretched/shrunk vertically or not
 -- @field v_stretch_factor This sets by how much more then window will be stretched horizontally in comparison to
 --                 other windows
 -- @field v_stretch_factor This sets by how much more then window will be stretched vertically in comparison to
@@ -114,9 +114,10 @@ end
 -- Called on window resize events.
 function Geyser.Container:reposition ()
   local x, y, w, h = self:get_x(), self:get_y(), self:get_width(), self:get_height()
-  moveWindow(self.name, self:get_x(), self:get_y())
-  resizeWindow(self.name, self:get_width(), self:get_height())
-
+  if self.type ~= "userwindow" then
+    moveWindow(self.name, self:get_x(), self:get_y())
+    resizeWindow(self.name, self:get_width(), self:get_height())
+  end
   -- deal with all children of this container
   for k, v in pairs(self.windowList) do
     if k ~= self and not v.nestLabels then
@@ -154,11 +155,19 @@ end
 --- Shows this window and all windows it contains.
 function Geyser.Container:show (auto)
   auto = auto or false
+  -- If my container is hidden I stay hidden and after it get visible again I'm visible too
+  if self.container.hidden or self.container.auto_hidden then
+    if auto == false then
+      self.hidden = false
+    end
+    return false
+  end
   if auto then
     self.auto_hidden = false
   else
     self.hidden = false
   end
+
   if not self.hidden and not self.auto_hidden then
     self:show_impl()
   end
@@ -172,16 +181,78 @@ function Geyser.Container:show_impl()
 end
 
 --- Raises the window to the top of the z-order stack, displaying in front of all other windows
-function Geyser.Container:raise ()
-	raiseWindow(self.name)
+--@param changeWindowIndex used internally
+--@see Geyser.Container:raiseAll
+function Geyser.Container:raise (changeWindowIndex)
+  raiseWindow(self.name)
+  if changeWindowIndex ~= false then
+    local index = table.index_of(self.container.windows, self.name)
+    if index == #self.container.windows then
+      return
+    end
+    local tempValue = self.container.windows[index]
+    table.remove(self.container.windows, index)
+    self.container.windows[#self.container.windows+1] = tempValue
+  end
 end
 
 --- Lowers the window to the bottom of the z-order stack, displaying behind all other windows
-function Geyser.Container:lower ()
-	lowerWindow(self.name)
+--@param changeWindowIndex used internally
+--@see Geyser.Container:lowerAll
+function Geyser.Container:lower (changeWindowIndex)
+  lowerWindow(self.name)
+  if changeWindowIndex ~= false then
+    local index = table.index_of(self.container.windows, self.name)
+    if index == 1 then
+      return
+    end
+    local tempValue = self.container.windows[index]
+    table.remove(self.container.windows, index)
+    table.insert(self.container.windows, 1, tempValue)
+  end
 end
 
---- Moves this window according to the new x and y contraints set.
+--- Raises the window and all its containing elements to the top of the z-order stack, displaying in front of all other windows.
+--@param container used internally
+--@param me used internally
+--@see Geyser.Container:raise
+function Geyser.Container:raiseAll(container, me)
+  container = container or self
+  -- raise myself
+  if me ~= false then
+    container:raise()
+  end
+  local v
+  for i=1, #container.windows do
+    v = container.windows[i]
+    container.windowList[v]:raise(false)
+    container.windowList[v]:raiseAll(container.windowList[v], false)
+  end
+end
+
+local function createWindowTable(container)
+  local v
+  Geyser.Container.windowTable = Geyser.Container.windowTable or {}
+  for i=1, #container.windows do
+    v = container.windows[i]
+    Geyser.Container.windowTable[#Geyser.Container.windowTable+1] = container.windowList[v]
+    createWindowTable(container.windowList[v])
+  end
+end
+
+--- Lowers the window and all its containing elements to the bottom of the z-order stack, displaying behind all other windows
+--@see Geyser.Container:lower
+function Geyser.Container:lowerAll()
+  createWindowTable(self)
+  -- iterate in reverse order through all elements to keep the same z-axis inside the container
+  for i=#Geyser.Container.windowTable,1,-1 do
+    Geyser.Container.windowTable[i]:lower(false)
+  end
+  Geyser.Container.windowTable = nil
+  self:lower()
+end
+
+--- Moves this window according to the new x and y constraints set.
 -- @param x New x constraint to use. If nil, uses current value.
 -- @param y New y constraint to use. If nil, uses current value.
 function Geyser.Container:move (x, y)
@@ -211,7 +282,7 @@ function Geyser.Container:setFontSize (fontSize)
   self:set_constraints()
 end
 
---- Sets all contraints (x, y, width, height) for this window.
+--- Sets all constraints (x, y, width, height) for this window.
 -- @param cons Any Lua table that contains appropriate constraint entries.
 function Geyser.Container:set_constraints (cons)
   cons = cons or self
@@ -229,7 +300,7 @@ function Geyser.Container:flash (time)
   local time = time or 1.0
   local x, y, width, height = self.get_x(), self.get_y(), self.get_width(), self.get_height()
   local name = self.name .. "_dimensions_flash"
-  createLabel(name, x, y, width, height, 1)
+  createLabel(self.windowname ,name, x, y, width, height, 1)
   resizeWindow(name, width, height)
   moveWindow(name, x, y)
   setBackgroundColor(name, 190, 190, 190, 128)
@@ -257,24 +328,63 @@ function Geyser.Container:new(cons, container)
   me.name = me.name or Geyser.nameGen()
   me.windowList = {}
   me.windows = {}
-  me.hidden = false
-  me.auto_hidden = false
+  --pass the given hidden/auto_hidden values for add2
+  if me.useAdd2 == true or (container and container.useAdd2) then
+    me.hidden = me.hidden or false
+    me.auto_hidden = me.auto_hidden or false
+  else
+    me.hidden = false
+    me.auto_hidden = false
+  end
   -- Set the metatable.
   setmetatable(me, self)
   self.__index = self
 
   -- If we're not not a class definition then add to a controlling
   -- container.
-  if not string.find(me.name, ".*Class") then
+  if not string.find(me.name, ".+Class$") then
     -- If passed in a container, add me to that container
     if container then
-      container:add(me)
+      if me.useAdd2 then
+        container:add2(me)
+      else
+        container:add(me)
+      end
     else
       -- Else assume the root window is my container
-      Geyser:add(me)
+      if me.useAdd2 then
+        Geyser:add2(me)
+      else
+        Geyser:add(me)
+      end
+      container=Geyser
+    end
+   --Create Root-Container for UserWindow and add Children
+   if (container == Geyser) and (me.windowname) and (me.windowname ~= "main") and me.type == "userwindow" then
+        container = Geyser.Container:new({name=me.windowname.."Container", type = "userwindow", x=0, y=0, width="100%", height="100%"})
+        if me.useAdd2 then
+          container:add2(me)
+        else
+          container:add(me)
+        end
+        container.get_width = function()
+            return getUserWindowSize(me.windowname)
+        end
+        container.get_height = function()
+            local w, h = getUserWindowSize(me.windowname)
+            return h
+        end
     end
   end
 
   --print("New in " .. self.name .. " : " .. me.name)
+  return me
+end
+
+--- Overridden constructor to use add2
+function Geyser.Container:new2 (cons, container)
+  cons = cons or {}
+  cons.useAdd2 = true
+  local me = self:new(cons, container)
   return me
 end
