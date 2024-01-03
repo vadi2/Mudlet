@@ -549,7 +549,6 @@ mudlet::mudlet()
     connect(dactionMuteMedia, &QAction::triggered, this, &mudlet::slot_muteMedia);
     connect(dactionMuteAPI, &QAction::triggered, this, &mudlet::slot_muteAPI);
     connect(dactionMuteMCMP, &QAction::triggered, this, &mudlet::slot_muteMCMP);
-    connect(dactionMuteMSP, &QAction::triggered, this, &mudlet::slot_muteMSP);
     connect(dactionInputLine, &QAction::triggered, this, &mudlet::slot_compactInputLine);
     connect(mpActionTriggers.data(), &QAction::triggered, this, &mudlet::slot_showTriggerDialog);
     connect(dactionScriptEditor, &QAction::triggered, this, &mudlet::slot_showEditorDialog);
@@ -628,7 +627,7 @@ mudlet::mudlet()
     }
 
     // Allow mute functionality always
-    mpButtonMute->setEnabled(true);
+    mpButtonSettings->setEnabled(true);
     mpActionMuteMedia->setEnabled(true);
     mpActionMuteAPI->setEnabled(true);
     mpActionMuteGame->setEnabled(true);
@@ -1964,7 +1963,6 @@ void mudlet::readLateSettings(const QSettings& settings)
 
     slot_muteAPI(settings.contains(qsl("enableMuteAPI")) ? settings.value(qsl("enableMuteAPI"), QVariant(false)).toBool() : false);
     slot_muteMCMP(settings.contains(qsl("enableMuteMCMP")) ? settings.value(qsl("enableMuteMCMP"), QVariant(false)).toBool() : false);
-    slot_muteMSP(settings.contains(qsl("enableMuteMSP")) ? settings.value(qsl("enableMuteMSP"), QVariant(false)).toBool() : false);
 }
 
 void mudlet::setToolBarIconSize(const int s)
@@ -1979,7 +1977,7 @@ void mudlet::setToolBarIconSize(const int s)
         mpMainToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         mpButtonConnect->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         mpButtonDiscord->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-        mpButtonMute->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+        mpButtonSettings->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         if (!mpButtonAbout.isNull()) {
             mpButtonAbout->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
         }
@@ -1988,7 +1986,7 @@ void mudlet::setToolBarIconSize(const int s)
         mpMainToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
         mpButtonConnect->setToolButtonStyle(Qt::ToolButtonIconOnly);
         mpButtonDiscord->setToolButtonStyle(Qt::ToolButtonIconOnly);
-        mpButtonMute->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        mpButtonSettings->setToolButtonStyle(Qt::ToolButtonIconOnly);
         if (!mpButtonAbout.isNull()) {
             mpButtonAbout->setToolButtonStyle(Qt::ToolButtonIconOnly);
         }
@@ -3042,9 +3040,6 @@ void mudlet::toggleMuteForProtocol(bool state, QAction* toolbarAction, QAction* 
     mpActionMuteMedia->setText(isMediaMuted ? tr("Unmute all media") : tr("Mute all media"));
     mpActionMuteMedia->setChecked(isMediaMuted);
     dactionMuteMedia->setChecked(isMediaMuted);
-    mpButtonMute->setText(isMediaMuted ? tr("Unmute") : tr("Mute"));
-    mpButtonMute->setChecked(false);
-    mpButtonMute->setEnabled(true);
 
     // Notify when all media is muted or all media is unmuted. Helps if the shortcut is hit accidentally.
     if (isMediaMuted || mediaUnmuted()) {
@@ -3081,7 +3076,6 @@ void mudlet::slot_muteMedia()
     if (mediaMuted()) {
         slot_muteAPI(false);
         slot_muteMCMP(false);
-        slot_muteMSP(false);
     } else {
         if (!mMuteAPI) {
             slot_muteAPI(true);
@@ -3089,10 +3083,6 @@ void mudlet::slot_muteMedia()
 
         if (!mMuteMCMP) {
             slot_muteMCMP(true);
-        }
-
-        if (!mMuteMSP) {
-            slot_muteMSP(true);
         }
     }
 }

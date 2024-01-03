@@ -498,7 +498,6 @@ public slots:
     void slot_muteMedia();
     void slot_muteAPI(const bool);
     void slot_muteMCMP(const bool);
-    void slot_muteMSP(const bool);
     void slot_newDataOnHost(const QString&, bool isLowerPriorityChange = false);
     void slot_notes();
     void slot_openMappingScriptsPage();
