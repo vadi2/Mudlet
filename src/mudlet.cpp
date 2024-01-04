@@ -347,9 +347,7 @@ mudlet::mudlet()
 
     mpActionOptions = new QAction(QIcon(qsl(":/icons/configure.png")), tr("Settings"), this);
     mpActionOptions->setToolTip(utils::richText(tr("See and edit profile preferences")));
-    mpMainToolBar->addAction(mpActionOptions);
     mpActionOptions->setObjectName(qsl("settings_action"));
-    mpMainToolBar->widgetForAction(mpActionOptions)->setObjectName(mpActionOptions->objectName());
 
     mpActionMuteMedia = new QAction(tr("Mute all media"), this);
     mpActionMuteMedia->setIcon(QIcon(qsl(":/icons/mute.png")));
@@ -359,16 +357,17 @@ mudlet::mudlet()
 
     mpActionMuteAPI = new QAction(tr("Mute sounds from Mudlet (triggers, scripts, etc.)"), this);
     mpActionMuteAPI->setIcon(QIcon(qsl(":/icons/mute.png")));
-    mpActionMuteAPI->setIconText(tr("Mute Mudlet API (Triggers, Scripts, etc.)"));
+    mpActionMuteAPI->setIconText(tr("Mute sounds from Mudlet (triggers, scripts, etc.)"));
     mpActionMuteAPI->setObjectName(qsl("muteAPI"));
     mpActionMuteAPI->setCheckable(true);
 
     mpActionMuteGame = new QAction(tr("Mute sounds from the game (MCMP, MSP)"), this);
     mpActionMuteGame->setIcon(QIcon(qsl(":/icons/mute.png")));
-    mpActionMuteGame->setIconText(tr("Mute game MCMP (Mud Client Media Protocol)"));
+    mpActionMuteGame->setIconText(tr("Mute sounds from the game (MCMP, MSP)"));
     mpActionMuteGame->setObjectName(qsl("muteMCMP"));
     mpActionMuteGame->setCheckable(true);
 
+    mpButtonSettings->addAction(mpActionOptions);
     mpButtonSettings->addAction(mpActionMuteMedia);
     mpButtonSettings->addAction(mpActionMuteAPI);
     mpButtonSettings->addAction(mpActionMuteGame);
