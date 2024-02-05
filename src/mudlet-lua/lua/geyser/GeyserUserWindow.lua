@@ -1,15 +1,12 @@
---------------------------------------
---                                  --
--- The Geyser Layout Manager by guy --
--- UserWindow support by Edru       --
---                                  --
---------------------------------------
+--- Represents a UserWindow Class.
+-- <br/>See also: <a href="https://wiki.mudlet.org/w/Manual:Geyser#Geyser.UserWindow">Mudlet Manual</a>
+-- @author guy
+-- @author Edru
+-- @module Geyser.UserWindow
 
 --- Represents a UserWindow Class
---Support of UserWindows in Geyser
---UserWindows use also all the functions of MiniConsole as they contain one
--- @class table
--- @name Geyser.UserWindow
+-- Support of UserWindows in Geyser
+-- UserWindows use also all the functions of MiniConsole as they contain one
 Geyser.UserWindow = Geyser.MiniConsole:new({
   name = "UserWindowClass",
   color = "black"})
@@ -176,6 +173,9 @@ function Geyser.UserWindow:new(cons)
   
   me:resetWindow()
   if me.stylesheet then me:setStyleSheet() end
+
+  Geyser.parentWindows = Geyser.parentWindows or {}
+  Geyser.parentWindows[me.name] = me
 
   return me
 end

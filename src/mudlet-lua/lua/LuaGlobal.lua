@@ -116,6 +116,7 @@ local packages = {
   "geyser/GeyserUtil.lua",
   "geyser/GeyserColor.lua",
   "geyser/GeyserSetConstraints.lua",
+  "geyser/GeyserStyleSheet.lua",
   "geyser/GeyserContainer.lua",
   "geyser/GeyserWindow.lua",
   "geyser/GeyserLabel.lua",
@@ -123,11 +124,13 @@ local packages = {
   "geyser/GeyserMiniConsole.lua",
   "geyser/GeyserMapper.lua",
   "geyser/GeyserReposition.lua",
+  "geyser/GeyserScrollBox.lua",
   "geyser/GeyserHBox.lua",
   "geyser/GeyserVBox.lua",
   "geyser/GeyserUserWindow.lua",
   "geyser/GeyserAdjustableContainer.lua",
   "geyser/GeyserCommandLine.lua",
+  "geyser/GeyserButton.lua",
 
   -- TODO probably don't need to load this file
   "geyser/GeyserTests.lua",
@@ -136,7 +139,8 @@ local packages = {
   "GMCP.lua",
   "KeyCodes.lua",
   "CursorShapes.lua",
-  "TTSValues.lua"
+  "TTSValues.lua",
+  "IDManager.lua",
 }
 
 if debugLoading then

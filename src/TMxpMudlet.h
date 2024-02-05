@@ -3,7 +3,7 @@
 
 /***************************************************************************
  *   Copyright (C) 2020 by Gustavo Sousa - gustavocms@gmail.com            *
- *   Copyright (C) 2020 by Stephen Lyons - slysven@virginmedia.com         *
+ *   Copyright (C) 2020, 2022 by Stephen Lyons - slysven@virginmedia.com   *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -36,12 +36,16 @@ class TMediaData;
 
 class TMxpMudlet : public TMxpClient
 {
+    // Count how many of this format have been stacked/applied on top of each other
+    unsigned int boldCounter = 0;
+    unsigned int italicCounter = 0;
+    unsigned int underlineCounter = 0;
+    unsigned int strikeOutCounter = 0;
+    QString mxpStyle; // Name/Version of the MXP style sheet uploaded by the mud
+
 public:
-    TMxpMudlet(Host* pHost)
-    : isBold(false)
-    , isItalic(false)
-    , isUnderline(false)
-    , mpHost(pHost)
+    explicit TMxpMudlet(Host* pHost)
+    : mpHost(pHost)
     , mLinkMode(false)
     {}
 
@@ -82,9 +86,20 @@ public:
     void playMedia(TMediaData& mediaData) override;
     void stopMedia(TMediaData& mediaData) override;
 
-    void setBold(bool bold) override { isBold = bold; }
-    void setItalic(bool italic) override { isItalic = italic; }
-    void setUnderline(bool underline) override { isUnderline = underline; }
+    void setBold(bool bold) override;
+    void setItalic(bool italic) override;
+    void setUnderline(bool underline) override;
+    void setStrikeOut(bool strikeOut) override;
+
+    bool bold() override { return boldCounter > 0; }
+    bool italic() override { return italicCounter > 0; }
+    bool underline() override { return underlineCounter > 0; }
+    bool strikeOut() override { return strikeOutCounter > 0; }
+
+    void resetTextProperties() override;
+
+    void setStyle(const QString& val) override { mxpStyle = val; }
+    QString getStyle() override { return mxpStyle;}
 
     void setFlag(const QString& elementName, const QMap<QString, QString>& values, const QString& content) override {
         Q_UNUSED(elementName)
@@ -114,13 +129,7 @@ public:
     // Shouldn't be here, look for a better solution
     QQueue<TMxpEvent> mMxpEvents;
 
-    bool isBold;
-    bool isItalic;
-    bool isUnderline;
-
 private:
-    inline static const QString scmVersion = QStringLiteral(APP_VERSION APP_BUILD);
-
     Host* mpHost;
     bool mLinkMode;
 };

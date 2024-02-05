@@ -22,6 +22,7 @@
 
 #include "HostManager.h"
 
+#include "dlgMapper.h"
 #include "mudlet.h"
 
 bool HostManager::deleteHost(const QString& hostname)
@@ -31,7 +32,7 @@ bool HostManager::deleteHost(const QString& hostname)
         qDebug() << "HostManager::deleteHost(" << hostname.toUtf8().constData() << ") ERROR: not a member of host pool... aborting!";
         return false;
     } else {
-        int ret = mHostPool.remove(hostname);
+        const int ret = mHostPool.remove(hostname);
         return ret;
     }
 }
@@ -53,8 +54,8 @@ bool HostManager::addHost(const QString& hostname, const QString& port, const QS
         return false;
     }
 
-    int id = mHostPool.size() + 1;
-    QSharedPointer<Host> pNewHost(new Host(portnumber, hostname, login, pass, id));
+    const int id = mHostPool.size() + 1;
+    QSharedPointer<Host> const pNewHost(new Host(portnumber, hostname, login, pass, id));
 
     if (Q_UNLIKELY(!pNewHost)) {
         qDebug() << "HostManager::addHost(" << hostname.toUtf8().constData() << ") ERROR: failed to create new Host for the host pool... aborting!";
@@ -117,8 +118,30 @@ void HostManager::postInterHostEvent(const Host* pHost, const TEvent& event, con
     allValidHosts = afterSendingHost;
     allValidHosts.append(beforeSendingHost);
 
-    for (int validHost : qAsConst(allValidHosts)) {
+    for (const int validHost : qAsConst(allValidHosts)) {
         hostList.at(validHost)->raiseEvent(event);
+    }
+}
+
+void HostManager::changeAllHostColour(const Host* pHost)
+{
+    if (!pHost) {
+        return;
+    }
+    //change all main and subconsoles color
+    const QList<QSharedPointer<Host>> hostList = mHostPool.values();
+    for (int i = 0; i < hostList.size(); i++) {
+        hostList.at(i)->mpConsole->changeColors();
+        // Mapper also needs a refresh of its colours
+        auto mapper = hostList.at(i)->mpMap->mpMapper;
+        if (mapper) {
+            mapper->setPalette(QApplication::palette());
+        }
+        QMutableMapIterator<QString, TConsole*> itSubConsole(hostList.at(i)->mpConsole->mSubConsoleMap);
+        while (itSubConsole.hasNext()) {
+            itSubConsole.next();
+            itSubConsole.value()->changeColors();
+        }
     }
 }
 

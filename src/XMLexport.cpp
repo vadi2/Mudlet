@@ -2,7 +2,7 @@
  *   Copyright (C) 2008-2013 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
  *   Copyright (C) 2016-2017 by Ian Adkins - ieadkins@gmail.com            *
- *   Copyright (C) 2017-2020 by Stephen Lyons - slysven@virginmedia.com    *
+ *   Copyright (C) 2017-2023 by Stephen Lyons - slysven@virginmedia.com    *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -43,83 +43,83 @@
 #include "post_guard.h"
 
 XMLexport::XMLexport( Host * pH )
-: mpHost( pH )
-, mpTrigger( Q_NULLPTR )
-, mpTimer( Q_NULLPTR )
-, mpAlias( Q_NULLPTR )
-, mpAction( Q_NULLPTR )
-, mpScript( Q_NULLPTR )
-, mpKey( Q_NULLPTR )
+: mpHost(pH)
+, mpTrigger(nullptr)
+, mpTimer(nullptr)
+, mpAlias(nullptr)
+, mpAction(nullptr)
+, mpScript(nullptr)
+, mpKey(nullptr)
 {
 }
 
 XMLexport::XMLexport( TTrigger * pT )
-: mpHost( Q_NULLPTR )
-, mpTrigger( pT )
-, mpTimer( Q_NULLPTR )
-, mpAlias( Q_NULLPTR )
-, mpAction( Q_NULLPTR )
-, mpScript( Q_NULLPTR )
-, mpKey( Q_NULLPTR )
+: mpHost(nullptr)
+, mpTrigger(pT)
+, mpTimer(nullptr)
+, mpAlias(nullptr)
+, mpAction(nullptr)
+, mpScript(nullptr)
+, mpKey(nullptr)
 {
 }
 
 XMLexport::XMLexport( TTimer * pT )
-: mpHost( Q_NULLPTR )
-, mpTrigger( Q_NULLPTR )
-, mpTimer( pT )
-, mpAlias( Q_NULLPTR )
-, mpAction( Q_NULLPTR )
-, mpScript( Q_NULLPTR )
-, mpKey( Q_NULLPTR )
+: mpHost(nullptr)
+, mpTrigger(nullptr)
+, mpTimer(pT)
+, mpAlias(nullptr)
+, mpAction(nullptr)
+, mpScript(nullptr)
+, mpKey(nullptr)
 {
 }
 
 XMLexport::XMLexport( TAlias * pT )
-: mpHost( Q_NULLPTR )
-, mpTrigger( Q_NULLPTR )
-, mpTimer( Q_NULLPTR )
-, mpAlias( pT )
-, mpAction( Q_NULLPTR )
-, mpScript( Q_NULLPTR )
-, mpKey( Q_NULLPTR )
+: mpHost(nullptr)
+, mpTrigger(nullptr)
+, mpTimer(nullptr)
+, mpAlias(pT)
+, mpAction(nullptr)
+, mpScript(nullptr)
+, mpKey(nullptr)
 {
 }
 
 XMLexport::XMLexport( TAction * pT )
-: mpHost( Q_NULLPTR )
-, mpTrigger( Q_NULLPTR )
-, mpTimer( Q_NULLPTR )
-, mpAlias( Q_NULLPTR )
-, mpAction( pT )
-, mpScript( Q_NULLPTR )
-, mpKey( Q_NULLPTR )
+: mpHost(nullptr)
+, mpTrigger(nullptr)
+, mpTimer(nullptr)
+, mpAlias(nullptr)
+, mpAction(pT)
+, mpScript(nullptr)
+, mpKey(nullptr)
 {
 }
 
 XMLexport::XMLexport( TScript * pT )
-: mpHost( Q_NULLPTR )
-, mpTrigger( Q_NULLPTR )
-, mpTimer( Q_NULLPTR )
-, mpAlias( Q_NULLPTR )
-, mpAction( Q_NULLPTR )
-, mpScript( pT )
-, mpKey( Q_NULLPTR )
+: mpHost(nullptr)
+, mpTrigger(nullptr)
+, mpTimer(nullptr)
+, mpAlias(nullptr)
+, mpAction(nullptr)
+, mpScript(pT)
+, mpKey(nullptr)
 {
 }
 
 XMLexport::XMLexport( TKey * pT )
-: mpHost( Q_NULLPTR )
-, mpTrigger( Q_NULLPTR )
-, mpTimer( Q_NULLPTR )
-, mpAlias( Q_NULLPTR )
-, mpAction( Q_NULLPTR )
-, mpScript( Q_NULLPTR )
-, mpKey( pT )
+: mpHost(nullptr)
+, mpTrigger(nullptr)
+, mpTimer(nullptr)
+, mpAlias(nullptr)
+, mpAction(nullptr)
+, mpScript(nullptr)
+, mpKey(pT)
 {
 }
 
-void XMLexport::writeModuleXML(const QString& moduleName, const QString& fileName)
+void XMLexport::writeModuleXML(const QString& moduleName, const QString& fileName, bool async)
 {
     auto pHost = mpHost;
     auto mudletPackage = writeXmlHeader();
@@ -186,27 +186,31 @@ void XMLexport::writeModuleXML(const QString& moduleName, const QString& fileNam
     }
 
     auto helpPackage = mudletPackage.append_child("HelpPackage");
-    if (pHost->moduleHelp.contains(moduleName) && pHost->moduleHelp.value(moduleName).contains(QStringLiteral("helpURL"))) {
-        helpPackage.append_child("helpURL").text().set(pHost->moduleHelp.value(moduleName).value(QStringLiteral("helpURL")).toUtf8().constData());
+    if (pHost->moduleHelp.contains(moduleName) && pHost->moduleHelp.value(moduleName).contains(qsl("helpURL"))) {
+        helpPackage.append_child("helpURL").text().set(pHost->moduleHelp.value(moduleName).value(qsl("helpURL")).toUtf8().constData());
     } else {
         helpPackage.append_child("helpURL").text().set("");
     }
-
-    auto future = QtConcurrent::run(this, &XMLexport::saveXml, fileName);
-    auto watcher = new QFutureWatcher<bool>;
-    QObject::connect(watcher, &QFutureWatcher<bool>::finished, mpHost, [=]() { mpHost->xmlSaved(fileName); });
-    watcher->setFuture(future);
-    saveFutures.append(future);
+    if (async) {
+        auto future = QtConcurrent::run([&, fileName]() { return saveXml(fileName); });
+        auto watcher = new QFutureWatcher<bool>;
+        connect(watcher, &QFutureWatcher<bool>::finished, mpHost, [=]() { mpHost->xmlSaved(fileName); });
+        watcher->setFuture(future);
+        saveFutures.append(future);
+    } else {
+        saveXml(fileName);
+        mpHost->xmlSaved(fileName);
+    }
 }
 
 void XMLexport::exportHost(const QString& filename_pugi_xml)
 {
     auto mudletPackage = writeXmlHeader();
     writeHost(mpHost, mudletPackage);
-    auto future = QtConcurrent::run(this, &XMLexport::saveXml, filename_pugi_xml);
+    auto future = QtConcurrent::run([&, filename_pugi_xml]() { return saveXml(filename_pugi_xml); });
 
     auto watcher = new QFutureWatcher<bool>;
-    QObject::connect(watcher, &QFutureWatcher<bool>::finished, mpHost, [=]() { mpHost->xmlSaved(QStringLiteral("profile")); });
+    connect(watcher, &QFutureWatcher<bool>::finished, mpHost, [=]() { mpHost->xmlSaved(qsl("profile")); });
     watcher->setFuture(future);
     saveFutures.append(future);
 }
@@ -301,42 +305,38 @@ void XMLexport::sanitizeForQxml(std::string& output)
 
 bool XMLexport::saveXml(const QString& fileName)
 {
-    QFile file(fileName);
+    QSaveFile file(fileName);
 
-    if (!file.open(QFile::WriteOnly)) {
-        qDebug().noquote().nospace() << "XMLexport::saveXml(\"" << fileName << "\") ERROR - failed to open file, reason: " << file.errorString() << ".";
+    auto printErrorMessage = [&](const QString& errorString) {
+        qDebug().noquote().nospace() << "XMLexport::saveXml(\"" << fileName << "\") ERROR - failed to save package, reason: " << errorString << ".";
+    };
+
+    if (!file.open(QIODevice::WriteOnly)) {
+        printErrorMessage(file.errorString().prepend("failed to open file, "));
         return false;
     }
 
-    bool result = saveXmlFile(file);
-    if (!result) {
-        if (file.error() != QFile::NoError) {
-            // Error reason was related to QFile:
-            qDebug().noquote().nospace() << "XMLexport::saveXml(\"" << fileName << "\") ERROR - failed to save package, reason: " << file.errorString() << ".";
-        } else {
-            // Error was due to failure in document preparation
-            qDebug().noquote().nospace() << "XMLexport::saveXml(\"" << fileName << "\") ERROR - failed to save package, reason: XML document preparation failure.";
-        }
+    bool success = saveXmlFile(file);
+    if (!success) {
+        printErrorMessage((file.error() != QFileDevice::NoError) ? file.errorString() : "XML document preparation failure");
+    } else if (!file.commit()) {
+        printErrorMessage(file.errorString());
+        success = false;
     }
 
-    file.close();
-    return result;
+    return success;
 }
 
-// This has been factored out to a separate method from saveXml(const QString&)
-// because there are situations where we have a QFile instance already and
-// just passing a filename and then creating another QFile instance on the
-// same file in the filesystem is less than optimum.
 // TODO: Refactor dlgTriggerEditor::slot_export() {at least} to call this method instead of saveXml(const QString&)
-bool XMLexport::saveXmlFile(QFile& file)
+bool XMLexport::saveXmlFile(QSaveFile& file)
 {
     std::stringstream saveStringStream(std::ios::out);
     // Remember, the mExportDoc is the data in the form of a pugi::xml_document
-    // instance - the save method needs a stream that impliments the
+    // instance - the save method needs a stream that implements the
     // std::ostream interface into which it can push the data:
     mExportDoc.save(saveStringStream);
     // We need to do our own replacement of ASCII control characters that are
-    // not valid in XML verison 1.0 and that means we cannot use the pugixml
+    // not valid in XML version 1.0 and that means we cannot use the pugixml
     // file methods as it does that in a different way which is not helpful
     // as we do not use that library for READING the XML files - so convert
     // the data to a std::string :
@@ -346,7 +346,7 @@ bool XMLexport::saveXmlFile(QFile& file)
     // Now we can use Qt's file handling which does handle non-Latin1 named
     // files - which MinGW's STL file handling (on Windows platform) does not:
     file.write(output.data());
-    return file.error() == QFile::NoError;
+    return file.error() == QFileDevice::NoError;
 }
 
 QString XMLexport::saveXml()
@@ -394,10 +394,11 @@ void XMLexport::writeHost(Host* pHost, pugi::xml_node mudletPackage)
     host.append_attribute("mFORCE_SAVE_ON_EXIT") = pHost->mFORCE_SAVE_ON_EXIT ? "yes" : "no";
     host.append_attribute("mEnableGMCP") = pHost->mEnableGMCP ? "yes" : "no";
     host.append_attribute("mEnableMSSP") = pHost->mEnableMSSP ? "yes" : "no";
-    host.append_attribute("mEnableMSP") = pHost->mEnableMSP ? "yes" : "no";
     host.append_attribute("mEnableMSDP") = pHost->mEnableMSDP ? "yes" : "no";
+    host.append_attribute("mEnableMSP") = pHost->mEnableMSP ? "yes" : "no";
+    host.append_attribute("mEnableMTTS") = pHost->mEnableMTTS ? "yes" : "no";
+    host.append_attribute("mEnableMNES") = pHost->mEnableMNES ? "yes" : "no";
     host.append_attribute("mMapStrongHighlight") = pHost->mMapStrongHighlight ? "yes" : "no";
-    host.append_attribute("mLogStatus") = pHost->mLogStatus ? "yes" : "no";
     host.append_attribute("mEnableSpellCheck") = pHost->mEnableSpellCheck ? "yes" : "no";
     bool enableUserDictionary;
     bool useSharedDictionary;
@@ -413,6 +414,7 @@ void XMLexport::writeHost(Host* pHost, pugi::xml_node mudletPackage)
     host.append_attribute("mMapperShowRoomBorders") = pHost->mMapperShowRoomBorders ? "yes" : "no";
     host.append_attribute("mFORCE_MXP_NEGOTIATION_OFF") = pHost->mFORCE_MXP_NEGOTIATION_OFF ? "yes" : "no";
     host.append_attribute("mFORCE_CHARSET_NEGOTIATION_OFF") = pHost->mFORCE_CHARSET_NEGOTIATION_OFF ? "yes" : "no";
+    host.append_attribute("forceNewEnvironNegotiationOff") = pHost->mForceNewEnvironNegotiationOff ? "yes" : "no";
     host.append_attribute("enableTextAnalyzer") = pHost->mEnableTextAnalyzer ? "yes" : "no";
     host.append_attribute("mRoomSize") = QString::number(pHost->mRoomSize, 'f', 1).toUtf8().constData();
     host.append_attribute("mLineSize") = QString::number(pHost->mLineSize, 'f', 1).toUtf8().constData();
@@ -422,6 +424,7 @@ void XMLexport::writeHost(Host* pHost, pugi::xml_node mudletPackage)
     host.append_attribute("mShowPanel") = pHost->mShowPanel ? "yes" : "no";
     host.append_attribute("mHaveMapperScript") = pHost->mHaveMapperScript ? "yes" : "no";
     host.append_attribute("mEditorAutoComplete") = pHost->mEditorAutoComplete ? "yes" : "no";
+    host.append_attribute("mEditorShowBidi") = pHost->getEditorShowBidi() ? "yes" : "no";
     host.append_attribute("mEditorTheme") = pHost->mEditorTheme.toUtf8().constData();
     host.append_attribute("mEditorThemeFile") = pHost->mEditorThemeFile.toUtf8().constData();
     host.append_attribute("mThemePreviewItemID") = QString::number(pHost->mThemePreviewItemID).toUtf8().constData();
@@ -437,6 +440,7 @@ void XMLexport::writeHost(Host* pHost, pugi::xml_node mudletPackage)
     host.append_attribute("mSslIgnoreExpired") = pHost->mSslIgnoreExpired ? "yes" : "no";
     host.append_attribute("mSslIgnoreSelfSigned") = pHost->mSslIgnoreSelfSigned ? "yes" : "no";
     host.append_attribute("mSslIgnoreAll") = pHost->mSslIgnoreAll ? "yes" : "no";
+    host.append_attribute("mAskTlsAvailable") = pHost->mAskTlsAvailable ? "yes" : "no";
     host.append_attribute("mDiscordAccessFlags") = QString::number(pHost->mDiscordAccessFlags).toUtf8().constData();
     host.append_attribute("mRequiredDiscordUserName") = pHost->mRequiredDiscordUserName.toUtf8().constData();
     host.append_attribute("mRequiredDiscordUserDiscriminator") = pHost->mRequiredDiscordUserDiscriminator.toUtf8().constData();
@@ -454,15 +458,34 @@ void XMLexport::writeHost(Host* pHost, pugi::xml_node mudletPackage)
     host.append_attribute("playerRoomOuterDiameter") = QString::number(outerDiameterPercentage).toUtf8().constData();
     host.append_attribute("playerRoomInnerDiameter") = QString::number(innerDiameterPercentage).toUtf8().constData();
     host.append_attribute("CompactInputLine") = pHost->getCompactInputLine() ? "yes" : "no";
+    host.append_attribute("CommandLineHistorySaveSize") = QString::number(pHost->getCommandLineHistorySaveSize()).toUtf8().constData();
 
     QString ignore;
-    QSetIterator<QChar> it(pHost->mDoubleClickIgnore);
-    while (it.hasNext()) {
-        ignore = ignore.append(it.next());
+    QSetIterator<QChar> ignoreIterator(pHost->mDoubleClickIgnore);
+    while (ignoreIterator.hasNext()) {
+        ignore = ignore.append(ignoreIterator.next());
     }
     host.append_attribute("mDoubleClickIgnore") = ignore.toUtf8().constData();
     host.append_attribute("EditorSearchOptions") = QString::number(pHost->mSearchOptions).toUtf8().constData();
     host.append_attribute("DebugShowAllProblemCodepoints") = pHost->debugShowAllProblemCodepoints() ? "yes" : "no";
+    host.append_attribute("announceIncomingText") = pHost->mAnnounceIncomingText ? "yes" : "no";
+    host.append_attribute("advertiseScreenReader") = pHost->mAdvertiseScreenReader ? "yes" : "no";
+    host.append_attribute("caretShortcut") = QMetaEnum::fromType<Host::CaretShortcut>().valueToKey(
+            static_cast<int>(pHost->mCaretShortcut));
+    host.append_attribute("blankLineBehaviour") = QMetaEnum::fromType<Host::BlankLineBehaviour>().valueToKey(
+            static_cast<int>(pHost->mBlankLineBehaviour));
+    host.append_attribute("NetworkPacketTimeout") = pHost->mTelnet.getPostingTimeout();
+    host.append_attribute("ShowIDsInEditor") = pHost->showIdsInEditor() ? "yes" : "no";
+    if (const int mode = static_cast<int>(pHost->getControlCharacterMode()); mode) {
+        // Don't bother to include the attribute if ignoreIterator is the default (zero)
+        // value - and as ignoreIterator is an ASCII digit ignoreIterator only needs
+        // QString::toLatin1() encoding:
+        host.append_attribute("ControlCharacterHandling") = QString::number(mode).toLatin1().constData();
+    }
+
+    if (pHost->getLargeAreaExitArrows()) {
+        host.append_attribute("Large2DMapAreaExitArrows") = "yes";
+    }
 
     { // Blocked so that indentation reflects that of the XML file
         host.append_child("name").text().set(pHost->mHostName.toUtf8().constData());
@@ -480,9 +503,15 @@ void XMLexport::writeHost(Host* pHost, pugi::xml_node mudletPackage)
             while (it.hasNext()) {
                 it.next();
                 mInstalledModules.append_child("key").text().set(it.key().toUtf8().constData());
-                QStringList entry = it.value();
+                const QStringList entry = it.value();
                 mInstalledModules.append_child("filepath").text().set(entry.at(0).toUtf8().constData());
-                mInstalledModules.append_child("globalSave").text().set(entry.at(1).toUtf8().constData());
+                if (entry.at(0).endsWith(qsl("mpackage"), Qt::CaseInsensitive) || entry.at(0).endsWith(qsl("zip"), Qt::CaseInsensitive)) {
+                    mInstalledModules.append_child("zipSync").text().set(entry.at(1).toUtf8().constData());
+                    // ensure compatibility with previous versions
+                    mInstalledModules.append_child("globalSave").text().set(0);
+                } else {
+                    mInstalledModules.append_child("globalSave").text().set(entry.at(1).toUtf8().constData());
+                }
                 if (entry.at(1).toInt()) {
                     pHost->modulesToWrite.insert(it.key(), entry);
                 }
@@ -490,14 +519,15 @@ void XMLexport::writeHost(Host* pHost, pugi::xml_node mudletPackage)
             }
         }
 
-        host.append_child("url").text().set(pHost->mUrl.toUtf8().constData());
+        host.append_child("url").text().set(pHost->getUrl().toUtf8().constData());
         host.append_child("serverPackageName").text().set(pHost->mServerGUI_Package_name.toUtf8().constData());
         host.append_child("serverPackageVersion").text().set(pHost->mServerGUI_Package_version.toUtf8().constData());
-        host.append_child("port").text().set(QString::number(pHost->mPort).toUtf8().constData());
-        host.append_child("borderTopHeight").text().set(QString::number(pHost->mBorderTopHeight).toUtf8().constData());
-        host.append_child("borderBottomHeight").text().set(QString::number(pHost->mBorderBottomHeight).toUtf8().constData());
-        host.append_child("borderLeftWidth").text().set(QString::number(pHost->mBorderLeftWidth).toUtf8().constData());
-        host.append_child("borderRightWidth").text().set(QString::number(pHost->mBorderRightWidth).toUtf8().constData());
+        host.append_child("port").text().set(QString::number(pHost->getPort()).toUtf8().constData());
+        auto borders = pHost->borders();
+        host.append_child("borderTopHeight").text().set(QString::number(borders.top()).toUtf8().constData());
+        host.append_child("borderBottomHeight").text().set(QString::number(borders.bottom()).toUtf8().constData());
+        host.append_child("borderLeftWidth").text().set(QString::number(borders.left()).toUtf8().constData());
+        host.append_child("borderRightWidth").text().set(QString::number(borders.right()).toUtf8().constData());
         host.append_child("wrapAt").text().set(QString::number(pHost->mWrapAt).toUtf8().constData());
         host.append_child("wrapIndentCount").text().set(QString::number(pHost->mWrapIndentCount).toUtf8().constData());
         host.append_child("mFgColor").text().set(pHost->mFgColor.name().toUtf8().constData());
@@ -531,6 +561,9 @@ void XMLexport::writeHost(Host* pHost, pugi::xml_node mudletPackage)
         host.append_child("mFgColor2").text().set(pHost->mFgColor_2.name().toUtf8().constData());
         host.append_child("mBgColor2").text().set(pHost->mBgColor_2.name().toUtf8().constData());
         host.append_child("mRoomBorderColor").text().set(pHost->mRoomBorderColor.name().toUtf8().constData());
+        auto mapInfoBgNode = host.append_child("mMapInfoBg");
+        mapInfoBgNode.text().set(pHost->mMapInfoBg.name().toUtf8().constData());
+        mapInfoBgNode.append_attribute("alpha").set_value(pHost->mMapInfoBg.alpha());
         host.append_child("mBlack2").text().set(pHost->mBlack_2.name().toUtf8().constData());
         host.append_child("mLightBlack2").text().set(pHost->mLightBlack_2.name().toUtf8().constData());
         host.append_child("mRed2").text().set(pHost->mRed_2.name().toUtf8().constData());
@@ -547,6 +580,7 @@ void XMLexport::writeHost(Host* pHost, pugi::xml_node mudletPackage)
         host.append_child("mLightMagenta2").text().set(pHost->mLightMagenta_2.name().toUtf8().constData());
         host.append_child("mWhite2").text().set(pHost->mWhite_2.name().toUtf8().constData());
         host.append_child("mLightWhite2").text().set(pHost->mLightWhite_2.name().toUtf8().constData());
+        // this crashes
         host.append_child("mSpellDic").text().set(pHost->mpConsole->getSystemSpellDictionary().toUtf8().constData());
         // TODO: Consider removing these sub-elements that duplicate the same
         // attributes - which WERE bugged - when we update the XML format, must leave
@@ -556,14 +590,21 @@ void XMLexport::writeHost(Host* pHost, pugi::xml_node mudletPackage)
         host.append_child("mRoomSize").text().set(QString::number(pHost->mRoomSize, 'f', 1).toUtf8().constData());
     }
     {
-        auto mapInfoContributors = host.append_child("mMapInfoContributors");
         QSetIterator<QString> iterator(pHost->mMapInfoContributors);
         while (iterator.hasNext()) {
-            auto mapInfoContributor = mapInfoContributors.append_child("mapInfoContributor");
+            auto mapInfoContributor = host.append_child("mapInfoContributor");
             mapInfoContributor.text().set(iterator.next().toUtf8().constData());
         }
     }
-
+    {
+        auto iterator = mudlet::self()->mpShortcutsManager->iterator();
+        while (iterator.hasNext()) {
+            auto key = iterator.next();
+            auto shortcut = host.append_child("profileShortcut");
+            shortcut.append_attribute("key") = key.toUtf8().constData();
+            shortcut.text().set(pHost->profileShortcuts.value(key)->toString().toUtf8().constData());
+        }
+    }
     {
         auto stopwatches = host.append_child("stopwatches");
         QListIterator<int> itStopWatchId(pHost->getStopWatchIds());
@@ -726,9 +767,9 @@ bool XMLexport::exportProfile(const QString& exportFileName)
     auto mudletPackage = writeXmlHeader();
 
     if (writeGenericPackage(mpHost, mudletPackage)) {
-        auto future = QtConcurrent::run(this, &XMLexport::saveXml, exportFileName);
+        auto future = QtConcurrent::run([&, exportFileName]() { return saveXml(exportFileName); });
         auto watcher = new QFutureWatcher<bool>;
-        QObject::connect(watcher, &QFutureWatcher<bool>::finished, mpHost, [=]() { mpHost->xmlSaved(QStringLiteral("profile")); });
+        QObject::connect(watcher, &QFutureWatcher<bool>::finished, mpHost, [=]() { mpHost->xmlSaved(qsl("profile")); });
         watcher->setFuture(future);
         saveFutures.append(future);
 
@@ -834,13 +875,8 @@ void XMLexport::writeTrigger(TTrigger* pT, pugi::xml_node xmlParent)
             trigger.append_child("mStayOpen").text().set(QString::number(pT->mStayOpen).toUtf8().constData());
             trigger.append_child("mCommand").text().set(pT->mCommand.toUtf8().constData());
             trigger.append_child("packageName").text().set(pT->mPackageName.toUtf8().constData());
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
             trigger.append_child("mFgColor").text().set(pT->mFgColor == QColorConstants::Transparent ? "transparent": pT->mFgColor.name().toUtf8().constData());
             trigger.append_child("mBgColor").text().set(pT->mBgColor == QColorConstants::Transparent ? "transparent": pT->mBgColor.name().toUtf8().constData());
-#else
-            trigger.append_child("mFgColor").text().set(pT->mFgColor == QColor("transparent") ? "transparent": pT->mFgColor.name().toUtf8().constData());
-            trigger.append_child("mBgColor").text().set(pT->mBgColor == QColor("transparent") ? "transparent": pT->mBgColor.name().toUtf8().constData());
-#endif
             trigger.append_child("mSoundFile").text().set(pT->mSoundFile.toUtf8().constData());
             trigger.append_child("colorTriggerFgColor").text().set(pT->mColorTriggerFgColor.name().toUtf8().constData());
             trigger.append_child("colorTriggerBgColor").text().set(pT->mColorTriggerBgColor.name().toUtf8().constData());
@@ -848,13 +884,13 @@ void XMLexport::writeTrigger(TTrigger* pT, pugi::xml_node xmlParent)
             auto regexCodeList = trigger.append_child("regexCodeList");
             // Revert the first 16 ANSI colour codes back to the wrong values
             // that are still used in the save files
-            QStringList unfixedAnsiColourPatternList = remapAnsiToColorNumber(pT->mRegexCodeList, pT->mRegexCodePropertyList);
+            const QStringList unfixedAnsiColourPatternList = remapAnsiToColorNumber(pT->mPatterns, pT->mPatternKinds);
             for (int i = 0; i < unfixedAnsiColourPatternList.size(); ++i) {
                 regexCodeList.append_child("string").text().set(unfixedAnsiColourPatternList.at(i).toUtf8().constData());
             }
 
             auto regexCodePropertyList = trigger.append_child("regexCodePropertyList");
-            for (int i : qAsConst(pT->mRegexCodePropertyList)) {
+            for (const int i : qAsConst(pT->mPatternKinds)) {
                 regexCodePropertyList.append_child("integer").text().set(QString::number(i).toUtf8().constData());
             }
         }
@@ -979,7 +1015,6 @@ void XMLexport::writeAction(TAction* pT, pugi::xml_node xmlParent)
             actionContents.append_child("sizeY").text().set(QString::number(pT->mSizeY).toUtf8().constData());
             actionContents.append_child("buttonColumn").text().set(QString::number(pT->mButtonColumns).toUtf8().constData());
             actionContents.append_child("buttonRotation").text().set(QString::number(pT->mButtonRotation).toUtf8().constData());
-            actionContents.append_child("buttonColor").text().set(pT->mButtonColor.name().toUtf8().constData());
         }
     }
 
@@ -1163,13 +1198,13 @@ QStringList XMLexport::remapAnsiToColorNumber(const QStringList & patternList, c
 {
 
     QStringList results;
-    QRegularExpression regex = QRegularExpression(QStringLiteral("^ANSI_COLORS_F{(\\d+|IGNORE|DEFAULT)}_B{(\\d+|IGNORE|DEFAULT)}$"));
+    QRegularExpression const regex = QRegularExpression(qsl("^ANSI_COLORS_F{(\\d+|IGNORE|DEFAULT)}_B{(\\d+|IGNORE|DEFAULT)}$"));
     QStringListIterator itPattern(patternList);
     QListIterator<int> itType(typeList);
     while (itPattern.hasNext() && itType.hasNext()) {
         if (itType.next() == REGEX_COLOR_PATTERN) {
             if (!itPattern.next().isEmpty()) {
-                QRegularExpressionMatch match = regex.match(itPattern.peekPrevious());
+                QRegularExpressionMatch const match = regex.match(itPattern.peekPrevious());
                 // Although we define two '('...')' capture groups the count/size is
                 // 3 (0 is the whole string)!
                 if (match.hasMatch() && match.capturedTexts().size() == 3) {
@@ -1264,7 +1299,7 @@ QStringList XMLexport::remapAnsiToColorNumber(const QStringList & patternList, c
                         qDebug() << "XMLexport::remapAnsiToColorNumber(...) ERROR - failed to extract BG color code from pattern text:" << itPattern.peekPrevious() << " setting colour to default background";
                     }
 
-                    results << QStringLiteral("FG%1BG%2").arg(QString::number(fg), QString::number(bg));
+                    results << qsl("FG%1BG%2").arg(QString::number(fg), QString::number(bg));
                 } else {
                     // No match - so insert previous string - which will cause
                     // a failure when it gets loaded as a REGEX_COLOR_PATTERN

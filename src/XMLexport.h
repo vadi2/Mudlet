@@ -4,7 +4,8 @@
 /***************************************************************************
  *   Copyright (C) 2008-2011 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2017-2019 by Stephen Lyons - slysven@virginmedia.com    *
+ *   Copyright (C) 2017-2019, 2022 by Stephen Lyons                        *
+ *                                               - slysven@virginmedia.com *
  *   Copyright (C) 2017 by Ian Adkins - ieadkins@gmail.com                 *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -26,8 +27,9 @@
 
 #include "pre_guard.h"
 #include <QClipboard>
-#include <QPointer>
 #include <QFuture>
+#include <QPointer>
+#include <QSaveFile>
 #include <pugixml.hpp>
 #include "post_guard.h"
 
@@ -49,13 +51,13 @@ class XMLexport : public QObject
     Q_OBJECT
 
 public:
-    XMLexport(Host*);
-    XMLexport(TTrigger*);
-    XMLexport(TTimer*);
-    XMLexport(TAlias*);
-    XMLexport(TAction*);
-    XMLexport(TScript*);
-    XMLexport(TKey*);
+    explicit XMLexport(Host*);
+    explicit XMLexport(TTrigger*);
+    explicit XMLexport(TTimer*);
+    explicit XMLexport(TAlias*);
+    explicit XMLexport(TAction*);
+    explicit XMLexport(TScript*);
+    explicit XMLexport(TKey*);
 
     void writeHost(Host*, pugi::xml_node hostPackage);
     void writeTrigger(TTrigger*, pugi::xml_node xmlParent);
@@ -65,7 +67,7 @@ public:
     void writeScript(TScript*, pugi::xml_node xmlParent);
     void writeKey(TKey*, pugi::xml_node xmlParent);
     void writeVariable(TVar*, LuaInterface*, VarUnit*, pugi::xml_node xmlParent);
-    void writeModuleXML(const QString& moduleName, const QString& fileName);
+    void writeModuleXML(const QString& moduleName, const QString& fileName, bool async = false);
 
     void exportHost(const QString& filename_pugi_xml);
     bool writeGenericPackage(Host* pHost, pugi::xml_node& mMudletPackage, bool ignoreModuleMember = true);
@@ -107,7 +109,7 @@ private:
     void writeKeyPackage(const Host* pHost, pugi::xml_node& mMudletPackage, bool skipModuleMembers);
     void writeVariablePackage(Host* pHost, pugi::xml_node& mMudletPackage);
     void inline replaceAll(std::string& source, const std::string& from, const std::string& to);
-    bool saveXmlFile(QFile&);
+    bool saveXmlFile(QSaveFile& file);
     bool saveXml(const QString&);
     pugi::xml_node writeXmlHeader();
     void sanitizeForQxml(std::string& output);

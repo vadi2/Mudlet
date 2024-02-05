@@ -2,8 +2,33 @@
 
 set -e
 
-[ -n "$TRAVIS_REPO_SLUG" ] && BUILD_DIR="${TRAVIS_BUILD_DIR}" || BUILD_DIR="${BUILD_FOLDER}"
-[ -n "$TRAVIS_REPO_SLUG" ] && SOURCE_DIR="${TRAVIS_BUILD_DIR}" || SOURCE_DIR="${GITHUB_WORKSPACE}"
+sign_and_notarize () {
+
+  local appBundle="$1"
+  codesign --deep -o runtime -s "$IDENTITY" "${appBundle}"
+  echo "Signed final .dmg"
+
+  cat << EOF > gon.json
+{
+  "notarize": [{
+    "path": "${appBundle}",
+    "bundle_id": "mudlet",
+    "staple": true
+  }]
+}
+EOF
+
+  for i in {1..3}; do
+    echo "Trying to notarize (attempt ${i})"
+    if gon gon.json; then
+      break
+    fi
+  done
+
+}
+
+BUILD_DIR="${BUILD_FOLDER}"
+SOURCE_DIR="${GITHUB_WORKSPACE}"
 
 if [[ "${MUDLET_VERSION_BUILD}" == -ptb* ]]; then
   public_test_build="true"
@@ -36,7 +61,7 @@ if [ "${DEPLOY}" = "deploy" ]; then
     echo "----"
   fi
 
-  if [ -z "${TRAVIS_TAG}" ] && ! [[ "$GITHUB_REF" =~ ^"refs/tags/" ]] && [ "${public_test_build}" != "true" ]; then
+  if ! [[ "$GITHUB_REF" =~ ^"refs/tags/" ]] && [ "${public_test_build}" != "true" ]; then
     echo "== Creating a snapshot build =="
     appBaseName="Mudlet-${VERSION}${MUDLET_VERSION_BUILD}"
     if [ -n "${GITHUB_REPOSITORY}" ]; then
@@ -48,23 +73,18 @@ if [ "${DEPLOY}" = "deploy" ]; then
     ./make-installer.sh "${appBaseName}.app"
 
     if [ -n "$MACOS_SIGNING_PASS" ]; then
-      codesign --deep -s "$IDENTITY" "${HOME}/Desktop/${appBaseName}.dmg"
-      echo "Signed final .dmg"
+      sign_and_notarize "${HOME}/Desktop/${appBaseName}.dmg"
     fi
 
-    if [ -n "$TRAVIS_REPO_SLUG" ]; then
-      DEPLOY_URL=$(wget --method PUT --body-file="${HOME}/Desktop/${appBaseName}.dmg"  "https://make.mudlet.org/snapshots/${appBaseName}.dmg" -O - -q)
-    else
-      echo "=== ... later, via Github ==="
-      # Move the finished file into a folder of its own, because we ask Github to upload contents of a folder
-      mkdir "upload/"
-      mv "${HOME}/Desktop/${appBaseName}.dmg" "upload/"
-      {
-        echo "FOLDER_TO_UPLOAD=$(pwd)/upload"
-        echo "UPLOAD_FILENAME=${appBaseName}"
-      } >> "$GITHUB_ENV"
-      DEPLOY_URL="Github artifact, see https://github.com/$GITHUB_REPOSITORY/runs/$GITHUB_RUN_ID"
-    fi
+    echo "=== ... later, via Github ==="
+    # Move the finished file into a folder of its own, because we ask Github to upload contents of a folder
+    mkdir "upload/"
+    mv "${HOME}/Desktop/${appBaseName}.dmg" "upload/"
+    {
+      echo "FOLDER_TO_UPLOAD=$(pwd)/upload"
+      echo "UPLOAD_FILENAME=${appBaseName}"
+    } >> "$GITHUB_ENV"
+    DEPLOY_URL="Github artifact, see https://github.com/$GITHUB_REPOSITORY/runs/$GITHUB_RUN_ID"
   else # ptb/release build
     app="${BUILD_DIR}/build/Mudlet.app"
     if [ "${public_test_build}" == "true" ]; then
@@ -94,11 +114,10 @@ if [ "${DEPLOY}" = "deploy" ]; then
 
     if [ ! -z "$MACOS_SIGNING_PASS" ]; then
       if [ "${public_test_build}" == "true" ]; then
-        codesign --deep -s "$IDENTITY" "${HOME}/Desktop/Mudlet PTB.dmg"
+        sign_and_notarize "${HOME}/Desktop/Mudlet PTB.dmg"
       else
-        codesign --deep -s "$IDENTITY" "${HOME}/Desktop/Mudlet.dmg"
+        sign_and_notarize "${HOME}/Desktop/Mudlet.dmg"
       fi
-      echo "Signed final .dmg"
     fi
 
     if [ "${public_test_build}" == "true" ]; then
@@ -118,8 +137,23 @@ if [ "${DEPLOY}" = "deploy" ]; then
       DEPLOY_URL="Github artifact, see https://github.com/$GITHUB_REPOSITORY/runs/$GITHUB_RUN_ID"
     else
       echo "=== Uploading installer to https://www.mudlet.org/wp-content/files/?C=M;O=D ==="
-      scp -i "${BUILD_DIR}/CI/mudlet-deploy-key-github.decoded" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${HOME}/Desktop/Mudlet-${VERSION}.dmg" "keneanung@mudlet.org:${DEPLOY_PATH}"
+      scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${HOME}/Desktop/Mudlet-${VERSION}.dmg" "mudmachine@mudlet.org:${DEPLOY_PATH}"
       DEPLOY_URL="https://www.mudlet.org/wp-content/files/Mudlet-${VERSION}.dmg"
+
+      SHA256SUM=$(shasum -a 256 "${HOME}/Desktop/Mudlet-${VERSION}.dmg" | awk '{print $1}')
+
+      # file_cat=1 asuming macOS is the 1st item in WP-Download-Manager category
+      curl -X POST 'https://www.mudlet.org/wp-content/plugins/wp-downloadmanager/download-add.php' \
+      -H "x-wp-download-token: $X_WP_DOWNLOAD_TOKEN" \
+      -F "file_type=2" \
+      -F "file_remote=$DEPLOY_URL" \
+      -F "file_name=Mudlet-${VERSION} (macOS)" \
+      -F "file_des=sha256: $SHA256SUM" \
+      -F "file_cat=1" \
+      -F "file_permission=-1" \
+      -F "output=json" \
+      -F "do=Add File"
+
     fi
 
     # install dblsqd. NPM must be available here because we use it to install the tool that creates the dmg
@@ -132,7 +166,7 @@ if [ "${DEPLOY}" = "deploy" ]; then
       wget "https://feeds.dblsqd.com/MKMMR7HNSP65PquQQbiDIw/public-test-build/mac/x86_64" --output-document="$downloadedfeed"
       echo "=== Generating a changelog ==="
       cd "${SOURCE_DIR}" || exit
-      changelog=$(lua "${SOURCE_DIR}/CI/generate-ptb-changelog.lua" --releasefile "${downloadedfeed}")
+      changelog=$(lua "${SOURCE_DIR}/CI/generate-changelog.lua" --mode ptb --releasefile "${downloadedfeed}")
 
       echo "=== Creating release in Dblsqd ==="
       dblsqd release -a mudlet -c public-test-build -m "${changelog}" "${VERSION}${MUDLET_VERSION_BUILD}" || true

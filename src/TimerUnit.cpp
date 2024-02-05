@@ -1,7 +1,8 @@
 /***************************************************************************
  *   Copyright (C) 2008-2013 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2019 by Stephen Lyons - slysven@virginmedia.com         *
+ *   Copyright (C) 2019, 2022-2023 by Stephen Lyons                        *
+ *                                               - slysven@virginmedia.com *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -31,6 +32,13 @@ TimerUnit::~TimerUnit()
     for (auto&& timer : qAsConst(mQTimerSet)) {
         delete timer;
     }
+}
+
+void TimerUnit::resetStats()
+{
+    statsItemsTotal = 0;
+    statsTempItems = 0;
+    statsActiveItems = 0;
 }
 
 void TimerUnit::_uninstall(TTimer* pChild, const QString& packageName)
@@ -196,7 +204,7 @@ bool TimerUnit::registerTimer(TTimer* pT)
 
     // This has some side effects, including stopping the timer...
     pT->setTime(pT->getTime());
-    QTimer::connect(pT->getQTimer(), &QTimer::timeout, mudlet::self(), &mudlet::slot_timer_fires, Qt::UniqueConnection);
+    QTimer::connect(pT->getQTimer(), &QTimer::timeout, mudlet::self(), &mudlet::slot_timerFires, Qt::UniqueConnection);
     return true;
 }
 
@@ -208,7 +216,7 @@ void TimerUnit::unregisterTimer(TTimer* pT)
     // Stop the QTimer ASAP:
     pT->stop();
     pT->deactivate();
-    QTimer::disconnect(pT->getQTimer(), &QTimer::timeout, mudlet::self(), &mudlet::slot_timer_fires);
+    QTimer::disconnect(pT->getQTimer(), &QTimer::timeout, mudlet::self(), &mudlet::slot_timerFires);
     if (pT->getParent()) {
         _removeTimer(pT);
         return;
@@ -253,7 +261,7 @@ void TimerUnit::_removeTimer(TTimer* pT)
 bool TimerUnit::enableTimer(const QString& name)
 {
     bool found = false;
-    QMap<QString, TTimer*>::const_iterator it = mLookupTable.constFind(name);
+    auto it = mLookupTable.constFind(name);
     while (it != mLookupTable.cend() && it.key() == name) {
         TTimer* pT = it.value();
 
@@ -292,7 +300,7 @@ bool TimerUnit::enableTimer(const QString& name)
 bool TimerUnit::disableTimer(const QString& name)
 {
     bool found = false;
-    QMap<QString, TTimer*>::const_iterator it = mLookupTable.constFind(name);
+    auto it = mLookupTable.constFind(name);
     while (it != mLookupTable.cend() && it.key() == name) {
         TTimer* pT = it.value();
         if (pT->isOffsetTimer()) {
@@ -315,14 +323,24 @@ TTimer* TimerUnit::findFirstTimer(const QString& name) const
     return mLookupTable.value(name);
 }
 
-// Not currently used but left for future code that will be looking for multiple
-// timers that all have the same name:
-QList<TTimer*> TimerUnit::findTimers(const QString& name)
+std::vector<int> TimerUnit::findItems(const QString& name, const bool exactMatch, const bool caseSensitive)
 {
-    // This does rather assume an empty QList will be returned if the name is
-    // not used for ANY TTimers - but it does not actually say so in the
-    // documentation!
-    return mLookupTable.values(name);
+    std::vector<int> ids;
+    const auto searchCaseSensitivity = caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
+    if (exactMatch) {
+        for (auto& item : qAsConst(mTimerMap)) {
+            if (!item->getName().compare(name, searchCaseSensitivity)) {
+                ids.push_back(item->getID());
+            }
+        }
+    } else {
+        for (auto& item : qAsConst(mTimerMap)) {
+            if (item->getName().contains(name, searchCaseSensitivity)) {
+                ids.push_back(item->getID());
+            }
+        }
+    }
+    return ids;
 }
 
 bool TimerUnit::killTimer(const QString& name)
@@ -383,52 +401,45 @@ void TimerUnit::markCleanup(TTimer* pT)
     mCleanupSet.insert(pT);
 }
 
-void TimerUnit::_assembleReport(TTimer* pChild)
+void TimerUnit::assembleReport(TTimer* pItem)
 {
-    std::list<TTimer*>* childrenList = pChild->mpMyChildrenList;
-    for (auto timer : *childrenList) {
-        _assembleReport(timer);
-        if (timer->isActive()) {
-            statsActiveTriggers++;
+    std::list<TTimer*>* childrenList = pItem->mpMyChildrenList;
+    for (auto pChild : *childrenList) {
+        ++statsItemsTotal;
+        if (pChild->isOffsetTimer() ? pChild->shouldBeActive() : pChild->isActive()) {
+            ++statsActiveItems;
         }
-        if (timer->isTemporary()) {
-            statsTempTriggers++;
+        if (pChild->isTemporary()) {
+            ++statsTempItems;
         }
-        statsTriggerTotal++;
+        assembleReport(pChild);
     }
 }
 
-QString TimerUnit::assembleReport()
+std::tuple<QString, int, int, int> TimerUnit::assembleReport()
 {
-    statsActiveTriggers = 0;
-    statsTriggerTotal = 0;
-    statsTempTriggers = 0;
-    for (auto rootTimer : mTimerRootNodeList) {
-        if (rootTimer->isActive()) {
-            statsActiveTriggers++;
+    resetStats();
+    for (auto pItem : mTimerRootNodeList) {
+        ++statsItemsTotal;
+        if (pItem->isOffsetTimer() ? pItem->shouldBeActive() : pItem->isActive()) {
+            ++statsActiveItems;
         }
-        if (rootTimer->isTemporary()) {
-            statsTempTriggers++;
+        if (pItem->isTemporary()) {
+            ++statsTempItems;
         }
-        statsTriggerTotal++;
-        std::list<TTimer*>* childrenList = rootTimer->mpMyChildrenList;
-        for (auto childTimer : *childrenList) {
-            _assembleReport(childTimer);
-            if (childTimer->isActive()) {
-                statsActiveTriggers++;
-            }
-            if (childTimer->isTemporary()) {
-                statsTempTriggers++;
-            }
-            statsTriggerTotal++;
-        }
+        assembleReport(pItem);
     }
     QStringList msg;
-    msg << "timers current total: " << QString::number(statsTriggerTotal) << "\n"
-        << "tempTimers current total: " << QString::number(statsTempTriggers) << "\n"
-        << "active timers: " << QString::number(statsActiveTriggers) << "\n";
+    msg << QLatin1String("Timers current total: ") << QString::number(statsItemsTotal) << QLatin1String("\n")
+        << QLatin1String("tempTimers current total: ") << QString::number(statsTempItems) << QLatin1String("\n")
+        << QLatin1String("active Timers: ") << QString::number(statsActiveItems) << QLatin1String("\n");
 
-    return msg.join("");
+    return {
+        msg.join(QString()),
+        statsItemsTotal,
+        statsTempItems,
+        statsActiveItems
+    };
 }
 
 void TimerUnit::changeHostName(const QString& newName)

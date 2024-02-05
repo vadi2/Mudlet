@@ -1,7 +1,7 @@
 /***************************************************************************
  *   Copyright (C) 2012-2013 by Heiko Koehn - KoehnHeiko@googlemail.com    *
  *   Copyright (C) 2014 by Ahmed Charles - acharles@outlook.com            *
- *   Copyright (C) 2014-2016, 2018, 2020-2021 by Stephen Lyons             *
+ *   Copyright (C) 2014-2016, 2018, 2020-2021, 2023 by Stephen Lyons       *
  *                                               - slysven@virginmedia.com *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -83,45 +83,24 @@ TRoom::~TRoom()
 QString TRoom::dirCodeToDisplayName(const int dirCode) const
 {
     switch (dirCode) {
-    case DIR_NORTH:     return tr("North");       break;
-    case DIR_NORTHEAST: return tr("North-east");  break;
-    case DIR_NORTHWEST: return tr("North-west");  break;
-    case DIR_SOUTH:     return tr("South");       break;
-    case DIR_SOUTHEAST: return tr("South-east");  break;
-    case DIR_SOUTHWEST: return tr("South-west");  break;
-    case DIR_EAST:      return tr("East");        break;
-    case DIR_WEST:      return tr("West");        break;
-    case DIR_UP:        return tr("Up");          break;
-    case DIR_DOWN:      return tr("Down");        break;
-    case DIR_IN:        return tr("In");          break;
-    case DIR_OUT:       return tr("Out");         break;
-    case DIR_OTHER:     return tr("Other");       break;
-    default:
-        return tr("Unknown");
+    case DIR_NORTH:     return tr("North");
+    case DIR_NORTHEAST: return tr("North-east");
+    case DIR_NORTHWEST: return tr("North-west");
+    case DIR_SOUTH:     return tr("South");
+    case DIR_SOUTHEAST: return tr("South-east");
+    case DIR_SOUTHWEST: return tr("South-west");
+    case DIR_EAST:      return tr("East");
+    case DIR_WEST:      return tr("West");
+    case DIR_UP:        return tr("Up");
+    case DIR_DOWN:      return tr("Down");
+    case DIR_IN:        return tr("In");
+    case DIR_OUT:       return tr("Out");
+    case DIR_OTHER:     return tr("Other");
+    default:            return tr("Unknown");
     }
 }
 
-QString TRoom::dirCodeToString(const int dirCode) const
-{
-    switch (dirCode) {
-    case DIR_NORTH:     return QLatin1String("north");
-    case DIR_NORTHEAST: return QLatin1String("northeast");
-    case DIR_NORTHWEST: return QLatin1String("northwest");
-    case DIR_EAST:      return QLatin1String("east");
-    case DIR_WEST:      return QLatin1String("west");
-    case DIR_SOUTH:     return QLatin1String("south");
-    case DIR_SOUTHEAST: return QLatin1String("southeastst");
-    case DIR_SOUTHWEST: return QLatin1String("southwest");
-    case DIR_UP:        return QLatin1String("up");
-    case DIR_DOWN:      return QLatin1String("down");
-    case DIR_IN:        return QLatin1String("in");
-    case DIR_OUT:       return QLatin1String("out");
-    default:
-        Q_UNREACHABLE();
-    }
-}
-
-QString TRoom::dirCodeToShortString(const int dirCode) const
+/* static */ QString TRoom::dirCodeToShortString(const int dirCode)
 {
     switch (dirCode) {
     case DIR_NORTH:     return QLatin1String("n");
@@ -132,6 +111,26 @@ QString TRoom::dirCodeToShortString(const int dirCode) const
     case DIR_SOUTH:     return QLatin1String("s");
     case DIR_SOUTHEAST: return QLatin1String("se");
     case DIR_SOUTHWEST: return QLatin1String("sw");
+    case DIR_UP:        return QLatin1String("up");
+    case DIR_DOWN:      return QLatin1String("down");
+    case DIR_IN:        return QLatin1String("in");
+    case DIR_OUT:       return QLatin1String("out");
+    default:
+        Q_UNREACHABLE();
+    }
+}
+
+/* static */ QString TRoom::dirCodeToString(const int dirCode)
+{
+    switch (dirCode) {
+    case DIR_NORTH:     return QLatin1String("north");
+    case DIR_NORTHEAST: return QLatin1String("northeast");
+    case DIR_NORTHWEST: return QLatin1String("northwest");
+    case DIR_EAST:      return QLatin1String("east");
+    case DIR_WEST:      return QLatin1String("west");
+    case DIR_SOUTH:     return QLatin1String("south");
+    case DIR_SOUTHEAST: return QLatin1String("southeast");
+    case DIR_SOUTHWEST: return QLatin1String("southwest");
     case DIR_UP:        return QLatin1String("up");
     case DIR_DOWN:      return QLatin1String("down");
     case DIR_IN:        return QLatin1String("in");
@@ -166,7 +165,7 @@ int TRoom::stringToDirCode(const QString& string) const
     if (string == QLatin1String("northwest")) {
         return DIR_NORTHWEST;
     }
-    if (string == QLatin1String("southeastst")) {
+    if (string == QLatin1String("southeast")) {
         return DIR_SOUTHEAST;
     }
     if (string == QLatin1String("southwest")) {
@@ -206,6 +205,7 @@ void TRoom::setExitStub(int direction, bool status)
     } else {
         exitStubs.removeAll(direction);
     }
+    mpRoomDB->mpMap->setUnsaved(__func__);
 }
 
 int TRoom::getExitWeight(const QString& cmd)
@@ -238,22 +238,19 @@ void TRoom::setWeight(int w)
         w = 1;
     }
     weight = w;
+    mpRoomDB->mpMap->setUnsaved(__func__);
 }
 
-// Previous implementations did not allow for REMOVAL of an exit weight (by
-// setting it to zero)
 void TRoom::setExitWeight(const QString& cmd, int w)
 {
     if (w > 0) {
         exitWeights[cmd] = w;
-        if (mpRoomDB && mpRoomDB->mpMap) {
-            mpRoomDB->mpMap->mMapGraphNeedsUpdate = true;
-        }
+        mpRoomDB->mpMap->setUnsaved(__func__);
+        mpRoomDB->mpMap->mMapGraphNeedsUpdate = true;
     } else if (exitWeights.contains(cmd)) {
         exitWeights.remove(cmd);
-        if (mpRoomDB && mpRoomDB->mpMap) {
-            mpRoomDB->mpMap->mMapGraphNeedsUpdate = true;
-        }
+        mpRoomDB->mpMap->setUnsaved(__func__);
+        mpRoomDB->mpMap->mMapGraphNeedsUpdate = true;
     }
 }
 
@@ -267,19 +264,21 @@ bool TRoom::setDoor(const QString& cmd, const int doorStatus)
         if (doors.value(cmd, 0) != doorStatus) {
             // .value will return 0 if there ISN'T a door for this cmd
             doors[cmd] = doorStatus;
+            mpRoomDB->mpMap->setUnsaved(__func__);
             return true; // As we have changed things
         } else {
             return false; // Valid but ineffective
         }
     } else if (doors.contains(cmd) && !doorStatus) {
         doors.remove(cmd);
+        mpRoomDB->mpMap->setUnsaved(__func__);
         return true; // As we have changed things
     } else {
         return false; // As we have not changed things
     }
 }
 
-int TRoom::getDoor(const QString& cmd)
+int TRoom::getDoor(const QString& cmd) const
 {
     return doors.value(cmd, 0);
     // Second argument is the result if cmd is not in the doors QMap
@@ -351,6 +350,7 @@ bool TRoom::setArea(int areaID, bool isToDeferAreaRelatedRecalculations)
         dirtyAreas.clear();
     }
 
+    mpRoomDB->mpMap->setUnsaved(__func__);
     return true;
 }
 
@@ -374,6 +374,7 @@ bool TRoom::setExit(const int to, const int direction)
         return false;
     }
     mpRoomDB->updateEntranceMap(this);
+    mpRoomDB->mpMap->setUnsaved(__func__);
     return true;
 }
 
@@ -522,6 +523,7 @@ void TRoom::setExitLock(int exit, bool state)
     } else {
         exitLocks.removeAll(exit);
     }
+    mpRoomDB->mpMap->setUnsaved(__func__);
 }
 
 bool TRoom::setSpecialExitLock(const QString& cmd, const bool doLock)
@@ -536,6 +538,7 @@ bool TRoom::setSpecialExitLock(const QString& cmd, const bool doLock)
         mSpecialExitLocks.remove(cmd);
     }
 
+    mpRoomDB->mpMap->setUnsaved(__func__);
     return true;
 }
 
@@ -557,7 +560,7 @@ bool TRoom::hasSpecialExitLock(const QString& cmd) const
 void TRoom::setSpecialExit(const int to, const QString& cmd)
 {
     if (cmd.isEmpty()) {
-        return; // Refuse to create an unnamed special exit!!!
+        return;
     }
 
     if (to > 0) {
@@ -581,12 +584,12 @@ void TRoom::setSpecialExit(const int to, const QString& cmd)
     }
     mpRoomDB->updateEntranceMap(this);
     mpRoomDB->mpMap->mMapGraphNeedsUpdate = true;
+    mpRoomDB->mpMap->setUnsaved(__func__);
 }
 
 void TRoom::clearSpecialExits()
 {
     if (mSpecialExits.isEmpty()) {
-        // Nothing to do:
         return;
     }
 
@@ -605,6 +608,7 @@ void TRoom::clearSpecialExits()
     }
     mpRoomDB->updateEntranceMap(this);
     mpRoomDB->mpMap->mMapGraphNeedsUpdate = true;
+    mpRoomDB->mpMap->setUnsaved(__func__);
 }
 
 void TRoom::removeAllSpecialExitsToRoom(const int roomId)
@@ -636,6 +640,7 @@ void TRoom::removeAllSpecialExitsToRoom(const int roomId)
         }
         mpRoomDB->updateEntranceMap(this);
         mpRoomDB->mpMap->mMapGraphNeedsUpdate = true;
+        mpRoomDB->mpMap->setUnsaved(__func__);
     }
 }
 
@@ -658,8 +663,8 @@ void TRoom::calcRoomDimensions()
             continue;
         }
         for (auto pointInLine : pointsInLine) {
-            qreal pointX = pointInLine.x();
-            qreal pointY = pointInLine.y();
+            qreal const pointX = pointInLine.x();
+            qreal const pointY = pointInLine.y();
             if (pointX < min_x) {
                 min_x = pointX;
             }
@@ -722,10 +727,10 @@ void TRoom::restore(QDataStream& ifs, int roomID, int version)
         // from version 11-ish:
         QMultiMap<int, QString> oldSpecialExits;
         ifs >> oldSpecialExits;
-        QMapIterator<int, QString> itOldSpecialExit(oldSpecialExits);
+        QMultiMapIterator<int, QString> itOldSpecialExit(oldSpecialExits);
         while (itOldSpecialExit.hasNext()) {
             itOldSpecialExit.next();
-            QString cmd{itOldSpecialExit.value()};
+            const QString cmd{itOldSpecialExit.value()};
             if (cmd.startsWith(QLatin1String("1"))) {
                 // Is locked:
                 mSpecialExits.insert(cmd.mid(1), itOldSpecialExit.key());
@@ -758,7 +763,7 @@ void TRoom::restore(QDataStream& ifs, int roomID, int version)
         ifs >> userData;
         if (version < 19) {
             // Recover and remove backup values from the user data
-            QString symbolString = userData.take(QLatin1String("system.fallback_symbol"));
+            const QString symbolString = userData.take(QLatin1String("system.fallback_symbol"));
             if (!symbolString.isEmpty()) {
                 // There is a fallback in the user data
                 mSymbol = symbolString;
@@ -792,7 +797,7 @@ void TRoom::restore(QDataStream& ifs, int roomID, int version)
             QMapIterator<QString, QList<QPointF>> itCustomLine(oldLinesData);
             while (itCustomLine.hasNext()) {
                 itCustomLine.next();
-                QString direction(itCustomLine.key());
+                const QString direction(itCustomLine.key());
                 if (direction == QLatin1String("N") || direction == QLatin1String("E") || direction == QLatin1String("S") || direction == QLatin1String("W") || direction == QLatin1String("UP")
                     || direction == QLatin1String("DOWN")
                     || direction == QLatin1String("NE")
@@ -812,7 +817,7 @@ void TRoom::restore(QDataStream& ifs, int roomID, int version)
             QMapIterator<QString, bool> itCustomLineArrow(oldLinesArrowData);
             while (itCustomLineArrow.hasNext()) {
                 itCustomLineArrow.next();
-                QString direction(itCustomLineArrow.key());
+                const QString direction(itCustomLineArrow.key());
                 if (direction == QLatin1String("N") || direction == QLatin1String("E") || direction == QLatin1String("S") || direction == QLatin1String("W") || direction == QLatin1String("UP")
                     || direction == QLatin1String("DOWN")
                     || direction == QLatin1String("NE")
@@ -832,7 +837,7 @@ void TRoom::restore(QDataStream& ifs, int roomID, int version)
             QMapIterator<QString, QList<int>> itCustomLineColor(oldLinesColorData);
             while (itCustomLineColor.hasNext()) {
                 itCustomLineColor.next();
-                QString direction(itCustomLineColor.key());
+                const QString direction(itCustomLineColor.key());
                 if (direction == QLatin1String("N") || direction == QLatin1String("E") || direction == QLatin1String("S") || direction == QLatin1String("W") || direction == QLatin1String("UP")
                     || direction == QLatin1String("DOWN")
                     || direction == QLatin1String("NE")
@@ -850,7 +855,7 @@ void TRoom::restore(QDataStream& ifs, int roomID, int version)
                         customLinesColor.insert(itCustomLineColor.key().toLower(), QColor(itCustomLineColor.value().at(0), itCustomLineColor.value().at(1), itCustomLineColor.value().at(2)));
                     }
                     // Otherwise we will fixup both empty
-                    // itCustomLineColor.value() entites AND altogether missing
+                    // itCustomLineColor.value() entities AND altogether missing
                     // ones outside of the while() {...}:
                 } else {
                     if (itCustomLineColor.value().count() > 2) {
@@ -867,17 +872,13 @@ void TRoom::restore(QDataStream& ifs, int roomID, int version)
             // operation we want to perform (obtain the directions of all custom
             // exit lines and remove those which are already included in the
             // colours) is much easier to perform on a QSet rather than a QList:
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
             auto customLineKeys = customLines.keys();
             QSet<QString> missingKeys{customLineKeys.begin(), customLineKeys.end()};
             if (!customLinesColor.isEmpty()) {
                 auto customLinesColorKeys = customLinesColor.keys();
-                QSet<QString> customLinesColorKeysSet{customLinesColorKeys.begin(), customLinesColorKeys.end()};
+                QSet<QString> const customLinesColorKeysSet{customLinesColorKeys.begin(), customLinesColorKeys.end()};
                 missingKeys.subtract(customLinesColorKeysSet);
             }
-#else
-            QSet<QString> missingKeys{customLines.keys().toSet().subtract(customLinesColor.keys().toSet())};
-#endif
             QSetIterator<QString> itMissingCustomLineColourKey(missingKeys);
             while (itMissingCustomLineColourKey.hasNext()) {
                 customLinesColor.insert(itMissingCustomLineColourKey.next(), QColor(Qt::red));
@@ -931,7 +932,7 @@ void TRoom::restore(QDataStream& ifs, int roomID, int version)
 void TRoom::audit(const QHash<int, int> roomRemapping, const QHash<int, int> areaRemapping)
 {
     if (areaRemapping.contains(area)) {
-        userData.insert(QStringLiteral("audit.remapped_area"), QString::number(area));
+        userData.insert(qsl("audit.remapped_area"), QString::number(area));
         area = areaRemapping.value(area);
     }
 
@@ -944,13 +945,8 @@ void TRoom::auditExits(const QHash<int, int> roomRemapping)
     // members from to identify any rogue members before removing them:
 
     QMap<QString, int> exitWeightsCopy = exitWeights;
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
     QSet<int> exitStubsCopy{exitStubs.begin(), exitStubs.end()};
     QSet<int> exitLocksCopy{exitLocks.begin(), exitLocks.end()};
-#else
-    QSet<int> exitStubsCopy{exitStubs.toSet()};
-    QSet<int> exitLocksCopy{exitLocks.toSet()};
-#endif
     QMap<QString, int> doorsCopy = doors;
     QMap<QString, QList<QPointF>> customLinesCopy = customLines;
     QMap<QString, QColor> customLinesColorCopy = customLinesColor;
@@ -1139,11 +1135,11 @@ void TRoom::auditExits(const QHash<int, int> roomRemapping)
         QMutableMapIterator<QString, int> it(mSpecialExits);
         while (it.hasNext()) {
             it.next();
-            QString exitName = it.key();
-            int exitRoomId = it.value();
+            const QString exitName = it.key();
+            const int exitRoomId = it.value();
             if (exitName.isEmpty()) {
                 if (mudlet::self()->showMapAuditErrors()) {
-                    QString warnMsg = tr("[ WARN ]  - In room id:%1 removing invalid (special) exit to %2 {with no name!}").arg(id, 6, QLatin1Char('0')).arg(exitRoomId, 6, QLatin1Char('0'));
+                    const QString warnMsg = tr("[ WARN ]  - In room id:%1 removing invalid (special) exit to %2 {with no name!}").arg(id, 6, QLatin1Char('0')).arg(exitRoomId, 6, QLatin1Char('0'));
                     // If size is less than or equal to 0 then there is nothing to print!!!
                     mpRoomDB->mpMap->postMessage(warnMsg);
                 }
@@ -1153,10 +1149,10 @@ void TRoom::auditExits(const QHash<int, int> roomRemapping)
             }
 
             if (roomRemapping.contains(exitRoomId)) {
-                QString auditKey = QStringLiteral("audit.remapped_special_exit.%1").arg(exitName);
+                const QString auditKey = qsl("audit.remapped_special_exit.%1").arg(exitName);
                 userData.insert(auditKey, QString::number(exitRoomId));
                 if (mudlet::self()->showMapAuditErrors()) {
-                    QString infoMsg = tr("[ INFO ]  - In room with id: %1 correcting special exit \"%2\" that\n"
+                    const QString infoMsg = tr("[ INFO ]  - In room with id: %1 correcting special exit \"%2\" that\n"
                                          "was to room with an exit to invalid room: %3 to now go\n"
                                          "to: %4.")
                                               .arg(id)
@@ -1182,16 +1178,16 @@ void TRoom::auditExits(const QHash<int, int> roomRemapping)
         QMutableMapIterator<QString, int> it(mSpecialExits);
         while (it.hasNext()) {
             it.next();
-            int exitRoomId = it.value();
-            QString exitName = it.key();
+            const int exitRoomId = it.value();
+            const QString exitName = it.key();
 
             if (exitRoomId > 0) {
                 // A real exit - should have a real destination
                 if (Q_UNLIKELY(!mpRoomDB->getRoom(exitRoomId))) {
                     // But it doesn't exist
-                    QString auditKey = QStringLiteral("audit.removed_valid_but_missing_special_exit.%1").arg(exitName);
+                    const QString auditKey = qsl("audit.removed_valid_but_missing_special_exit.%1").arg(exitName);
                     if (mudlet::self()->showMapAuditErrors()) {
-                        QString warnMsg = tr("[ WARN ]  - Room with id: %1 has a special exit \"%2\" with an\n"
+                        const QString warnMsg = tr("[ WARN ]  - Room with id: %1 has a special exit \"%2\" with an\n"
                                              "exit to: %3 but that room does not exist.  The exit will\n"
                                              "be removed (but the destination room id will be stored in\n"
                                              "the room user data under a key:\n"
@@ -1240,10 +1236,10 @@ void TRoom::auditExits(const QHash<int, int> roomRemapping)
                 }
             } else {
                 // < 1 and not renumbered because the bad room Id DID NOT exist
-                QString auditKey = QStringLiteral("audit.removed_invalid_special_exit.%1").arg(exitName);
+                const QString auditKey = qsl("audit.removed_invalid_special_exit.%1").arg(exitName);
                 userData.insert(auditKey, QString::number(exitRoomId));
                 if (mudlet::self()->showMapAuditErrors()) {
-                    QString infoMsg = tr("[ INFO ]  - In room with id: %1 special exit \"%2\"\n"
+                    const QString infoMsg = tr("[ INFO ]  - In room with id: %1 special exit \"%2\"\n"
                                          "that was to room with an invalid room: %3 that does not exist.\n"
                                          "The exit will be removed (the bad destination room id will be stored in the\n"
                                          "room user data under a key:\n"
@@ -1305,7 +1301,7 @@ void TRoom::auditExits(const QHash<int, int> roomRemapping)
             }
         }
         if (mudlet::self()->showMapAuditErrors()) {
-            QString infoMsg = tr("[ INFO ]  - In room with id: %1 found one or more surplus door items that were removed:\n"
+            const QString infoMsg = tr("[ INFO ]  - In room with id: %1 found one or more surplus door items that were removed:\n"
                                  "%2.")
                                       .arg(id)
                                       .arg(extras.join(QLatin1String(", ")));
@@ -1325,10 +1321,10 @@ void TRoom::auditExits(const QHash<int, int> roomRemapping)
         while (itSpareExitWeight.hasNext()) {
             itSpareExitWeight.next();
             exitWeights.remove(itSpareExitWeight.key());
-            extras << QStringLiteral("\"%1\"(%2)").arg(itSpareExitWeight.key()).arg(itSpareExitWeight.value());
+            extras << qsl("\"%1\"(%2)").arg(itSpareExitWeight.key()).arg(itSpareExitWeight.value());
         }
         if (mudlet::self()->showMapAuditErrors()) {
-            QString infoMsg = tr("[ INFO ]  - In room with id: %1 found one or more surplus weight items that were removed:\n"
+            const QString infoMsg = tr("[ INFO ]  - In room with id: %1 found one or more surplus weight items that were removed:\n"
                                  "%2.")
                                       .arg(id)
                                       .arg(extras.join(QLatin1String(", ")));
@@ -1346,12 +1342,12 @@ void TRoom::auditExits(const QHash<int, int> roomRemapping)
         QStringList extras;
         QSetIterator<int> itSpareExitLock(exitLocksCopy);
         while (itSpareExitLock.hasNext()) {
-            int dirCode = itSpareExitLock.next();
+            const int dirCode = itSpareExitLock.next();
             extras.append(dirCodeToDisplayName(dirCode));
             exitLocks.removeAll(dirCode);
         }
         if (mudlet::self()->showMapAuditErrors()) {
-            QString infoMsg = tr("[ INFO ]  - In room with id: %1 found one or more surplus exit lock items that were removed:\n"
+            const QString infoMsg = tr("[ INFO ]  - In room with id: %1 found one or more surplus exit lock items that were removed:\n"
                                  "%2.")
                                       .arg(id)
                                       .arg(extras.join(QLatin1String(", ")));
@@ -1437,7 +1433,7 @@ void TRoom::auditExits(const QHash<int, int> roomRemapping)
 
         if (!extras.isEmpty()) {
             if (mudlet::self()->showMapAuditErrors()) {
-                QString infoMsg = tr("[ INFO ]  - In room with id: %1 found one or more surplus custom line elements that\n"
+                const QString infoMsg = tr("[ INFO ]  - In room with id: %1 found one or more surplus custom line elements that\n"
                                      "were removed: %2.")
                                           .arg(id)
                                           .arg(extras.join(QLatin1String(", ")));
@@ -1463,10 +1459,10 @@ void TRoom::auditExit(int& exitRoomId,                     // Reference to where
                       const QHash<int, int> roomRemapping)
 {
     if (roomRemapping.contains(exitRoomId)) {
-        QString auditKey = QStringLiteral("audit.remapped_exit.%1").arg(dirCode);
+        const QString auditKey = qsl("audit.remapped_exit.%1").arg(dirCode);
         userData.insert(auditKey, QString::number(exitRoomId));
         if (mudlet::self()->showMapAuditErrors()) {
-            QString infoMsg = tr("[ INFO ]  - In room with id: %1 correcting exit \"%2\" that was to room with\n"
+            const QString infoMsg = tr("[ INFO ]  - In room with id: %1 correcting exit \"%2\" that was to room with\n"
                                  "an exit to invalid room: %3 to now go to: %4.")
                                       .arg(id)
                                       .arg(displayName)
@@ -1484,9 +1480,9 @@ void TRoom::auditExit(int& exitRoomId,                     // Reference to where
         // A real exit - should have a real destination, and NOT have a stub
         if (Q_UNLIKELY(!mpRoomDB->getRoom(exitRoomId))) {
             // But it doesn't exist
-            QString auditKey = QStringLiteral("audit.made_stub_of_valid_but_missing_exit.%1").arg(dirCode);
+            const QString auditKey = qsl("audit.made_stub_of_valid_but_missing_exit.%1").arg(dirCode);
             if (mudlet::self()->showMapAuditErrors()) {
-                QString warnMsg = tr("[ WARN ]  - Room with id: %1 has an exit \"%2\" to: %3 but that room\n"
+                const QString warnMsg = tr("[ WARN ]  - Room with id: %1 has an exit \"%2\" to: %3 but that room\n"
                                      "does not exist.  The exit will be removed (but the destination room\n"
                                      "Id will be stored in the room user data under a key:\n"
                                      "\"%4\")\n"
@@ -1543,7 +1539,7 @@ void TRoom::auditExit(int& exitRoomId,                     // Reference to where
             // We cannot allow a stub exit at the same time as a real exit:
             if (exitStubs.contains(dirCode)) {
                 if (mudlet::self()->showMapAuditErrors()) {
-                    QString warnMsg = tr("[ ALERT ] - Room with id: %1 has an exit \"%2\" to: %3 but also\n"
+                    const QString warnMsg = tr("[ ALERT ] - Room with id: %1 has an exit \"%2\" to: %3 but also\n"
                                          "has a stub exit!  As a real exit precludes a stub, the latter will\n"
                                          "be removed.")
                                               .arg(id)
@@ -1605,7 +1601,7 @@ void TRoom::auditExit(int& exitRoomId,                     // Reference to where
         // either 0 or < -1 and not renumbered because the bad room Id DID NOT
         // exist, there could be a "double fault" in that there is also a stub
         // exit, but that will be masked as we turn the exit into a stub anyhow.
-        QString auditKey = QStringLiteral("audit.made_stub_of_invalid_exit.%1").arg(dirCode);
+        const QString auditKey = qsl("audit.made_stub_of_invalid_exit.%1").arg(dirCode);
         userData.insert(auditKey, QString::number(exitRoomId));
         QString infoMsg;
         if (mudlet::self()->showMapAuditErrors()) {
@@ -1633,26 +1629,28 @@ void TRoom::auditExit(int& exitRoomId,                     // Reference to where
         exitStubsPool.remove(dirCode); // Remove the stub in this direction from check pool as we have handled it
 
         if (exitLocks.contains(dirCode)) {
-            QString auditKeyLocked = QStringLiteral("audit.invalid_exit.%1.isLocked").arg(dirCode);
-            userData.insert(auditKeyLocked, QStringLiteral("true"));
+            const QString auditKeyLocked = qsl("audit.invalid_exit.%1.isLocked").arg(dirCode);
+            userData.insert(auditKeyLocked, qsl("true"));
             if (mudlet::self()->showMapAuditErrors()) {
-                infoMsg.append(tr("\nIt was locked, this is recorded as user data with key:\n"
-                                  "\"%1\".")
-                                       .arg(auditKeyLocked));
+                infoMsg.append(
+                    qsl("\n%1").arg(
+                        tr("It was locked, this is recorded as user data with key:\n\"%1\".")
+                        .arg(auditKeyLocked)));
             }
-            logMsg.append(tr(R"(  It was locked, this is recorded as user data with key: "%1".)").arg(auditKeyLocked));
+            logMsg.append(qsl("  %1").arg(tr(R"(It was locked, this is recorded as user data with key: "%1".)").arg(auditKeyLocked)));
             exitLocks.removeAll(dirCode);
         }
 
         if (exitWeights.contains(exitKey)) {
-            QString auditKeyWeight = QStringLiteral("audit.invalid_exit.%1.weight").arg(dirCode);
+            const QString auditKeyWeight = qsl("audit.invalid_exit.%1.weight").arg(dirCode);
             userData.insert(auditKeyWeight, QString::number(exitWeights.value(exitKey)));
             if (mudlet::self()->showMapAuditErrors()) {
-                infoMsg.append(tr("\nIt had a weight, this is recorded as user data with key:\n"
-                                  "\"%1\".")
-                                       .arg(auditKeyWeight));
+                infoMsg.append(
+                    qsl("\n%1").arg(
+                        tr("It had a weight, this is recorded as user data with key:\n\"%1\".")
+                        .arg(auditKeyWeight)));
             }
-            logMsg.append(tr(R"(  It had a weight, this is recorded as user data with key: "%1".)").arg(auditKeyWeight));
+            logMsg.append(qsl("  %1").arg(tr(R"(It had a weight, this is recorded as user data with key: "%1".)").arg(auditKeyWeight)));
             exitWeights.remove(exitKey);
         }
         if (mudlet::self()->showMapAuditErrors()) {
@@ -1663,7 +1661,7 @@ void TRoom::auditExit(int& exitRoomId,                     // Reference to where
 
         if (customLines.contains(exitKey)) {
             if (mudlet::self()->showMapAuditErrors()) {
-                QString warnMsg = tr("[ WARN ]  - There was a custom exit line associated with the invalid exit but\n"
+                const QString warnMsg = tr("[ WARN ]  - There was a custom exit line associated with the invalid exit but\n"
                                      "it has not been possible to salvage this, it has been lost!");
                 mpRoomDB->mpMap->postMessage(warnMsg);
             }
@@ -1695,7 +1693,7 @@ void TRoom::writeJsonRoom(QJsonArray& obj) const
     roomObj.insert(QLatin1String("id"), static_cast<double>(id));
 
     if (!name.isEmpty()) {
-        QJsonValue nameValue{name};
+        QJsonValue const nameValue{name};
         roomObj.insert(QLatin1String("name"), nameValue);
     }
 
@@ -1745,7 +1743,7 @@ int TRoom::readJsonRoom(const QJsonArray& array, const int index, const int area
     const QJsonObject roomObj{array.at(index).toObject()};
     // This is not needed to be stored into id as that is done when the room is
     // added to the TRoomDB via a TRoomDB::addRoom(...) call:
-    int roomId = roomObj.value(QLatin1String("id")).toInt();
+    const int roomId = roomObj.value(QLatin1String("id")).toInt();
     name = roomObj.value(QLatin1String("name")).toString();
     area = areaId;
     readJsonUserData(roomObj.value(QLatin1String("userData")).toObject());
@@ -1763,8 +1761,8 @@ int TRoom::readJsonRoom(const QJsonArray& array, const int index, const int area
         weight = roomObj.value(QLatin1String("weight")).toInt();
     }
 
-    if (roomObj.contains(QLatin1String("symbol")) && roomObj.value(QLatin1String("symbol")).isString()) {
-        mSymbol = roomObj.value(QLatin1String("symbol")).toString();
+    if (roomObj.contains(QLatin1String("symbol")) && roomObj.value(QLatin1String("symbol")).isObject()) {
+        readJsonSymbol(roomObj);
     }
 
     if (roomObj.contains(QLatin1String("environment")) && roomObj.value(QLatin1String("environment")).isDouble()) {
@@ -1870,9 +1868,9 @@ bool TRoom::readJsonExits(const QJsonObject& obj)
 void TRoom::writeJsonNormalExit(QJsonArray& array, const int dir) const
 {
     QJsonObject exitObj;
-    QString directionString = dirCodeToString(dir);
-    int exitId = getExit(dir);
-    QString directionKey = dirCodeToShortString(dir);
+    const QString directionString = dirCodeToString(dir);
+    const int exitId = getExit(dir);
+    const QString directionKey = dirCodeToShortString(dir);
     // Skip any unreal exits:
     if (exitId < 1) {
         return;
@@ -1905,7 +1903,7 @@ void TRoom::writeJsonNormalExit(QJsonArray& array, const int dir) const
 
 bool TRoom::readJsonNormalExit(const QJsonObject& exitObj, const int dir)
 {
-    int exitRoomId = exitObj.value(QLatin1String("exitId")).toInt();
+    const int exitRoomId = exitObj.value(QLatin1String("exitId")).toInt();
     bool hasCustomExit = false;
     if (exitRoomId < 1) {
         qDebug().nospace().noquote() << "TRoom::readJsonNormalExit(...) INFO - when reading exits for room id: " << id << " the normal \"" << dirCodeToString(dir)
@@ -1980,7 +1978,7 @@ bool TRoom::readJsonNormalExit(const QJsonObject& exitObj, const int dir)
 void TRoom::writeJsonSpecialExit(QJsonArray& array, const QString& dir, const int exitId) const
 {
     QJsonObject exitObj;
-    bool exitLocked = mSpecialExitLocks.contains(dir);
+    const bool exitLocked = mSpecialExitLocks.contains(dir);
 
     // Safety step to avoid insertion of any unreal exits:
     if (exitId < 1 || dir.isEmpty()) {
@@ -2013,7 +2011,7 @@ void TRoom::writeJsonSpecialExit(QJsonArray& array, const QString& dir, const in
 
 bool TRoom::readJsonSpecialExit(const QJsonObject& exitObj, const QString& dir)
 {
-    int exitRoomId = exitObj.value(QLatin1String("exitId")).toInt();
+    const int exitRoomId = exitObj.value(QLatin1String("exitId")).toInt();
     bool hasCustomExit = false;
     if (exitRoomId < 1) {
         qDebug().nospace().noquote() << "TRoom::readJsonSpecialExit(...) INFO - when reading exits for room id: " << id << " the special \"" << dir
@@ -2106,7 +2104,7 @@ void TRoom::writeJsonCustomExitLine(QJsonObject& exitObj, const QString& directi
         const QPointF point{points.at(i)};
         customLinePointCoordinateArray.append(static_cast<double>(point.x()));
         customLinePointCoordinateArray.append(static_cast<double>(point.y()));
-        // We might wish to consider storing a z in the future to accomodate 3D
+        // We might wish to consider storing a z in the future to accommodate 3D
         // custom lines...!
         const QJsonValue customLinePointCoordinatesValue{customLinePointCoordinateArray};
         customLinePointsArray.append(customLinePointCoordinatesValue);
@@ -2145,19 +2143,19 @@ void TRoom::readJsonCustomExitLine(const QJsonObject& exitObj, const QString& di
         return;
     }
 
-    QJsonArray customLinePointsArray = customLineObj.value(QLatin1String("coordinates")).toArray();
+    QJsonArray const customLinePointsArray = customLineObj.value(QLatin1String("coordinates")).toArray();
     if (customLinePointsArray.isEmpty()) {
         return;
     }
 
     QList<QPointF> points;
     for (int i = 0, total = customLinePointsArray.count(); i < total; ++i) {
-        QJsonArray customLinePointCoordinateArray = customLinePointsArray.at(i).toArray();
+        QJsonArray const customLinePointCoordinateArray = customLinePointsArray.at(i).toArray();
         if (customLinePointCoordinateArray.size() == 2 && customLinePointCoordinateArray.at(0).isDouble() && customLinePointCoordinateArray.at(1).isDouble()) {
-            QPointF point{customLinePointCoordinateArray.at(0).toDouble(), customLinePointCoordinateArray.at(1).toDouble()};
+            QPointF const point{customLinePointCoordinateArray.at(0).toDouble(), customLinePointCoordinateArray.at(1).toDouble()};
 
             // We might wish to consider if there is a z in the future to
-            // accomodate 3D custom lines...!
+            // accommodate 3D custom lines...!
             points.append(point);
         }
     }
@@ -2172,7 +2170,7 @@ void TRoom::readJsonCustomExitLine(const QJsonObject& exitObj, const QString& di
     }
 
     if (customLineObj.contains(QLatin1String("style")) && customLineObj.value(QLatin1String("style")).isString()) {
-        QString lineStyle{customLineObj.value(QLatin1String("style")).toString()};
+        const QString lineStyle{customLineObj.value(QLatin1String("style")).toString()};
         if (lineStyle == QLatin1String("dash line")) {
             customLinesStyle.insert(directionString, Qt::DashLine);
         } else if (lineStyle == QLatin1String("dash dot dot line")) {
@@ -2268,7 +2266,7 @@ void TRoom::readJsonExitStubs(const QJsonObject& obj)
     for (const auto exitStubValue : exitStubsArray) {
         const QJsonObject exitStubObj{exitStubValue.toObject()};
         const QString direction{exitStubObj.value(QLatin1String("name")).toString()};
-        int dir = stringToDirCode(direction);
+        const int dir = stringToDirCode(direction);
         QString doorKey;
         if (dir != DIR_OTHER) {
             doorKey = dirCodeToShortString(dir);
@@ -2292,7 +2290,7 @@ void TRoom::readJsonExitStubs(const QJsonObject& obj)
 // does get used then no change to the format is needed:
 void TRoom::writeJsonHighlight(QJsonObject& obj) const
 {
-    bool noColor = (highlightColor == scDefaultHighlightForeground) && (highlightColor2 == scDefaultHighlightBackground);
+    const bool noColor = (highlightColor == scDefaultHighlightForeground) && (highlightColor2 == scDefaultHighlightBackground);
     if (!highlight && qFuzzyCompare(1.0f + highlightRadius, 1.0f) && noColor) {
         // The default case so no need to include it:
         return;
@@ -2316,7 +2314,7 @@ void TRoom::writeJsonHighlight(QJsonObject& obj) const
     }
 
     highlightObj.insert(QLatin1String("radius"), static_cast<double>(highlightRadius));
-    QJsonValue highlightValue{highlightObj};
+    QJsonValue const highlightValue{highlightObj};
     obj.insert(QLatin1String("highlight"), highlightValue);
 }
 
@@ -2355,5 +2353,13 @@ void TRoom::writeJsonSymbol(QJsonObject& roomObj) const
 
 void TRoom::readJsonSymbol(const QJsonObject& roomObj)
 {
-    Q_UNUSED(roomObj);
+    const QJsonObject symbolObj{roomObj.value(QLatin1String("symbol")).toObject()};
+    if (symbolObj.contains(QLatin1String("text")) && symbolObj.value(QLatin1String("text")).isString()) {
+        mSymbol = symbolObj.value(QLatin1String("text")).toString();
+    }
+
+    QColor const color = TMap::readJsonColor(symbolObj);
+    if (color.isValid()) {
+        mSymbolColor = color;
+    }
 }

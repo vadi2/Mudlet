@@ -195,7 +195,7 @@ QString TTextCodec_437::convertToUnicode(const char *in, int length, ConverterSt
         result += QChar::ByteOrderMark;
     }
     for (int i = 0; i < length; ++i) {
-        unsigned char ch = in[i];
+        unsigned char const ch = in[i];
         if (ch < 0x80) {
             // ASCII - which is the same as Latin1 when the MS Bit is not set:
             result += QLatin1Char(ch);
@@ -227,7 +227,7 @@ QString TTextCodec_667::convertToUnicode(const char *in, int length, ConverterSt
         result += QChar::ByteOrderMark;
     }
     for (int i = 0; i < length; ++i) {
-        unsigned char ch = in[i];
+        unsigned char const ch = in[i];
         if (ch < 0x80) {
             // ASCII - which is the same as Latin1 when the MS Bit is not set:
             result += QLatin1Char(ch);
@@ -259,7 +259,7 @@ QString TTextCodec_737::convertToUnicode(const char *in, int length, ConverterSt
         result += QChar::ByteOrderMark;
     }
     for (int i = 0; i < length; ++i) {
-        unsigned char ch = in[i];
+        unsigned char const ch = in[i];
         if (ch < 0x80) {
             // ASCII - which is the same as Latin1 when the MS Bit is not set:
             result += QLatin1Char(ch);
@@ -295,7 +295,7 @@ QString TTextCodec_869::convertToUnicode(const char *in, int length, ConverterSt
         result += QChar::ByteOrderMark;
     }
     for (int i = 0; i < length; ++i) {
-        unsigned char ch = in[i];
+        unsigned char const ch = in[i];
         if (ch < 0x80) {
             // ASCII - which is the same as Latin1 when the MS Bit is not set:
             result += QLatin1Char(ch);
@@ -324,7 +324,7 @@ QString TTextCodec_869::convertToUnicode(const char *in, int length, ConverterSt
 // * consider the second of the three int state_data[3] array and if castable to
 //   a (bool) false, i.e. zero we should remove a BOM if the IgnoreHeader flag
 //   is not set and it is present at the start of the data. If there is no state
-//   we should remove such a BOM at the begining of "in" for all calls.
+//   we should remove such a BOM at the beginning of "in" for all calls.
 // * if ConvertInvalidToNull is set we are to convert invalid individual QChars
 //   to nulls or if NOT set do what other encoders do and insert a '?' as we
 //   should if there is no state
@@ -335,12 +335,12 @@ QByteArray TTextCodec_437::convertFromUnicode(const QChar *in, int length, Conve
     int remainingChars = length;
     // Use '?' as replacement character (like some of Qt's own QTextCodec s)
     // unless we are told to use a NULL:
-    const char replacement = (state && (state->flags & ConversionFlag::ConvertInvalidToNull)) ? '\0' : '?';
+    const char replacement = (state && (state->flags & QTextCodec::ConvertInvalidToNull)) ? '\0' : '?';
     int i = 0;
     QByteArray result;
 
     if (!length) {
-        // Avoid extra tests elsewere on an empty Unicode string
+        // Avoid extra tests elsewhere on an empty Unicode string
         return {};
     }
 
@@ -361,7 +361,7 @@ QByteArray TTextCodec_437::convertFromUnicode(const QChar *in, int length, Conve
     } else {
         if (in[i] == QChar::ByteOrderMark) {
             ++i;
-            // Redundent but keeps things simpler if debugging.
+            // Redundant but keeps things simpler if debugging.
             --remainingChars;
         }
     }
@@ -405,7 +405,7 @@ QByteArray TTextCodec_437::convertFromUnicode(const QChar *in, int length, Conve
         } else {
             // In range of Extended ASCII \x80 up to end of BMP \xffff so let's
             // find out if it is in the lookup table.
-            int pos = CptoUnicode.indexOf(in[i]);
+            const int pos = CptoUnicode.indexOf(in[i]);
             // Protect against a bogus index that will break the use of an
             // quint8 afterwards:
             Q_ASSERT_X(pos < 128, "TTextCodec_437", "lookup table is malformed and oversized so that a bogus index of 128 or more was found");
@@ -439,12 +439,12 @@ QByteArray TTextCodec_667::convertFromUnicode(const QChar *in, int length, Conve
     int remainingChars = length;
     // Use '?' as replacement character (like some of Qt's own QTextCodec s)
     // unless we are told to use a NULL:
-    const char replacement = (state && (state->flags & ConversionFlag::ConvertInvalidToNull)) ? '\0' : '?';
+    const char replacement = (state && (state->flags & QTextCodec::ConvertInvalidToNull)) ? '\0' : '?';
     int i = 0;
     QByteArray result;
 
     if (!length) {
-        // Avoid extra tests elsewere on an empty Unicode string
+        // Avoid extra tests elsewhere on an empty Unicode string
         return {};
     }
 
@@ -465,7 +465,7 @@ QByteArray TTextCodec_667::convertFromUnicode(const QChar *in, int length, Conve
     } else {
         if (in[i] == QChar::ByteOrderMark) {
             ++i;
-            // Redundent but keeps things simpler if debugging.
+            // Redundant but keeps things simpler if debugging.
             --remainingChars;
         }
     }
@@ -509,7 +509,7 @@ QByteArray TTextCodec_667::convertFromUnicode(const QChar *in, int length, Conve
         } else {
             // In range of Extended ASCII \x80 up to end of BMP \xffff so let's
             // find out if it is in the lookup table.
-            int pos = CptoUnicode.indexOf(in[i]);
+            const int pos = CptoUnicode.indexOf(in[i]);
             // Protect against a bogus index that will break the use of an
             // quint8 afterwards:
             Q_ASSERT_X(pos < 128, "TTextCodec_667", "lookup table is malformed and oversized so that a bogus index of 128 or more was found");
@@ -543,12 +543,12 @@ QByteArray TTextCodec_737::convertFromUnicode(const QChar *in, int length, Conve
     int remainingChars = length;
     // Use '?' as replacement character (like some of Qt's own QTextCodec s)
     // unless we are told to use a NULL:
-    const char replacement = (state && (state->flags & ConversionFlag::ConvertInvalidToNull)) ? '\0' : '?';
+    const char replacement = (state && (state->flags & QTextCodec::ConvertInvalidToNull)) ? '\0' : '?';
     int i = 0;
     QByteArray result;
 
     if (!length) {
-        // Avoid extra tests elsewere on an empty Unicode string
+        // Avoid extra tests elsewhere on an empty Unicode string
         return {};
     }
 
@@ -569,7 +569,7 @@ QByteArray TTextCodec_737::convertFromUnicode(const QChar *in, int length, Conve
     } else {
         if (in[i] == QChar::ByteOrderMark) {
             ++i;
-            // Redundent but keeps things simpler if debugging.
+            // Redundant but keeps things simpler if debugging.
             --remainingChars;
         }
     }
@@ -613,7 +613,7 @@ QByteArray TTextCodec_737::convertFromUnicode(const QChar *in, int length, Conve
         } else {
             // In range of Extended ASCII \x80 up to end of BMP \xffff so let's
             // find out if it is in the lookup table.
-            int pos = CptoUnicode.indexOf(in[i]);
+            const int pos = CptoUnicode.indexOf(in[i]);
             // Protect against a bogus index that will break the use of an
             // quint8 afterwards:
             Q_ASSERT_X(pos < 128, "TTextCodec_737", "lookup table is malformed and oversized so that a bogus index of 128 or more was found");
@@ -647,12 +647,12 @@ QByteArray TTextCodec_869::convertFromUnicode(const QChar *in, int length, Conve
     int remainingChars = length;
     // Use '?' as replacement character (like some of Qt's own QTextCodec s)
     // unless we are told to use a NULL:
-    const char replacement = (state && (state->flags & ConversionFlag::ConvertInvalidToNull)) ? '\0' : '?';
+    const char replacement = (state && (state->flags & QTextCodec::ConvertInvalidToNull)) ? '\0' : '?';
     int i = 0;
     QByteArray result;
 
     if (!length) {
-        // Avoid extra tests elsewere on an empty Unicode string
+        // Avoid extra tests elsewhere on an empty Unicode string
         return {};
     }
 
@@ -673,7 +673,7 @@ QByteArray TTextCodec_869::convertFromUnicode(const QChar *in, int length, Conve
     } else {
         if (in[i] == QChar::ByteOrderMark) {
             ++i;
-            // Redundent but keeps things simpler if debugging.
+            // Redundant but keeps things simpler if debugging.
             --remainingChars;
         }
     }
@@ -717,7 +717,7 @@ QByteArray TTextCodec_869::convertFromUnicode(const QChar *in, int length, Conve
         } else {
             // In range of Extended ASCII \x80 up to end of BMP \xffff so let's
             // find out if it is in the lookup table.
-            int pos = CptoUnicode.indexOf(in[i]);
+            const int pos = CptoUnicode.indexOf(in[i]);
             // Protect against a bogus index that will break the use of an
             // quint8 afterwards:
             Q_ASSERT_X(pos < 128, "TTextCodec_869", "lookup table is malformed and oversized so that a bogus index of 128 or more was found");

@@ -1,14 +1,9 @@
---------------------------------------
---                                  --
--- The Geyser Layout Manager by guy --
---                                  --
---------------------------------------
-
 --- Represents a generic container with positional information.
 -- Has no notion of contents and is used to contain other windows
 -- and impose some sense of order.
--- @class table
--- @name Geyser.Container
+-- <br/>See also: <a href="https://wiki.mudlet.org/w/Manual:Geyser#Geyser.Container">Mudlet Manual</a>
+-- @author guy
+-- @module Geyser.Container
 -- @field parent The parent class of this window
 -- @field type The type of this window, usually lowercase of the classname and
 --             can be used in checks for certain types. For a Container
@@ -43,13 +38,10 @@
 -- @field windows This is an ordered list of the names of the window held by this container.
 -- @field fontSize The default size font used when calculating dimensions
 --                 based on the character constraint. Default is 8.
--- @field h_policy This sets if this widget should be stretched/shrinked horizontally or not
--- @field v_policy This sets if this widget should be stretched/shrinked vertically or not
--- @field v_stretch_factor This sets by how much more then window will be stretched horizontally in comparison to
---                 other windows
--- @field v_stretch_factor This sets by how much more then window will be stretched vertically in comparison to
---                 other windows
-
+-- @field h_policy This sets if this widget should be stretched/shrunk horizontally or not
+-- @field v_policy This sets if this widget should be stretched/shrunk vertically or not
+-- @field v_stretch_factor This sets by how much more then window will be stretched horizontally in comparison to other windows
+-- @field v_stretch_factor This sets by how much more then window will be stretched vertically in comparison to other windows
 Geyser.Container = {
   name = "ContainerClass",
   x = "10px",
@@ -252,7 +244,7 @@ function Geyser.Container:lowerAll()
   self:lower()
 end
 
---- Moves this window according to the new x and y contraints set.
+--- Moves this window according to the new x and y constraints set.
 -- @param x New x constraint to use. If nil, uses current value.
 -- @param y New y constraint to use. If nil, uses current value.
 function Geyser.Container:move (x, y)
@@ -282,7 +274,7 @@ function Geyser.Container:setFontSize (fontSize)
   self:set_constraints()
 end
 
---- Sets all contraints (x, y, width, height) for this window.
+--- Sets all constraints (x, y, width, height) for this window.
 -- @param cons Any Lua table that contains appropriate constraint entries.
 function Geyser.Container:set_constraints (cons)
   cons = cons or self
@@ -294,10 +286,15 @@ end
 
 --- Flashes a white box over the dimensions of this container.
 -- This is very useful to see where a container actually is if you've
--- forgotten its details.
+-- forgotten its details or as an alert function to notify the user.
 -- @param time Time in seconds to flash for, default is 1.0s.
-function Geyser.Container:flash (time)
+-- @param[opt=true] onHidden Optional, use as an alert function and don't flash hidden containers.
+function Geyser.Container:flash (time, onHidden)
   local time = time or 1.0
+  local onHidden = onHidden ~= false
+  
+  if not onHidden then return end
+  
   local x, y, width, height = self.get_x(), self.get_y(), self.get_width(), self.get_height()
   local name = self.name .. "_dimensions_flash"
   createLabel(self.windowname ,name, x, y, width, height, 1)
@@ -319,6 +316,7 @@ setmetatable(Geyser.Container, Geyser)
 -- @param cons Any Lua table that contains appropriate constraint entries.
 --             Include any parameter such as name or fontSize in cons
 --             that are to be used for the new window.
+-- @param container The parent container.
 function Geyser.Container:new(cons, container)
   -- create new table for the container and copy over constraints
   local me = Geyser.copyTable(cons)
@@ -342,7 +340,7 @@ function Geyser.Container:new(cons, container)
 
   -- If we're not not a class definition then add to a controlling
   -- container.
-  if not string.find(me.name, ".*Class") then
+  if not string.find(me.name, ".+Class$") then
     -- If passed in a container, add me to that container
     if container then
       if me.useAdd2 then
@@ -360,7 +358,7 @@ function Geyser.Container:new(cons, container)
       container=Geyser
     end
    --Create Root-Container for UserWindow and add Children
-   if (container == Geyser) and (me.windowname) and (me.windowname ~= "main") then
+   if (container == Geyser) and (me.windowname) and (me.windowname ~= "main") and me.type == "userwindow" then
         container = Geyser.Container:new({name=me.windowname.."Container", type = "userwindow", x=0, y=0, width="100%", height="100%"})
         if me.useAdd2 then
           container:add2(me)
