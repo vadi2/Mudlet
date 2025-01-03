@@ -48,7 +48,7 @@ Updater::Updater(QObject* parent, QSettings* settings, bool testVersion) : QObje
     QString baseUrl = QStringLiteral("https://feeds.dblsqd.com/MKMMR7HNSP65PquQQbiDIw");
     QString channel = testVersion ? QStringLiteral("public-test-build") : QStringLiteral("release");
 
-    // On 32-bit Windows, check if we can upgrade to 64-bit
+    // On Windows, check if we can upgrade to 64-bit
 #if defined(Q_OS_WIN32)
     QString arch = is64BitCompatible() ? QStringLiteral("x86_64") : QStringLiteral("x86");
 #else
@@ -497,6 +497,16 @@ QString Updater::getPreviousVersion() const
 #if defined(Q_OS_WIN32)
 bool Updater::is64BitCompatible() const 
 {
+#if defined(Q_OS_WIN64)
+    const bool is64BitBuild = true;
+#else
+    const bool is64BitBuild = false;
+#endif
+
+    if (is64BitBuild) {
+        return true;
+    }
+    
     BOOL isWow64 = FALSE;
     typedef BOOL (WINAPI *LPFN_ISWOW64PROCESS)(HANDLE, PBOOL);
     LPFN_ISWOW64PROCESS fnIsWow64Process = (LPFN_ISWOW64PROCESS)
