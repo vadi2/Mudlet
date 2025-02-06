@@ -36,8 +36,8 @@
 #                                                                          #
 ############################################################################
 
-lessThan(QT_MAJOR_VERSION, 5)|if(lessThan(QT_MAJOR_VERSION,6):lessThan(QT_MINOR_VERSION, 14)) {
-    error("Mudlet requires Qt 5.14 or later")
+lessThan(QT_MAJOR_VERSION, 6)|if(equals(QT_MAJOR_VERSION,6):lessThan(QT_MINOR_VERSION, 4)) {
+    error("Mudlet requires Qt 6.4 or later") 
 }
 
 # Including IRC Library
