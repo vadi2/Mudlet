@@ -73,6 +73,28 @@
 
 using namespace std::chrono;
 
+// Qt implementation of ITextOutput interface - bridges interface to existing Qt widgets
+class QtTextOutput : public ITextOutput {
+private:
+    QPointer<TMainConsole> mConsole;
+    
+public:
+    QtTextOutput(TMainConsole* console) : mConsole(console) {}
+    
+    void printCommand(const QString& command) override {
+        if (mConsole) {
+            QString cmd = command; // Make non-const copy as printCommand expects non-const
+            mConsole->printCommand(cmd);
+        }
+    }
+    
+    void printText(const QString& text, const QColor& fg, const QColor& bg) override {
+        if (mConsole) {
+            mConsole->print(text, fg, bg);
+        }
+    }
+};
+
 stopWatch::stopWatch()
 : mIsInitialised(false)
 , mIsRunning(false)
@@ -450,8 +472,20 @@ Host::Host(int port, const QString& hostname, const QString& login, const QStrin
     startMapAutosave(interval);
 }
 
+// Setup the text output interface - call this after mpConsole is created
+void Host::setupTextOutput()
+{
+    if (mpConsole && !mpTextOutput) {
+        mpTextOutput = new QtTextOutput(mpConsole);
+    }
+}
+
 Host::~Host()
 {
+    // Clean up text output interface
+    delete mpTextOutput;
+    mpTextOutput = nullptr;
+    
     if (mpDockableMapWidget) {
         mpDockableMapWidget->deleteLater();
     }
@@ -1316,7 +1350,13 @@ void Host::send(QString cmd, bool wantPrint, bool dontExpandAliases)
         if (!cmd.isEmpty() || !mUSE_IRE_DRIVER_BUGFIX || mUSE_FORCE_LF_AFTER_PROMPT) {
             // used to print the terminal <LF> that terminates a telnet command
             // this is important to get the cursor position right
-            mpConsole->printCommand(cmd);
+            
+            // Use interface abstraction if available, fallback to direct console access
+            if (mpTextOutput) {
+                mpTextOutput->printCommand(cmd);
+            } else {
+                mpConsole->printCommand(cmd);
+            }
         }
 
         //If 3D Mapper is active mpConsole->update(); seems to be superfluous and even cause problems in MacOS

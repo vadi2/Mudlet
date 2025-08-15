@@ -76,6 +76,14 @@ class dlgModuleManager;
 class dlgProfilePreferences;
 class cTelnet;
 
+// Interface abstraction for text output - proof of concept for libmudlet separation
+class ITextOutput {
+public:
+    virtual ~ITextOutput() = default;
+    virtual void printCommand(const QString& command) = 0;
+    virtual void printText(const QString& text, const QColor& fg = Qt::white, const QColor& bg = Qt::black) = 0;
+};
+
 class stopWatch {
     friend class XMLimport;
 
@@ -175,6 +183,10 @@ public:
     void            setName(const QString& name);
     QString         getUrl()                         { return mUrl; }
     void            setUrl(const QString& url)       { mUrl = url; }
+    
+    // Interface abstraction setup - call this after mpConsole is created
+    void            setupTextOutput();
+    void            setTextOutput(ITextOutput* textOutput) { mpTextOutput = textOutput; }
     QString         getDiscordGameName()             { return mDiscordGameName; }
     void            setDiscordGameName(const QString& name) { mDiscordGameName = name; }
     int             getPort()                        { return mPort; }
@@ -455,6 +467,9 @@ public:
     // have to maintain a separate one here in this class which does not, as
     // something derived from a QOject, have one:
     QPointer<TMainConsole> mpConsole;
+    
+    // Interface abstraction for text output - allows decoupling from Qt widgets
+    ITextOutput* mpTextOutput = nullptr;
     cTelnet mTelnet;
     QPointer<dlgPackageManager> mpPackageManager;
     QPointer<dlgModuleManager> mpModuleManager;
