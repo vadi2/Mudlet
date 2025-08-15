@@ -1999,7 +1999,9 @@ void mudlet::addConsoleForNewHost(Host* pH)
     pH->mpConsole = pConsole;
     
     // Setup text output interface abstraction after console is created
+    qDebug() << "[INTERFACE] About to call setupTextOutput for profile:" << pH->getName();
     pH->setupTextOutput();
+    qDebug() << "[INTERFACE] setupTextOutput completed for profile:" << pH->getName();
     
     pConsole->setWindowTitle(pH->getName());
     pConsole->setObjectName(pH->getName());

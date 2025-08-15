@@ -79,18 +79,27 @@ private:
     QPointer<TMainConsole> mConsole;
     
 public:
-    QtTextOutput(TMainConsole* console) : mConsole(console) {}
+    QtTextOutput(TMainConsole* console) : mConsole(console) {
+        qDebug() << "[INTERFACE] QtTextOutput created with console:" << (console ? "valid" : "null");
+    }
     
     void printCommand(const QString& command) override {
+        qDebug() << "[INTERFACE] QtTextOutput::printCommand called with:" << command;
         if (mConsole) {
             QString cmd = command; // Make non-const copy as printCommand expects non-const
+            qDebug() << "[INTERFACE] Calling mConsole->printCommand()";
             mConsole->printCommand(cmd);
+        } else {
+            qDebug() << "[INTERFACE] Warning: mConsole is null!";
         }
     }
     
     void printText(const QString& text, const QColor& fg, const QColor& bg) override {
+        qDebug() << "[INTERFACE] QtTextOutput::printText called with text:" << text;
         if (mConsole) {
             mConsole->print(text, fg, bg);
+        } else {
+            qDebug() << "[INTERFACE] Warning: mConsole is null in printText!";
         }
     }
 };
@@ -475,8 +484,17 @@ Host::Host(int port, const QString& hostname, const QString& login, const QStrin
 // Setup the text output interface - call this after mpConsole is created
 void Host::setupTextOutput()
 {
+    qDebug() << "[INTERFACE] Host::setupTextOutput() called";
+    qDebug() << "[INTERFACE] mpConsole:" << (mpConsole ? "valid" : "null");
+    qDebug() << "[INTERFACE] mpTextOutput:" << (mpTextOutput ? "already set" : "null");
+    
     if (mpConsole && !mpTextOutput) {
         mpTextOutput = new QtTextOutput(mpConsole);
+        qDebug() << "[INTERFACE] Created new QtTextOutput instance";
+    } else if (!mpConsole) {
+        qDebug() << "[INTERFACE] Warning: Cannot setup text output - mpConsole is null";
+    } else if (mpTextOutput) {
+        qDebug() << "[INTERFACE] Text output already set up";
     }
 }
 
@@ -1352,9 +1370,13 @@ void Host::send(QString cmd, bool wantPrint, bool dontExpandAliases)
             // this is important to get the cursor position right
             
             // Use interface abstraction if available, fallback to direct console access
+            qDebug() << "[INTERFACE] Host::send() - about to print command:" << cmd;
+            qDebug() << "[INTERFACE] mpTextOutput available:" << (mpTextOutput ? "yes" : "no");
             if (mpTextOutput) {
+                qDebug() << "[INTERFACE] Using interface abstraction";
                 mpTextOutput->printCommand(cmd);
             } else {
+                qDebug() << "[INTERFACE] Falling back to direct console access";
                 mpConsole->printCommand(cmd);
             }
         }
