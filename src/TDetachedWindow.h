@@ -139,10 +139,9 @@ private slots:
     void slot_muteGame();
     void slot_showAboutDialog();
 
-    // Discord and IRC slots for detached window context
+    // Discord slot for detached window context
     void slot_profileDiscord();
     void slot_mudletDiscord();
-    void slot_irc();
 
     // Window menu activation slots
     void slot_activateMainWindow();
@@ -209,7 +208,6 @@ private:
     // Discord and IRC actions
     QAction* mpActionDiscord{nullptr};
     QAction* mpActionMudletDiscord{nullptr};
-    QAction* mpActionIRC{nullptr};
 
     // Toolbar buttons
     QToolButton* mpButtonConnect{nullptr};

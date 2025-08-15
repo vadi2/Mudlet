@@ -700,12 +700,7 @@ void TDetachedWindow::createToolBar()
     mpToolBar->widgetForAction(mpActionMudletDiscord)->setObjectName(mpActionMudletDiscord->objectName());
     mpActionMudletDiscord->setVisible(false); // Mudlet Discord becomes visible if game has custom invite
 
-    mpActionIRC = new QAction(tr("Open IRC"), this);
-    mpActionIRC->setIcon(QIcon(qsl(":/icons/internet-telephony.png")));
-    mpActionIRC->setObjectName(qsl("openIRC"));
-
     mpButtonDiscord->addAction(mpActionDiscord);
-    mpButtonDiscord->addAction(mpActionIRC);
     mpButtonDiscord->setDefaultAction(mpActionDiscord);
 
     // Map and other tools
@@ -838,10 +833,9 @@ void TDetachedWindow::connectToolBarActions()
     connect(mpActionAbout, &QAction::triggered, this, &TDetachedWindow::slot_showAboutDialog);
     connect(mpActionFullScreenView, &QAction::triggered, this, &TDetachedWindow::slot_toggleFullScreenView);
 
-    // Discord/IRC actions - use our custom slots to ensure correct profile context
+    // Discord actions - use our custom slots to ensure correct profile context
     connect(mpActionDiscord, &QAction::triggered, this, &TDetachedWindow::slot_profileDiscord);
     connect(mpActionMudletDiscord, &QAction::triggered, this, &TDetachedWindow::slot_mudletDiscord);
-    connect(mpActionIRC, &QAction::triggered, this, &TDetachedWindow::slot_irc);
 }
 
 void TDetachedWindow::updateToolBarActions()
@@ -2497,11 +2491,6 @@ void TDetachedWindow::slot_mudletDiscord()
     if (mudletInstance) {
         mudletInstance->slot_mudletDiscord();
     }
-}
-
-void TDetachedWindow::slot_irc()
-{
-    mudlet::self()->slot_irc();
 }
 
 void TDetachedWindow::slot_muteMedia()

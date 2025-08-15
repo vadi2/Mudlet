@@ -321,6 +321,7 @@ public:
     static int setFontSize(lua_State*);
     static int getFontSize(lua_State*);
     static int openUserWindow(lua_State*);
+    static int openIRC(lua_State*);
     static int setUserWindowTitle(lua_State*);
     static int echoUserWindow(lua_State*);
     static int clearUserWindow(lua_State*);

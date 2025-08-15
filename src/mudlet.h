@@ -434,7 +434,6 @@ public slots:
     void slot_connectionDialogueFinished(const QString&, bool);
     void slot_disconnect();
     void slot_handleToolbarVisibilityChanged(bool);
-    void slot_irc();
 #if defined(INCLUDE_UPDATER)
     void slot_manualUpdateCheck();
     void slot_showFullChangelog();
@@ -648,7 +647,6 @@ private:
     QPointer<QAction> mpActionDiscord;
     QPointer<QAction> mpActionFullScreenView;
     QPointer<QAction> mpActionHelp;
-    QPointer<QAction> mpActionIRC;
     QPointer<QAction> mpActionKeys;
     QPointer<QAction> mpActionMapper;
     QPointer<QAction> mpActionModuleManager;

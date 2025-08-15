@@ -1791,6 +1791,22 @@ int TLuaInterpreter::openUserWindow(lua_State* L)
     return 1;
 }
 
+// Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#openIRC
+int TLuaInterpreter::openIRC(lua_State* L)
+{
+    Host* pHost = mudlet::self()->getActiveHost();
+    if (!pHost) {
+        return 0;
+    }
+
+    if (!pHost->mpDlgIRC) {
+        pHost->mpDlgIRC = new dlgIRC(pHost);
+    }
+    pHost->mpDlgIRC->raise();
+    pHost->mpDlgIRC->show();
+    return 0;
+}
+
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#paste
 int TLuaInterpreter::paste(lua_State* L)
 {
