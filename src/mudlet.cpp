@@ -877,7 +877,7 @@ void mudlet::setupConfig()
     }
     qDebug() << "mudlet::setupConfig() INFO:" << "using config dir:" << confPath;
 
-    mpSettings = new QSettings(qsl("%1/Mudlet.ini").arg(confPath), QSettings::IniFormat);
+    mpSettings = new QSettings(qsl("%1/Mudlet.conf").arg(confPath), QSettings::IniFormat);
     migrateConfig(*mpSettings);
 }
 
@@ -2844,6 +2844,19 @@ void mudlet::writeSettings()
     settings.setValue(qsl("drawUpperLowerLevels"), mDrawUpperLowerLevels);
     mpSettings->setValue("AI/modelPath", mAIModelPath);
     mpSettings->setValue("AI/autoStart", mAIAutoStart);
+    
+    // Force settings to be written to disk immediately
+    settings.sync();
+    switch (settings.status()) {
+    case QSettings::NoError:
+        break;
+    case QSettings::FormatError:
+        qWarning().nospace().noquote() << "mudlet::writeSettings() ERROR - failed to save settings, reason: \"Format error\".";
+        break;
+    case QSettings::AccessError:
+        qWarning().nospace().noquote() << "mudlet::writeSettings() ERROR - failed to save settings, reason: \"Access error\".";
+        break;
+    }
 }
 
 void mudlet::slot_showConnectionDialog()
