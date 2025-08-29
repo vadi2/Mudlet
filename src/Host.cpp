@@ -275,6 +275,7 @@ Host::Host(int port, const QString& hostname, const QString& login, const QStrin
 , mBubbleMode(false)
 , mShowRoomID(false)
 , mShowPanel(true)
+, mShow3DView(false)
 , mServerGUI_Package_version(QLatin1String("-1"))
 , mServerGUI_Package_name(QLatin1String("nothing"))
 , mAcceptServerGUI(true)
@@ -4579,6 +4580,8 @@ QFont Host::getAndClearTempDisplayFont()
 const QSet<QString> Host::mValidExperiments = {
     qsl("experiment.rendering.originalish"),
     qsl("experiment.rendering.more-transparent"),
+    qsl("experiment.rendering.sky-ground"),
+    qsl("experiment.rendering-z.squished-rooms"),
     qsl("experiment.rendering-movement.smooth"),
     qsl("experiment.3dmap.modernmapper"),
 };

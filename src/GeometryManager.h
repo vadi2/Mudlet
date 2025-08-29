@@ -22,6 +22,8 @@
 
 #include "pre_guard.h"
 #include <QVector>
+#include <QVector3D>
+#include <QQuaternion>
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLFunctions>
@@ -83,6 +85,7 @@ public:
     void cleanup();
     
     // Generate geometry data for different primitives
+    GeometryData generateRectangularCuboidGeometry(float x, float y, float z, float xSize, float ySize, float zSize, float r, float g, float b, float a);
     GeometryData generateCubeGeometry(float x, float y, float z, float size, float r, float g, float b, float a);
     GeometryData generateLineGeometry(const QVector<float>& vertices, const QVector<float>& colors);
     GeometryData generateTriangleGeometry(const QVector<float>& vertices, const QVector<float>& colors);
@@ -140,7 +143,7 @@ private:
     PFNGLDRAWELEMENTSINSTANCEDPROC glDrawElementsInstanced = nullptr;
     
     void generateCubeTemplate();
-    GeometryData transformCubeTemplate(float x, float y, float z, float size, float r, float g, float b, float a);
+    GeometryData transformCubeTemplate(float x, float y, float z, float xSize, float ySize, float zSize, float r, float g, float b, float a);
 };
 
 #endif // MUDLET_GEOMETRY_MANAGER_H

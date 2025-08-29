@@ -46,7 +46,7 @@ ModernGLWidget::ModernGLWidget(TMap* pMap, Host* pHost, QWidget* parent)
     } else {
         setAttribute(Qt::WA_OpaquePaintEvent);
     }
-    
+
     // Initialize smooth camera animation
     mCameraAnimationTimer = new QTimer(this);
     mCameraAnimationTimer->setInterval(17); // ~60fps updates for smoother animation
@@ -181,8 +181,8 @@ void ModernGLWidget::setupBuffers()
 void ModernGLWidget::updateMatrices()
 {
     // Update camera controller with current state, but skip position updates during smooth animation
-    if (!mCameraSmoothAnimating) {
-        mCameraController.setPosition(static_cast<float>(mMapCenterX), static_cast<float>(mMapCenterY), static_cast<float>(mMapCenterZ));
+    if (!mCameraSmoothAnimating && !mPanMode) {
+        mCameraController.setTarget(static_cast<float>(mMapCenterX), static_cast<float>(mMapCenterY), static_cast<float>(mMapCenterZ));
     }
     mCameraController.setViewportSize(width(), height());
     mCameraController.updateMatrices();
@@ -216,7 +216,7 @@ void ModernGLWidget::paintGL()
     }
 
     int ox, oy, oz;
-    if (!mShiftMode && !mCameraSmoothAnimating) {
+    if (!mShiftMode) {
         mRID = mpMap->mRoomIdHash.value(mpMap->mProfileName);
         TRoom* pRID = mpMap->mpRoomDB->getRoom(mRID);
         if (!pRID) {
@@ -259,26 +259,19 @@ void ModernGLWidget::paintGL()
                      << "to (" << targetX << "," << targetY << "," << targetZ << ")";
             
             startSmoothTransition(targetAID, targetX, targetY, targetZ);
-            mPreviousRID = mRID; // Update tracking
-            
-            // Use current position for this frame while animation starts
-            ox = mMapCenterX;
-            oy = mMapCenterY;  
-            oz = mMapCenterZ;
-        } else {
-            // No room change or experiment disabled - use instant positioning
-            mAID = pRID->getArea();
-            ox = pRID->x();
-            oy = pRID->y();
-            oz = pRID->z();
-            mMapCenterX = ox;
-            mMapCenterY = oy;
-            mMapCenterZ = oz;
-            mPreviousRID = mRID; // Update tracking
-            
-            if (mRID != mPreviousRID) {
-                qDebug() << "[Smooth Camera] Room ID changed but experiment disabled or not available";
-            }
+        }
+        // Instant update map (smooth transition only impacts camera position)
+        mAID = pRID->getArea();
+        ox = pRID->x();
+        oy = pRID->y();
+        oz = pRID->z();
+        mMapCenterX = ox;
+        mMapCenterY = oy;
+        mMapCenterZ = oz;
+        mPreviousRID = mRID; // Update tracking
+
+        if (mRID != mPreviousRID) {
+            qDebug() << "[Smooth Camera] Room ID changed but experiment disabled or not available";
         }
 
     } else {
@@ -348,6 +341,13 @@ void ModernGLWidget::renderRooms()
         return;
     }
 
+    if (mpHost && mpHost->experimentEnabled("experiment.rendering-z.squished-rooms")) {
+        mZSquishFactor = 8.0f;
+    } else {
+        mZSquishFactor = 1.0f;
+    }
+
+
     float pz = static_cast<float>(mMapCenterZ);
     float px = static_cast<float>(mMapCenterX);
     float py = static_cast<float>(mMapCenterY);
@@ -386,24 +386,39 @@ void ModernGLWidget::renderRooms()
         bool isCurrentRoom = (rz == pz) && (rx == px) && (ry == py);
         bool isTargetRoom = (currentRoomId == mTargetRoomId);
         bool belowOrAtLevel = (rz <= pz);
+        float roomAlpha = 1.0f;
+        const float defaultSize = 1.0f / scale;
 
         // 1. Collect main room cube data
         if (isCurrentRoom) {
             // Current room: red
-            currentRoomInstances.append(CubeInstanceData(rx, ry, rz, 1.0f / scale, 1.0f / scale, 1.0f / scale, 1.0f, 0.0f, 0.0f, 1.0f));
+            currentRoomInstances.append(CubeInstanceData(rx, ry, rz, 1.0f / scale, 1.0f / scale, (1.0f / scale) / mZSquishFactor, 1.0f, 0.0f, 0.0f, 1.0f));
         } else if (isTargetRoom) {
             // Target room: green
-            targetRoomInstances.append(CubeInstanceData(rx, ry, rz, 1.0f / scale, 1.0f / scale, 1.0f / scale, 0.0f, 1.0f, 0.0f, 1.0f));
+            targetRoomInstances.append(CubeInstanceData(rx, ry, rz, 1.0f / scale, 1.0f / scale, (1.0f / scale) / mZSquishFactor, 0.0f, 1.0f, 0.0f, 1.0f));
         } else {
             // Normal room: use planeColor logic based on z-level relationship
             QColor roomColor = getPlaneColor(static_cast<int>(rz), belowOrAtLevel);
             float redComponent = roomColor.redF();
             float greenComponent = roomColor.greenF(); 
             float blueComponent = roomColor.blueF();
-            float roomAlpha = 1.0f;
             
-            // Check for more-transparent experiment
-            if (mpHost->experimentEnabled("experiment.rendering.more-transparent")) {
+            // Check for experimental rendering styles
+            if (mpHost->experimentEnabled("experiment.rendering.sky-ground")) {
+                static bool debugOnce = false;
+                if (!debugOnce) {
+                    qDebug() << "[Experiment Debug] Sky-ground experiment is ENABLED";
+                    debugOnce = true;
+                }
+                int levelDistance = static_cast<int>(rz - pz);
+                // rooms above current -> increasing alpha
+                roomAlpha = qBound(0.2f, roomAlpha - (0.2f * levelDistance), 1.0f);
+            
+                // Lighten rooms above, darken rooms below
+                redComponent = qBound(0.1f, redComponent + 0.2f*levelDistance, 0.9f);
+                greenComponent = qBound(0.1f, greenComponent + 0.2f*levelDistance, 0.9f);
+                blueComponent = qBound(0.1f, blueComponent + 0.2f*levelDistance, 0.9f);
+            } else if (mpHost->experimentEnabled("experiment.rendering.more-transparent")) {
                 static bool debugOnce = false;
                 if (!debugOnce) {
                     qDebug() << "[Experiment Debug] More-transparent experiment is ENABLED - SLIDING DARKNESS TEST";
@@ -412,7 +427,7 @@ void ModernGLWidget::renderRooms()
                 // EXPERIMENT: Apply sliding darkness based on level distance
                 int levelDistance = abs(static_cast<int>(rz - pz));
                 float darknessFactor = 1.0f; // Default: no darkness
-                
+
                 if (levelDistance == 1) {
                     darknessFactor = 0.5f; // 50% darker
                 } else if (levelDistance == 2) {
@@ -420,16 +435,16 @@ void ModernGLWidget::renderRooms()
                 } else if (levelDistance > 2) {
                     darknessFactor = 0.05f; // 95% darker
                 }
-                
+
                 // Apply darkness to color components, keep full opacity
                 redComponent *= darknessFactor;
                 greenComponent *= darknessFactor;
                 blueComponent *= darknessFactor;
                 roomAlpha = 1.0f; // Full opacity
-                
+
                 if (levelDistance > 0) {
                     qDebug() << "[Sliding Darkness] Room Z:" << rz << "Player Z:" << pz 
-                             << "Distance:" << levelDistance << "Darkness factor:" << darknessFactor;
+                        << "Distance:" << levelDistance << "Darkness factor:" << darknessFactor;
                 }
             } else {
                 // Original rendering: rooms above are dark and transparent
@@ -444,19 +459,29 @@ void ModernGLWidget::renderRooms()
                 }
             }
             
-            mainRoomInstances.append(CubeInstanceData(rx, ry, rz, 1.0f / scale, 1.0f / scale, 1.0f / scale, redComponent, greenComponent, blueComponent, roomAlpha));
+            mainRoomInstances.append(CubeInstanceData(rx, ry, rz, 1.0f / scale, 1.0f / scale, (1.0f / scale) / mZSquishFactor, redComponent, greenComponent, blueComponent, roomAlpha));
         }
 
         // 2. Collect environment color overlay data
         QColor envColor = getEnvironmentColor(pR);
-        float overlayZ = rz + 0.25f; // Slightly above the main cube
+        float overlayZ = rz + 0.25f/mZSquishFactor; // Slightly above the main cube
         float envRed = envColor.redF();
         float envGreen = envColor.greenF();
         float envBlue = envColor.blueF();
         float overlayAlpha = 0.8f; // Default overlay transparency
         
         // Apply same sliding darkness to environment overlay
-        if (mpHost->experimentEnabled("experiment.rendering.more-transparent")) {
+        if (mpHost->experimentEnabled("experiment.rendering.sky-ground")) {
+            // rooms above current -> increasing alpha
+            int levelDistance = static_cast<int>(rz - pz);
+            float overlayAlpha = roomAlpha * 0.8f;
+            
+            // Lighten rooms above, darken rooms below
+            envRed = qBound(0.1f, envRed + 0.1f*levelDistance, 0.9f);
+            envGreen = qBound(0.1f, envGreen + 0.1f*levelDistance, 0.9f);
+            envBlue = qBound(0.1f, envBlue + 0.1f*levelDistance, 0.9f);
+
+        } else if (mpHost->experimentEnabled("experiment.rendering.more-transparent")) {
             // EXPERIMENT: Apply same darkness calculation to environment overlay
             int levelDistance = abs(static_cast<int>(rz - pz));
             float darknessFactor = 1.0f; // Default: no darkness
@@ -487,10 +512,12 @@ void ModernGLWidget::renderRooms()
             }
         }
         
-        overlayInstances.append(CubeInstanceData(rx, ry, overlayZ, 0.75f / scale, 0.75f / scale, 0.75f / scale, envRed, envGreen, envBlue, overlayAlpha));
+        overlayInstances.append(CubeInstanceData(rx, ry, overlayZ, 0.75f / scale, 0.75f / scale, (0.75f / scale) / mZSquishFactor, envRed, envGreen, envBlue, overlayAlpha));
 
         // 3. Render up/down exit indicators on the overlay (keep individual rendering for now)
-        renderUpDownIndicators(pR, rx, ry, overlayZ + 0.1f);
+        if (!mpHost->experimentEnabled("experiment.rendering.sky-ground")) {
+            renderUpDownIndicators(pR, rx, ry, overlayZ + 0.1f/mZSquishFactor);
+        }
     }
 
     // Create instanced render commands for each batch
@@ -551,6 +578,10 @@ void ModernGLWidget::renderConnections()
     // Collect all lines to draw
     QVector<float> lineVertices;
     QVector<float> lineColors;
+
+    // Collect area exit cube data for instanced rendering
+    QVector<CubeInstanceData> areaExitInstances;
+    QVector<CubeInstanceData> areaExitOverlayInstances;
 
     QSetIterator<int> itRoom(pArea->getAreaRooms());
     while (itRoom.hasNext()) {
@@ -633,6 +664,13 @@ void ModernGLWidget::renderConnections()
                 // Add colors for both vertices with appropriate alpha
                 lineColors << r << g << b << connectionAlpha; // Start color
                 lineColors << r << g << b << connectionAlpha; // End color
+                                                              //
+                // Render all collected lines
+                if (!lineVertices.isEmpty()) {
+                    renderLines(lineVertices, lineColors);
+                    lineVertices.clear();
+                    lineColors.clear();
+                }
 
             } else {
                 // Area exit - draw directional stub
@@ -689,15 +727,21 @@ void ModernGLWidget::renderConnections()
                 // Use different color for area exits (greenish) with appropriate alpha and darkening
                 lineColors << exitRed << exitGreen << exitBlue << exitAlpha; // Start color
                 lineColors << exitRed << exitGreen << exitBlue << exitAlpha; // End color
+                                                                             //
+                // Render all collected lines
+                if (!lineVertices.isEmpty()) {
+                    renderLines(lineVertices, lineColors);
+                    lineVertices.clear();
+                    lineColors.clear();
+                }
 
-                // Render green area exit cube at the destination position with translucency and darkening
-                renderCube(dx, dy, dz, 1.0f / scale, exitRed, exitGreen, exitBlue, exitAlpha);
+                // Collect area exit cube data for instanced rendering
+                const float size = 1.0f / scale;
+                areaExitInstances.append(CubeInstanceData(dx, dy, dz, size, size, size / mZSquishFactor, exitRed, exitGreen, exitBlue, exitAlpha));
 
-                // Render smaller environment overlay rectangle on top with translucency and darkening
-                auto disableDepthCommand2 = std::make_unique<GLStateCommand>(GLStateCommand::DISABLE_DEPTH_TEST);
-                mRenderCommandQueue.addCommand(std::move(disableDepthCommand2));
+                // Collect area exit environment overlay data for instanced rendering
                 QColor envColor = getEnvironmentColor(pExit);
-                float overlayZ = dz + 0.25f;
+                float overlayZ = dz + 0.25f/mZSquishFactor;
                 float overlayAlpha = exitAboveCurrentLevel ? 0.16f : 0.8f; // 0.2 * 0.8 for above level
                 
                 // Darken area exit environment overlay if above current level
@@ -713,36 +757,79 @@ void ModernGLWidget::renderConnections()
                     exitEnvBlue *= darkenFactor;
                 }
                 
-                renderCube(dx,
-                           dy,
-                           overlayZ,
-                           0.5f / scale, // Much smaller overlay
-                           exitEnvRed,
-                           exitEnvGreen,
-                           exitEnvBlue,
-                           overlayAlpha);
-                auto enableDepthCommand2 = std::make_unique<GLStateCommand>(GLStateCommand::ENABLE_DEPTH_TEST);
-                mRenderCommandQueue.addCommand(std::move(enableDepthCommand2));
+                const float exitEnvSize = 0.5f / scale;
+                areaExitOverlayInstances.append(CubeInstanceData(dx, dy, overlayZ, exitEnvSize, exitEnvSize, exitEnvSize / mZSquishFactor, exitEnvRed, exitEnvGreen, exitEnvBlue, overlayAlpha));
             }
         }
     }
 
-    // Render all collected lines
-    if (!lineVertices.isEmpty()) {
-        renderLines(lineVertices, lineColors);
+    // Create batched instanced render commands for area exit cubes
+    if (!areaExitInstances.isEmpty()) {
+        auto command = std::make_unique<RenderInstancedCubesCommand>(areaExitInstances, 
+                                                                    mCameraController.getProjectionMatrix(), 
+                                                                    mCameraController.getViewMatrix(), 
+                                                                    mCameraController.getModelMatrix());
+        mRenderCommandQueue.addCommand(std::move(command));
     }
+
+    // Create batched instanced render commands for area exit overlays
+    if (!areaExitOverlayInstances.isEmpty()) {
+        // Disable depth testing for overlays like the original
+        auto disableDepthCommand = std::make_unique<GLStateCommand>(GLStateCommand::DISABLE_DEPTH_TEST);
+        mRenderCommandQueue.addCommand(std::move(disableDepthCommand));
+
+        auto command = std::make_unique<RenderInstancedCubesCommand>(areaExitOverlayInstances, 
+                                                                    mCameraController.getProjectionMatrix(), 
+                                                                    mCameraController.getViewMatrix(), 
+                                                                    mCameraController.getModelMatrix());
+        mRenderCommandQueue.addCommand(std::move(command));
+
+        // Re-enable depth testing for subsequent rendering
+        auto enableDepthCommand = std::make_unique<GLStateCommand>(GLStateCommand::ENABLE_DEPTH_TEST);
+        mRenderCommandQueue.addCommand(std::move(enableDepthCommand));
+    }
+
+    // Render all collected lines
+    //if (!lineVertices.isEmpty()) {
+    //    renderLines(lineVertices, lineColors);
+    //}
 }
 
-void ModernGLWidget::renderCube(float x, float y, float z, float size, float r, float g, float b, float a)
+void ModernGLWidget::renderRectangularCuboid(float x, float y, float z, float xSize, float ySize, float zSize, float r, float g, float b, float a)
 {
     // Create render command and queue it
-    auto command = std::make_unique<RenderCubeCommand>(x, y, z, size, r, g, b, a, 
+    auto command = std::make_unique<RenderRectangularCuboidCommand>(x, y, z, xSize, ySize, zSize, r, g, b, a,
                                                       mCameraController.getProjectionMatrix(), 
                                                       mCameraController.getViewMatrix(), 
                                                       mCameraController.getModelMatrix());
     mRenderCommandQueue.addCommand(std::move(command));
 }
 
+void ModernGLWidget::renderCube(float x, float y, float z, float size, float r, float g, float b, float a)
+{
+    // Create render command and queue it
+    auto command = std::make_unique<RenderCubeCommand>(x, y, z, size, r, g, b, a,
+                                                      mCameraController.getProjectionMatrix(), 
+                                                      mCameraController.getViewMatrix(), 
+                                                      mCameraController.getModelMatrix());
+    mRenderCommandQueue.addCommand(std::move(command));
+}
+
+// New camera position control
+void ModernGLWidget::shiftCamera(float verticalAngle, float horizontalAngle, float rotationAngle)
+{
+    mCameraController.shiftPerspective(verticalAngle, horizontalAngle, rotationAngle);
+    update();
+}
+
+// New camera position control
+void ModernGLWidget::setCameraPosition(float r, float theta, float phi)
+{
+    mCameraController.setPosition(r, theta, phi);
+    update();
+}
+
+// Implement slot methods (same interface as original)
 void ModernGLWidget::slot_showAllLevels()
 {
     mShowTopLevels = 999999;
@@ -753,73 +840,43 @@ void ModernGLWidget::slot_showAllLevels()
 void ModernGLWidget::slot_shiftDown()
 {
     mShiftMode = true;
-    
-    if (mpHost && mpHost->experimentEnabled("experiment.rendering-movement.smooth")) {
-        startSmoothTransition(mAID, mMapCenterX, mMapCenterY - 1, mMapCenterZ);
-    } else {
-        mMapCenterY--;
-        update();
-    }
+    mCameraController.translateTargetBackward();
+    update();
 }
 
 void ModernGLWidget::slot_shiftUp()
 {
     mShiftMode = true;
-    
-    if (mpHost && mpHost->experimentEnabled("experiment.rendering-movement.smooth")) {
-        startSmoothTransition(mAID, mMapCenterX, mMapCenterY + 1, mMapCenterZ);
-    } else {
-        mMapCenterY++;
-        update();
-    }
+    mCameraController.translateTargetForward();
+    update();
 }
 
 void ModernGLWidget::slot_shiftLeft()
 {
     mShiftMode = true;
-    
-    if (mpHost && mpHost->experimentEnabled("experiment.rendering-movement.smooth")) {
-        startSmoothTransition(mAID, mMapCenterX - 1, mMapCenterY, mMapCenterZ);
-    } else {
-        mMapCenterX--;
-        update();
-    }
+    mCameraController.translateTargetLeft();
+    update();
 }
 
 void ModernGLWidget::slot_shiftRight()
 {
     mShiftMode = true;
-    
-    if (mpHost && mpHost->experimentEnabled("experiment.rendering-movement.smooth")) {
-        startSmoothTransition(mAID, mMapCenterX + 1, mMapCenterY, mMapCenterZ);
-    } else {
-        mMapCenterX++;
-        update();
-    }
+    mCameraController.translateTargetRight();
+    update();
 }
 
 void ModernGLWidget::slot_shiftZup()
 {
     mShiftMode = true;
-    
-    if (mpHost && mpHost->experimentEnabled("experiment.rendering-movement.smooth")) {
-        startSmoothTransition(mAID, mMapCenterX, mMapCenterY, mMapCenterZ + 1);
-    } else {
-        mMapCenterZ++;
-        update();
-    }
+    mCameraController.translateTargetUp();
+    update();
 }
 
 void ModernGLWidget::slot_shiftZdown()
 {
     mShiftMode = true;
-    
-    if (mpHost && mpHost->experimentEnabled("experiment.rendering-movement.smooth")) {
-        startSmoothTransition(mAID, mMapCenterX, mMapCenterY, mMapCenterZ - 1);
-    } else {
-        mMapCenterZ--;
-        update();
-    }
+    mCameraController.translateTargetDown();
+    update();
 }
 
 void ModernGLWidget::slot_singleLevelView()
@@ -889,30 +946,64 @@ void ModernGLWidget::slot_setScale(int angle)
 
 void ModernGLWidget::slot_setCameraPositionX(int angle)
 {
-    angle /= 10; // qNormalizeAngle equivalent
-    float currentY = mCameraController.getYRot();
-    float currentZ = mCameraController.getZRot();
-    mCameraController.setRotation(angle, currentY, currentZ);
+    angle *= 10;
+    QVector3D currentPosition = mCameraController.getPosition();
+    mCameraController.setPosition(currentPosition[0], currentPosition[1], angle);
     is2DView = false;
     update();
 }
 
 void ModernGLWidget::slot_setCameraPositionY(int angle)
 {
-    angle /= 10; // qNormalizeAngle equivalent
-    float currentX = mCameraController.getXRot();
-    float currentZ = mCameraController.getZRot();
-    mCameraController.setRotation(currentX, angle, currentZ);
+    angle *= 10;
+    QVector3D currentPosition = mCameraController.getPosition();
+    mCameraController.setPosition(currentPosition[0], currentPosition[1], angle);
     is2DView = false;
     update();
 }
 
 void ModernGLWidget::slot_setCameraPositionZ(int angle)
 {
-    angle /= 10; // qNormalizeAngle equivalent
-    float currentX = mCameraController.getXRot();
-    float currentY = mCameraController.getYRot();
-    mCameraController.setRotation(currentX, currentY, angle);
+    angle *= 10;
+    angle = qBound(0, angle, 180);
+    QVector3D currentPosition = mCameraController.getPosition();
+    mCameraController.setPosition(currentPosition[0], angle, currentPosition[2]);
+    is2DView = false;
+    update();
+}
+
+void ModernGLWidget::slot_shiftCameraDown()
+{
+    const float angle = 3.0f;
+    QVector3D currentPosition = mCameraController.getPosition();
+    mCameraController.setPosition(currentPosition[0], currentPosition[1]+angle, currentPosition[2]);
+    is2DView = false;
+    update();
+}
+
+void ModernGLWidget::slot_shiftCameraUp()
+{
+    const float angle = 3.0f;
+    QVector3D currentPosition = mCameraController.getPosition();
+    mCameraController.setPosition(currentPosition[0], currentPosition[1]-angle, currentPosition[2]);
+    is2DView = false;
+    update();
+}
+
+void ModernGLWidget::slot_shiftCameraLeft()
+{
+    const float angle = 3.0f;
+    QVector3D currentPosition = mCameraController.getPosition();
+    mCameraController.setPosition(currentPosition[0], currentPosition[1], currentPosition[2]-angle);
+    is2DView = false;
+    update();
+}
+
+void ModernGLWidget::slot_shiftCameraRight()
+{
+    const float angle = 3.0f;
+    QVector3D currentPosition = mCameraController.getPosition();
+    mCameraController.setPosition(currentPosition[0], currentPosition[1], currentPosition[2]+angle);
     is2DView = false;
     update();
 }
@@ -930,7 +1021,7 @@ void ModernGLWidget::setViewCenter(int areaId, int xPos, int yPos, int zPos)
         mMapCenterX = xPos;
         mMapCenterY = yPos;
         mMapCenterZ = zPos;
-        mCameraController.setViewCenter(xPos, yPos, zPos);
+        mCameraController.setTarget(xPos, yPos, zPos);
         update();
     }
 }
@@ -952,19 +1043,75 @@ void ModernGLWidget::wheelEvent(QWheelEvent* e)
 void ModernGLWidget::mousePressEvent(QMouseEvent* event)
 {
     // Implement mouse handling (placeholder)
-    QOpenGLWidget::mousePressEvent(event);
+    mudlet::self()->activateProfile(mpHost);
+    if (!mpMap||!mpMap->mpRoomDB) {
+        return;
+    }
+    if (event->buttons() & Qt::LeftButton) {        // translation on xy-plane
+        // TODO: allow user to click on rooms
+        auto eventPos = event->position().toPoint();
+        const int x = eventPos.x();
+        const int y = height() - eventPos.y(); // the opengl origin is at bottom left
+        mPanMode = true;
+        mPanXStart = x;
+        mPanYStart = y;
+    } 
 }
 
 void ModernGLWidget::mouseMoveEvent(QMouseEvent* event)
 {
     // Implement mouse handling (placeholder)
-    QOpenGLWidget::mouseMoveEvent(event);
+    //QOpenGLWidget::mouseMoveEvent(event);
+    if (!mpMap||!mpMap->mpRoomDB) {
+        return;
+    }
+    if (mPanMode) {
+        auto eventPos = event->position();
+        auto x = static_cast<float>(eventPos.x());
+        auto y = static_cast<float>(height()) - static_cast<float>(eventPos.y()); // the opengl origin is at bottom left
+        if ((mPanXStart - x) > 1.0f) {
+            if (event->modifiers() & Qt::ControlModifier) {
+                slot_shiftCameraRight();
+            } else {
+                slot_shiftLeft();
+            }
+            mPanXStart = x;
+        } else if ((mPanXStart - x) < -1.0f) {
+            if (event->modifiers() & Qt::ControlModifier) {
+                slot_shiftCameraLeft();
+            } else {
+                slot_shiftRight();
+            }
+            mPanXStart = x;
+        }
+        if ((mPanYStart - y) > 1.0f) {
+            if (event->modifiers() & Qt::ControlModifier) {
+                slot_shiftCameraUp();
+            } else {
+                slot_shiftUp();
+            }
+            mPanYStart = y;
+        } else if ((mPanYStart - y) < -1.0f) {
+            if (event->modifiers() & Qt::ControlModifier) {
+                slot_shiftCameraDown();
+            } else {
+                slot_shiftDown();
+            }
+            mPanYStart = y;
+        }
+    }
 }
 
 void ModernGLWidget::mouseReleaseEvent(QMouseEvent* event)
 {
-    // Implement mouse handling (placeholder)
+    mPanMode = false;
+    mCameraController.snapTargetToGrid();
+    const QVector3D newCenter = mCameraController.getTarget();
+    mMapCenterX = newCenter.x();
+    mMapCenterY = newCenter.y();
+    mMapCenterZ = newCenter.z();
     QOpenGLWidget::mouseReleaseEvent(event);
+    update();
 }
 
 void ModernGLWidget::renderLines(const QVector<float>& vertices, const QVector<float>& colors)
@@ -1047,58 +1194,58 @@ QColor ModernGLWidget::getPlaneColor(int zLevel, bool belowOrAtLevel)
 {
     // Both color arrays from original glwidget.cpp
     static const float planeColor[][4] = {{0.5f, 0.6f, 0.5f, 0.2f},
-                                          {0.233f, 0.498f, 0.113f, 0.2f},
-                                          {0.666f, 0.333f, 0.498f, 0.2f},
-                                          {0.5f, 0.333f, 0.666f, 0.2f},
-                                          {0.69f, 0.458f, 0.0f, 0.2f},
-                                          {0.333f, 0.0f, 0.49f, 0.2f},
-                                          {133.0f / 255.0f, 65.0f / 255.0f, 98.0f / 255.0f, 0.2f},
-                                          {0.3f, 0.3f, 0.0f, 0.2f},
-                                          {0.6f, 0.2f, 0.6f, 0.2f},
-                                          {0.6f, 0.6f, 0.2f, 0.2f},
-                                          {0.4f, 0.1f, 0.4f, 0.2f},
-                                          {0.4f, 0.4f, 0.1f, 0.2f},
-                                          {0.3f, 0.1f, 0.3f, 0.2f},
-                                          {0.3f, 0.3f, 0.1f, 0.2f},
-                                          {0.2f, 0.1f, 0.2f, 0.2f},
-                                          {0.2f, 0.2f, 0.1f, 0.2f},
-                                          {0.24f, 0.1f, 0.5f, 0.2f},
-                                          {0.1f, 0.1f, 0.0f, 0.2f},
-                                          {0.54f, 0.6f, 0.2f, 0.2f},
-                                          {0.2f, 0.2f, 0.5f, 0.2f},
-                                          {0.6f, 0.6f, 0.2f, 0.2f},
-                                          {0.6f, 0.4f, 0.6f, 0.2f},
-                                          {0.4f, 0.4f, 0.1f, 0.2f},
-                                          {0.4f, 0.2f, 0.4f, 0.2f},
-                                          {0.2f, 0.2f, 0.0f, 0.2f},
-                                          {0.2f, 0.1f, 0.3f, 0.2f}};
+        {0.233f, 0.498f, 0.113f, 0.2f},
+        {0.666f, 0.333f, 0.498f, 0.2f},
+        {0.5f, 0.333f, 0.666f, 0.2f},
+        {0.69f, 0.458f, 0.0f, 0.2f},
+        {0.333f, 0.0f, 0.49f, 0.2f},
+        {133.0f / 255.0f, 65.0f / 255.0f, 98.0f / 255.0f, 0.2f},
+        {0.3f, 0.3f, 0.0f, 0.2f},
+        {0.6f, 0.2f, 0.6f, 0.2f},
+        {0.6f, 0.6f, 0.2f, 0.2f},
+        {0.4f, 0.1f, 0.4f, 0.2f},
+        {0.4f, 0.4f, 0.1f, 0.2f},
+        {0.3f, 0.1f, 0.3f, 0.2f},
+        {0.3f, 0.3f, 0.1f, 0.2f},
+        {0.2f, 0.1f, 0.2f, 0.2f},
+        {0.2f, 0.2f, 0.1f, 0.2f},
+        {0.24f, 0.1f, 0.5f, 0.2f},
+        {0.1f, 0.1f, 0.0f, 0.2f},
+        {0.54f, 0.6f, 0.2f, 0.2f},
+        {0.2f, 0.2f, 0.5f, 0.2f},
+        {0.6f, 0.6f, 0.2f, 0.2f},
+        {0.6f, 0.4f, 0.6f, 0.2f},
+        {0.4f, 0.4f, 0.1f, 0.2f},
+        {0.4f, 0.2f, 0.4f, 0.2f},
+        {0.2f, 0.2f, 0.0f, 0.2f},
+        {0.2f, 0.1f, 0.3f, 0.2f}};
 
     static const float planeColor2[][4] = {{0.9f, 0.5f, 0.0f, 1.0f},
-                                           {165.0f / 255.0f, 102.0f / 255.0f, 167.0f / 255.0f, 1.0f},
-                                           {170.0f / 255.0f, 10.0f / 255.0f, 127.0f / 255.0f, 1.0f},
-                                           {203.0f / 255.0f, 135.0f / 255.0f, 101.0f / 255.0f, 1.0f},
-                                           {154.0f / 255.0f, 154.0f / 255.0f, 115.0f / 255.0f, 1.0f},
-                                           {107.0f / 255.0f, 154.0f / 255.0f, 100.0f / 255.0f, 1.0f},
-                                           {154.0f / 255.0f, 184.0f / 255.0f, 111.0f / 255.0f, 1.0f},
-                                           {67.0f / 255.0f, 154.0f / 255.0f, 148.0f / 255.0f, 1.0f},
-                                           {154.0f / 255.0f, 118.0f / 255.0f, 151.0f / 255.0f, 1.0f},
-                                           {208.0f / 255.0f, 213.0f / 255.0f, 164.0f / 255.0f, 1.0f},
-                                           {213.0f / 255.0f, 169.0f / 255.0f, 158.0f / 255.0f, 1.0f},
-                                           {139.0f / 255.0f, 209.0f / 255.0f, 0.0f, 1.0f},
-                                           {163.0f / 255.0f, 209.0f / 255.0f, 202.0f / 255.0f, 1.0f},
-                                           {158.0f / 255.0f, 156.0f / 255.0f, 209.0f / 255.0f, 1.0f},
-                                           {209.0f / 255.0f, 144.0f / 255.0f, 162.0f / 255.0f, 1.0f},
-                                           {209.0f / 255.0f, 183.0f / 255.0f, 78.0f / 255.0f, 1.0f},
-                                           {111.0f / 255.0f, 209.0f / 255.0f, 88.0f / 255.0f, 1.0f},
-                                           {95.0f / 255.0f, 120.0f / 255.0f, 209.0f / 255.0f, 1.0f},
-                                           {31.0f / 255.0f, 209.0f / 255.0f, 126.0f / 255.0f, 1.0f},
-                                           {1.0f, 170.0f / 255.0f, 1.0f, 1.0f},
-                                           {158.0f / 255.0f, 105.0f / 255.0f, 158.0f / 255.0f, 1.0f},
-                                           {68.0f / 255.0f, 189.0f / 255.0f, 189.0f / 255.0f, 1.0f},
-                                           {0.1f, 0.69f, 0.49f, 1.0f},
-                                           {0.0f, 0.15f, 1.0f, 1.0f},
-                                           {0.12f, 0.02f, 0.20f, 1.0f},
-                                           {0.0f, 0.3f, 0.1f, 1.0f}};
+        {165.0f / 255.0f, 102.0f / 255.0f, 167.0f / 255.0f, 1.0f},
+        {170.0f / 255.0f, 10.0f / 255.0f, 127.0f / 255.0f, 1.0f},
+        {203.0f / 255.0f, 135.0f / 255.0f, 101.0f / 255.0f, 1.0f},
+        {154.0f / 255.0f, 154.0f / 255.0f, 115.0f / 255.0f, 1.0f},
+        {107.0f / 255.0f, 154.0f / 255.0f, 100.0f / 255.0f, 1.0f},
+        {154.0f / 255.0f, 184.0f / 255.0f, 111.0f / 255.0f, 1.0f},
+        {67.0f / 255.0f, 154.0f / 255.0f, 148.0f / 255.0f, 1.0f},
+        {154.0f / 255.0f, 118.0f / 255.0f, 151.0f / 255.0f, 1.0f},
+        {208.0f / 255.0f, 213.0f / 255.0f, 164.0f / 255.0f, 1.0f},
+        {213.0f / 255.0f, 169.0f / 255.0f, 158.0f / 255.0f, 1.0f},
+        {139.0f / 255.0f, 209.0f / 255.0f, 0.0f, 1.0f},
+        {163.0f / 255.0f, 209.0f / 255.0f, 202.0f / 255.0f, 1.0f},
+        {158.0f / 255.0f, 156.0f / 255.0f, 209.0f / 255.0f, 1.0f},
+        {209.0f / 255.0f, 144.0f / 255.0f, 162.0f / 255.0f, 1.0f},
+        {209.0f / 255.0f, 183.0f / 255.0f, 78.0f / 255.0f, 1.0f},
+        {111.0f / 255.0f, 209.0f / 255.0f, 88.0f / 255.0f, 1.0f},
+        {95.0f / 255.0f, 120.0f / 255.0f, 209.0f / 255.0f, 1.0f},
+        {31.0f / 255.0f, 209.0f / 255.0f, 126.0f / 255.0f, 1.0f},
+        {1.0f, 170.0f / 255.0f, 1.0f, 1.0f},
+        {158.0f / 255.0f, 105.0f / 255.0f, 158.0f / 255.0f, 1.0f},
+        {68.0f / 255.0f, 189.0f / 255.0f, 189.0f / 255.0f, 1.0f},
+        {0.1f, 0.69f, 0.49f, 1.0f},
+        {0.0f, 0.15f, 1.0f, 1.0f},
+        {0.12f, 0.02f, 0.20f, 1.0f},
+        {0.0f, 0.3f, 0.1f, 1.0f}};
 
     int ef = abs(zLevel % 26);
     const float* color;
@@ -1107,18 +1254,26 @@ QColor ModernGLWidget::getPlaneColor(int zLevel, bool belowOrAtLevel)
     // rz <= pz: glColor4f(planeColor[ef]) - use planeColor for rooms below/at level
     // rz > pz:  glColor4f(planeColor2[ef]) - use planeColor2 for rooms above level
     // Try using the brighter array as default since most rooms are likely at the same level
-    if (belowOrAtLevel) {
-        color = planeColor2[ef]; // Use bright colors for rooms at/below level
-        // qDebug() << "Using planeColor2[" << ef << "] for room at/below level";
+    if (mpHost->experimentEnabled("experiment.rendering.sky-ground")) {
+        if (zLevel > 0) {
+            return QColor(50,50,150,255); // blue
+        } else {
+            return QColor(100,50,25,255); // brown
+        }
     } else {
-        color = planeColor[ef]; // Use darker colors for rooms above level
-        // qDebug() << "Using planeColor[" << ef << "] for room above level";
-    }
+        if (belowOrAtLevel) {
+            color = planeColor2[ef]; // Use bright colors for rooms at/below level
+                                     // qDebug() << "Using planeColor2[" << ef << "] for room at/below level";
+        } else {
+            color = planeColor[ef]; // Use darker colors for rooms above level
+                                    // qDebug() << "Using planeColor[" << ef << "] for room above level";
+        }
 
-    return QColor(static_cast<int>(color[0] * 255),
-                  static_cast<int>(color[1] * 255),
-                  static_cast<int>(color[2] * 255),
-                  255); // Use full alpha for room colors
+        return QColor(static_cast<int>(color[0] * 255),
+                static_cast<int>(color[1] * 255),
+                static_cast<int>(color[2] * 255),
+                255); // Use full alpha for room colors
+    }
 }
 
 QColor ModernGLWidget::getEnvironmentColor(TRoom* pRoom)
@@ -1217,6 +1372,9 @@ QColor ModernGLWidget::getEnvironmentColor(TRoom* pRoom)
 void ModernGLWidget::startSmoothTransition(int targetAID, int targetX, int targetY, int targetZ)
 {
     
+    // Very slow for demonstration
+    mAnimationDuration = 500;
+
     // Set up animation parameters
     mTargetAID = targetAID;
     mTargetMapCenterX = static_cast<float>(targetX);
@@ -1224,15 +1382,26 @@ void ModernGLWidget::startSmoothTransition(int targetAID, int targetX, int targe
     mTargetMapCenterZ = static_cast<float>(targetZ);
     
     // Store current position as start position
-    mStartMapCenterX = static_cast<float>(mMapCenterX);
-    mStartMapCenterY = static_cast<float>(mMapCenterY);
-    mStartMapCenterZ = static_cast<float>(mMapCenterZ);
+    if (mCameraSmoothAnimating) {
+        mStartMapCenterX = mCurrentAnimationX;
+        mStartMapCenterY = mCurrentAnimationY;
+        mStartMapCenterZ = mCurrentAnimationZ;
+    } else {
+        mStartMapCenterX = static_cast<float>(mMapCenterX);
+        mStartMapCenterY = static_cast<float>(mMapCenterY);
+        mStartMapCenterZ = static_cast<float>(mMapCenterZ);
+    }
     
     // Initialize current animation position
     mCurrentAnimationX = mStartMapCenterX;
     mCurrentAnimationY = mStartMapCenterY;
     mCurrentAnimationZ = mStartMapCenterZ;
     
+    // update map's actual position
+    mMapCenterX = static_cast<float>(targetX);
+    mMapCenterY = static_cast<float>(targetY);
+    mMapCenterZ = static_cast<float>(targetZ);
+
     // Reset animation progress
     mAnimationProgress = 0.0;
     
@@ -1256,9 +1425,7 @@ void ModernGLWidget::onCameraAnimationTick()
         mCameraAnimationTimer->stop();
         
         mAID = mTargetAID;
-        mMapCenterX = static_cast<int>(mTargetMapCenterX);
-        mMapCenterY = static_cast<int>(mTargetMapCenterY);
-        mMapCenterZ = static_cast<int>(mTargetMapCenterZ);
+        mCameraController.setTarget(static_cast<int>(mTargetMapCenterX), static_cast<int>(mTargetMapCenterY), static_cast<int>(mTargetMapCenterZ));
         
         // Set final floating-point position
         mCurrentAnimationX = mTargetMapCenterX;
@@ -1279,7 +1446,7 @@ void ModernGLWidget::onCameraAnimationTick()
     }
     
     // Update camera controller with current floating-point position
-    mCameraController.setViewCenter(mCurrentAnimationX, mCurrentAnimationY, mCurrentAnimationZ);
+    mCameraController.setTarget(mCurrentAnimationX, mCurrentAnimationY, mCurrentAnimationZ);
     
     // Trigger a repaint
     update();

@@ -106,16 +106,16 @@ void GeometryManager::generateCubeTemplate()
     // Colors will be set per instance, so we don't populate them in the template
 }
 
-GeometryData GeometryManager::transformCubeTemplate(float x, float y, float z, float size, float r, float g, float b, float a)
+GeometryData GeometryManager::transformCubeTemplate(float x, float y, float z, float xSize, float ySize, float zSize, float r, float g, float b, float a)
 {
     GeometryData result;
     
     // Transform vertices and copy normals
     for (int i = 0; i < mCubeTemplate.vertices.size(); i += 3) {
         // Scale and translate vertex
-        result.vertices << (mCubeTemplate.vertices[i] * size + x);
-        result.vertices << (mCubeTemplate.vertices[i + 1] * size + y);  
-        result.vertices << (mCubeTemplate.vertices[i + 2] * size + z);
+        result.vertices << (mCubeTemplate.vertices[i] * xSize + x);
+        result.vertices << (mCubeTemplate.vertices[i + 1] * ySize + y);  
+        result.vertices << (mCubeTemplate.vertices[i + 2] * zSize + z);
         
         // Copy normal (no transformation needed since it's a uniform scale)
         result.normals << mCubeTemplate.normals[i];
@@ -132,6 +132,16 @@ GeometryData GeometryManager::transformCubeTemplate(float x, float y, float z, f
     return result;
 }
 
+GeometryData GeometryManager::generateRectangularCuboidGeometry(float x, float y, float z, float xSize, float ySize, float zSize, float r, float g, float b, float a)
+{
+    if (!mInitialized) {
+        qWarning() << "GeometryManager: generateRectangularCuboidGeometry called before initialize()";
+        return GeometryData();
+    }
+    
+    return transformCubeTemplate(x, y, z, xSize, ySize, zSize, r, g, b, a);
+}
+
 GeometryData GeometryManager::generateCubeGeometry(float x, float y, float z, float size, float r, float g, float b, float a)
 {
     if (!mInitialized) {
@@ -139,7 +149,7 @@ GeometryData GeometryManager::generateCubeGeometry(float x, float y, float z, fl
         return GeometryData();
     }
     
-    return transformCubeTemplate(x, y, z, size, r, g, b, a);
+    return transformCubeTemplate(x, y, z, size, size, size, r, g, b, a);
 }
 
 GeometryData GeometryManager::generateLineGeometry(const QVector<float>& vertices, const QVector<float>& colors)
@@ -149,15 +159,56 @@ GeometryData GeometryManager::generateLineGeometry(const QVector<float>& vertice
     }
     
     GeometryData result;
-    result.vertices = vertices;
-    result.colors = colors;
+    // Transform vertices and copy normals
+    const float size = 0.02f;
+    const float scalingFactor = 12.5f;
+    int colorIndex = 0;
+    for (int i = 0; i < vertices.size(); i += 6) {
+        const QVector3D origin = QVector3D(vertices[i], vertices[i+1], vertices[i+2]);
+        const QVector3D dest = QVector3D(vertices[i+3], vertices[i+4], vertices[i+5]);
+        const QVector3D upVec = QVector3D(0.0f, 0.0f, 1.0f);
+        const QQuaternion rot = QQuaternion::rotationTo(upVec, dest-origin);
+        QVector3D rotated = rot.rotatedVector(upVec);
+        QVector3D recenter = rotated * (dest-origin).length() * scalingFactor * size + origin;
+        //qDebug() << "Exit vector " << rotated[0] << ", " << rotated[1] << ", " << rotated[2];
+        // Transform vertices and copy normals
+        for (int j = 0; j < mCubeTemplate.vertices.size(); j += 3) {
+            // Scale translate and rotate vertex
+            QVector3D vertex = QVector3D(mCubeTemplate.vertices[j], mCubeTemplate.vertices[j+1], mCubeTemplate.vertices[j+2] * (dest-origin).length()*scalingFactor);
+            rotated = rot.rotatedVector(vertex);
+            result.vertices << rotated.x() * size + recenter.x();
+            result.vertices << rotated.y() * size + recenter.y();
+            result.vertices << rotated.z() * size + recenter.z();
+            
+            // Copy and rotate normal
+            vertex = QVector3D(mCubeTemplate.normals[j], mCubeTemplate.normals[j+1], mCubeTemplate.normals[j+2]);
+            rotated = rot.rotatedVector(vertex);
+            result.normals << rotated.x();
+            result.normals << rotated.y();
+            result.normals << rotated.z();
+            
+            // Set color for this vertex
+            result.colors << colors[colorIndex] << colors[colorIndex+1] << colors[colorIndex+2] << colors[colorIndex+3];
+        }
+        colorIndex += 4;
     
-    // Create dummy normals for lines (pointing up)
-    for (int i = 0; i < vertices.size() / 3; ++i) {
-        result.normals << 0.0f << 0.0f << 1.0f;
+        // Copy indices (they don't need transformation)
+        result.indices = mCubeTemplate.indices;
+    }
+
+    if (vertices.isEmpty() || colors.isEmpty() || vertices.size() % 3 != 0 || colors.size() % 4 != 0) {
+        qDebug() << "GeometryManager: Invalid vertex or color array size";
+        return GeometryData();
     }
     
+    // Check that we have the right ratio: 3 floats per vertex, 4 floats per color
+    if (vertices.size() / 3 != colors.size() / 4) {
+        qDebug() << "GeometryManager: Vertex count doesn't match color count";
+        return GeometryData();
+    }
+        
     return result;
+
 }
 
 GeometryData GeometryManager::generateTriangleGeometry(const QVector<float>& vertices, const QVector<float>& colors)
@@ -276,7 +327,7 @@ void GeometryManager::renderInstancedCubes(const QVector<CubeInstanceData>& inst
         // Fallback to individual cube rendering
         for (const auto& instance : instances) {
             GeometryData cubeGeometry = transformCubeTemplate(instance.position[0], instance.position[1], instance.position[2],
-                                                             instance.size[0], instance.color[0], instance.color[1], instance.color[2], instance.color[3]);
+                                                             instance.size[0], instance.size[1], instance.size[2], instance.color[0], instance.color[1], instance.color[2], instance.color[3]);
             renderGeometry(cubeGeometry, vao, vertexBuffer, colorBuffer, normalBuffer, indexBuffer, drawMode);
         }
         return;

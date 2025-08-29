@@ -65,6 +65,8 @@ public:
 
     void wheelEvent(QWheelEvent* e) override;
     void setViewCenter(int, int, int, int);
+    void shiftCamera(float, float, float);
+    void setCameraPosition(float, float, float);
 
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
@@ -74,6 +76,10 @@ public slots:
     void slot_shiftDown();
     void slot_shiftLeft();
     void slot_shiftRight();
+    void slot_shiftCameraUp();
+    void slot_shiftCameraDown();
+    void slot_shiftCameraLeft();
+    void slot_shiftCameraRight();
     void slot_shiftZup();
     void slot_shiftZdown();
     void slot_setCameraPositionX(int angle);
@@ -174,11 +180,15 @@ private:
     bool mCameraSmoothAnimating = false; // Dedicated flag for smooth camera animation
     int mPreviousRID = 0; // Track previous room ID to detect changes
 
+    // Non-cubic rooms
+    float mZSquishFactor = 1.0f;
+
     // Private methods for modern OpenGL
     void updateMatrices();
     void renderRooms();
     void renderConnections();
     void renderCube(float x, float y, float z, float size, float r, float g, float b, float a);
+    void renderRectangularCuboid(float x, float y, float z, float xSize, float ySize, float zSize, float r, float g, float b, float a);
     void renderLines(const QVector<float>& vertices, const QVector<float>& colors);
     void renderTriangles(const QVector<float>& vertices, const QVector<float>& colors);
     void renderUpDownIndicators(TRoom* pRoom, float x, float y, float z);
