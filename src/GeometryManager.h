@@ -22,6 +22,8 @@
 
 #include "pre_guard.h"
 #include <QVector>
+#include <QVector3D>
+#include <QQuaternion>
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLFunctions>

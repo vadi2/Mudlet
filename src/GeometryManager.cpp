@@ -151,15 +151,56 @@ GeometryData GeometryManager::generateLineGeometry(const QVector<float>& vertice
     }
     
     GeometryData result;
-    result.vertices = vertices;
-    result.colors = colors;
+    // Transform vertices and copy normals
+    const float size = 0.02f;
+    const float scalingFactor = 12.5f;
+    int colorIndex = 0;
+    for (int i = 0; i < vertices.size(); i += 6) {
+        const QVector3D origin = QVector3D(vertices[i], vertices[i+1], vertices[i+2]);
+        const QVector3D dest = QVector3D(vertices[i+3], vertices[i+4], vertices[i+5]);
+        const QVector3D upVec = QVector3D(0.0f, 0.0f, 1.0f);
+        const QQuaternion rot = QQuaternion::rotationTo(upVec, dest-origin);
+        QVector3D rotated = rot.rotatedVector(upVec);
+        QVector3D recenter = rotated * (dest-origin).length() * scalingFactor * size + origin;
+        //qDebug() << "Exit vector " << rotated[0] << ", " << rotated[1] << ", " << rotated[2];
+        // Transform vertices and copy normals
+        for (int j = 0; j < mCubeTemplate.vertices.size(); j += 3) {
+            // Scale translate and rotate vertex
+            QVector3D vertex = QVector3D(mCubeTemplate.vertices[j], mCubeTemplate.vertices[j+1], mCubeTemplate.vertices[j+2] * (dest-origin).length()*scalingFactor);
+            rotated = rot.rotatedVector(vertex);
+            result.vertices << rotated.x() * size + recenter.x();
+            result.vertices << rotated.y() * size + recenter.y();
+            result.vertices << rotated.z() * size + recenter.z();
+            
+            // Copy and rotate normal
+            vertex = QVector3D(mCubeTemplate.normals[j], mCubeTemplate.normals[j+1], mCubeTemplate.normals[j+2]);
+            rotated = rot.rotatedVector(vertex);
+            result.normals << rotated.x();
+            result.normals << rotated.y();
+            result.normals << rotated.z();
+            
+            // Set color for this vertex
+            result.colors << colors[colorIndex] << colors[colorIndex+1] << colors[colorIndex+2] << colors[colorIndex+3];
+        }
+        colorIndex += 4;
     
-    // Create dummy normals for lines (pointing up)
-    for (int i = 0; i < vertices.size() / 3; ++i) {
-        result.normals << 0.0f << 0.0f << 1.0f;
+        // Copy indices (they don't need transformation)
+        result.indices = mCubeTemplate.indices;
+    }
+
+    if (vertices.isEmpty() || colors.isEmpty() || vertices.size() % 3 != 0 || colors.size() % 4 != 0) {
+        qDebug() << "GeometryManager: Invalid vertex or color array size";
+        return GeometryData();
     }
     
+    // Check that we have the right ratio: 3 floats per vertex, 4 floats per color
+    if (vertices.size() / 3 != colors.size() / 4) {
+        qDebug() << "GeometryManager: Vertex count doesn't match color count";
+        return GeometryData();
+    }
+        
     return result;
+
 }
 
 GeometryData GeometryManager::generateTriangleGeometry(const QVector<float>& vertices, const QVector<float>& colors)

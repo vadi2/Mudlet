@@ -119,7 +119,8 @@ void RenderLinesCommand::execute(QOpenGLFunctions* gl,
     QMatrix3x3 normalMatrix = mModelMatrix.normalMatrix();
     shader->setUniformValue("uNormalMatrix", normalMatrix);
     
-    geometryManager->renderGeometry(lineGeometry, vao, vertexBuffer, colorBuffer, normalBuffer, indexBuffer, resourceManager, GL_LINES);
+    //geometryManager->renderGeometry(lineGeometry, vao, vertexBuffer, colorBuffer, normalBuffer, indexBuffer, resourceManager, GL_LINES);
+    geometryManager->renderGeometry(lineGeometry, vao, vertexBuffer, colorBuffer, normalBuffer, indexBuffer, resourceManager, GL_TRIANGLES);
 }
 
 // RenderTrianglesCommand implementation

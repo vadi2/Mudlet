@@ -624,6 +624,13 @@ void ModernGLWidget::renderConnections()
                 // Add colors for both vertices with appropriate alpha
                 lineColors << r << g << b << connectionAlpha; // Start color
                 lineColors << r << g << b << connectionAlpha; // End color
+                                                              //
+                // Render all collected lines
+                if (!lineVertices.isEmpty()) {
+                    renderLines(lineVertices, lineColors);
+                    lineVertices.clear();
+                    lineColors.clear();
+                }
 
             } else {
                 // Area exit - draw directional stub
@@ -680,6 +687,13 @@ void ModernGLWidget::renderConnections()
                 // Use different color for area exits (greenish) with appropriate alpha and darkening
                 lineColors << exitRed << exitGreen << exitBlue << exitAlpha; // Start color
                 lineColors << exitRed << exitGreen << exitBlue << exitAlpha; // End color
+                                                                             //
+                // Render all collected lines
+                if (!lineVertices.isEmpty()) {
+                    renderLines(lineVertices, lineColors);
+                    lineVertices.clear();
+                    lineColors.clear();
+                }
 
                 // Render green area exit cube at the destination position with translucency and darkening
                 const float size = 1.0f / scale;
@@ -714,9 +728,9 @@ void ModernGLWidget::renderConnections()
     }
 
     // Render all collected lines
-    if (!lineVertices.isEmpty()) {
-        renderLines(lineVertices, lineColors);
-    }
+    //if (!lineVertices.isEmpty()) {
+    //    renderLines(lineVertices, lineColors);
+    //}
 }
 
 void ModernGLWidget::renderRectangularCuboid(float x, float y, float z, float xSize, float ySize, float zSize, float r, float g, float b, float a)
