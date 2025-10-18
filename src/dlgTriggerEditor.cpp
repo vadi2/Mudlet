@@ -69,7 +69,8 @@ using namespace std::chrono_literals;
 static const char* cButtonBaseColor = "baseColor";
 
 dlgTriggerEditor::dlgTriggerEditor(Host* pH)
-: mpHost(pH)
+: QMainWindow(mudlet::self())
+, mpHost(pH)
 , mSearchOptions(pH->mSearchOptions)
 {
     // init generated dialog

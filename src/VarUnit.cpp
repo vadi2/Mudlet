@@ -269,9 +269,32 @@ void VarUnit::setBase(TVar* pVariable)
 
 void VarUnit::clear()
 {
-    // delete base;
+    // Collect all TVars from the tree using depth-first search
+    QList<TVar*> toDelete;
+    if (base) {
+        toDelete.append(base);
+        int index = 0;
+        while (index < toDelete.size()) {
+            TVar* current = toDelete.at(index);
+            if (current) {
+                // Add all children to the list
+                QList<TVar*> children = current->getChildren(false);
+                toDelete.append(children);
+            }
+            ++index;
+        }
+    }
+
+    // Clear the containers first to avoid dangling pointers
     tVars.clear();
     wVars.clear();
     variableSet.clear();
     mPointers.clear();
+
+    // Now delete all TVars
+    for (TVar* var : toDelete) {
+        delete var;
+    }
+
+    base = nullptr;
 }
