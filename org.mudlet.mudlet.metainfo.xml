@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2025 Mudlet Developers -->
+<component type="desktop-application">
+  <id>org.mudlet.mudlet</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+
+  <name>Mudlet</name>
+  <summary>Play immersive, multiplayer, pure-text RPGs</summary>
+
+  <description>
+    <p>
+      Mudlet is a quality MUD (Multi-User Dungeon) client, designed to take mudding to a new level.
+      It's a modern breed of a client on the gaming scene – with an intuitive user interface, a specially
+      designed scripting framework, and a very fast text display.
+    </p>
+    <p>Key Features:</p>
+    <ul>
+      <li>Simple to use with an intuitive user interface</li>
+      <li>Very fast text display handling thousands of lines in under a second</li>
+      <li>Powerful trigger engine for automation</li>
+      <li>Rich Lua-based scripting framework with extensive API</li>
+      <li>Excellent script editor with syntax highlighting</li>
+      <li>2D and 3D mapper with autowalk functionality</li>
+      <li>Powerful and simple to use GMCP (Generic MUD Communication Protocol)</li>
+      <li>Discord integration</li>
+      <li>Completely themable interface</li>
+      <li>Cross-platform: runs on Windows, macOS and Linux</li>
+      <li>Full compatibility: run same scripts on any platform</li>
+    </ul>
+    <p>
+      Whether you're a power user creating complex automation or a casual gamer exploring text-based
+      worlds, Mudlet provides a modern, feature-rich environment for playing MUDs.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">mudlet.desktop</launchable>
+
+  <url type="homepage">https://www.mudlet.org</url>
+  <url type="bugtracker">https://github.com/Mudlet/Mudlet/issues</url>
+  <url type="help">https://wiki.mudlet.org</url>
+  <url type="donation">https://www.mudlet.org/donate/</url>
+  <url type="vcs-browser">https://github.com/Mudlet/Mudlet</url>
+
+  <developer id="org.mudlet">
+    <name>Mudlet Developers</name>
+  </developer>
+
+  <provides>
+    <binary>mudlet</binary>
+  </provides>
+
+  <categories>
+    <category>Game</category>
+    <category>AdventureGame</category>
+    <category>RolePlaying</category>
+  </categories>
+
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">intense</content_attribute>
+    <content_attribute id="social-info">intense</content_attribute>
+  </content_rating>
+
+  <releases>
+    <release version="4.18.2" date="2024-03-15"/>
+  </releases>
+</component>
