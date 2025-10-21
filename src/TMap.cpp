@@ -562,15 +562,15 @@ void TMap::audit()
                                 const QString msg = tr("[ INFO ] - CONVERTING: old style label, areaID:%1 labelID:%2.").arg(areaID).arg(i);
                                 postMessage(msg);
                             }
-                            appendAreaErrorMsg(areaID, tr("[ INFO ] - Converting old style label id: %1.").arg(i));
+                            appendAreaErrorMsg(areaID, tr("[ INFO ] - Converting old style labelID: %1.").arg(i));
                             pArea->mMapLabels[i] = pArea->mMapLabels.take(newID);
 
                         } else {
                             if (mudlet::self()->showMapAuditErrors()) {
-                                const QString msg = tr("[ WARN ] - CONVERTING: cannot convert old style label in area with id: %1,  label id is: %2.").arg(areaID).arg(i);
+                                const QString msg = tr("[ WARN ] - CONVERTING: cannot convert old style label in area with areaID: %1,  labelID is: %2.").arg(areaID).arg(i);
                                 postMessage(msg);
                             }
-                            appendAreaErrorMsg(areaID, tr("[ WARN ] - CONVERTING: cannot convert old style label with id: %1.").arg(i));
+                            appendAreaErrorMsg(areaID, tr("[ WARN ] - CONVERTING: cannot convert old style label with labelID: %1.").arg(i));
                         }
                     }
                     if ((l.size.width() > std::numeric_limits<qreal>::max()) || (l.size.width() < -std::numeric_limits<qreal>::max())) {
@@ -2395,9 +2395,9 @@ void TMap::pushErrorMessagesToFile(const QString title, const bool isACleanup)
         itAreasMsg.next();
         QString titleText;
         if (!mpRoomDB->getAreaNamesMap().value(itAreasMsg.key()).isEmpty()) {
-            titleText = tr(R"(Area id: %1 "%2")").arg(itAreasMsg.key()).arg(mpRoomDB->getAreaNamesMap().value(itAreasMsg.key()));
+            titleText = tr(R"(AreaID: %1 "%2")").arg(itAreasMsg.key()).arg(mpRoomDB->getAreaNamesMap().value(itAreasMsg.key()));
         } else {
-            titleText = tr("Area id: %1").arg(itAreasMsg.key());
+            titleText = tr("AreaID: %1").arg(itAreasMsg.key());
         }
         pHost->mErrorLogStream << createFileHeaderLine(titleText, QLatin1Char('-'));
         QListIterator<QString> itMapAreaMsg(itAreasMsg.value());
@@ -2413,9 +2413,9 @@ void TMap::pushErrorMessagesToFile(const QString title, const bool isACleanup)
         QString titleText;
         TRoom* pR = mpRoomDB->getRoom(itRoomsMsg.key());
         if (pR && !pR->name.isEmpty()) {
-            titleText = tr(R"(Room id: %1 "%2")").arg(itRoomsMsg.key()).arg(pR->name);
+            titleText = tr(R"(RoomID: %1 "%2")").arg(itRoomsMsg.key()).arg(pR->name);
         } else {
-            titleText = tr("Room id: %1").arg(itRoomsMsg.key());
+            titleText = tr("RoomID: %1").arg(itRoomsMsg.key());
         }
         pHost->mErrorLogStream << createFileHeaderLine(titleText, QLatin1Char('-'));
         QListIterator<QString> itMapRoomMsg(itRoomsMsg.value());

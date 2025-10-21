@@ -650,8 +650,8 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
             TRoom* pR = itRoom.value();
             if (!pR) {
                 if (mudlet::self()->showMapAuditErrors()) {
-                    const QString warnMsg = tr("[ WARN ]  - Problem with data structure associated with room id: %1 - that\n"
-                                         "room's data has been lost so the id is now being deleted.  This\n"
+                    const QString warnMsg = tr("[ WARN ]  - Problem with data structure associated with roomID: %1 - that\n"
+                                         "room's data has been lost so the roomID is now being deleted.  This\n"
                                          "suggests serious problems with the currently running version of\n"
                                          "Mudlet - is your system running out of memory?")
                                               .arg(itRoom.key());
@@ -659,7 +659,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
                 }
                 mpMap->appendRoomErrorMsg(itRoom.key(),
                                           tr("[ WARN ]  - Problem with data structure associated with this room."
-                                             "  The room's data has been lost so the id is now being deleted."
+                                             "  The room's data has been lost so the roomID is now being deleted."
                                              "  This suggests serious problems with the currently running version of Mudlet"
                                              " - is your system running out of memory?"),
                                           true);
@@ -707,10 +707,10 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
 
         if (!areas.contains(usedAreaId)) {
             if (mudlet::self()->showMapAuditErrors()) {
-                const QString warnMsg = tr("[ ALERT ] - Area with id: %1 expected but not found, will be created.").arg(usedAreaId);
+                const QString warnMsg = tr("[ ALERT ] - Area with areaID: %1 expected but not found, will be created.").arg(usedAreaId);
                 mpMap->postMessage(warnMsg);
             }
-            mpMap->appendAreaErrorMsg(usedAreaId, tr("[ ALERT ] - Area with this id expected but not found, will be created."), true);
+            mpMap->appendAreaErrorMsg(usedAreaId, tr("[ ALERT ] - Area with this areaID expected but not found, will be created."), true);
             missingAreasNeeded.append(usedAreaId);
         }
     }
@@ -858,10 +858,10 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
         }
     } else {
         if (mudlet::self()->showMapAuditErrors()) {
-            const QString infoMsg = tr("[ INFO ]  - Area id numbering is satisfactory.");
+            const QString infoMsg = tr("[ INFO ]  - AreaID numbering is satisfactory.");
             mpMap->postMessage(infoMsg);
         }
-        mpMap->appendErrorMsg(tr("[ INFO ]  - Area id numbering is satisfactory."), false);
+        mpMap->appendErrorMsg(tr("[ INFO ]  - AreaID numbering is satisfactory."), false);
     }
     // END OF TASK 2,3,4,5 - all needed areas exist and remap details are in
     // areaRemapping - still need to update rooms and areaNames
@@ -934,10 +934,10 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
         }
     } else {
         if (mudlet::self()->showMapAuditErrors()) {
-            const QString infoMsg = tr("[ INFO ]  - Room id numbering is satisfactory.");
+            const QString infoMsg = tr("[ INFO ]  - RoomID numbering is satisfactory.");
             mpMap->postMessage(infoMsg);
         }
-        mpMap->appendErrorMsg(tr("[ INFO ]  - Room id numbering is satisfactory."), false);
+        mpMap->appendErrorMsg(tr("[ INFO ]  - RoomID numbering is satisfactory."), false);
     }
     // END OF TASK 1
 
@@ -957,7 +957,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
             QSet<int> _set{pR->exitStubs.begin(), pR->exitStubs.end()};
             if (_set.count() < _listCount) {
                 if (mudlet::self()->showMapAuditErrors()) {
-                    const QString infoMsg = tr("[ INFO ]  - Duplicate exit stub identifiers found in room id: %1, this is an\n"
+                    const QString infoMsg = tr("[ INFO ]  - Duplicate exit stub identifiers found in roomID: %1, this is an\n"
                                          "anomaly but has been cleaned up easily.")
                                               .arg(itRoom.key());
                     mpMap->postMessage(infoMsg);
@@ -971,7 +971,7 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
             _set = QSet<int>{pR->exitLocks.begin(), pR->exitLocks.end()};
             if (_set.count() < _listCount) {
                 if (mudlet::self()->showMapAuditErrors()) {
-                    const QString infoMsg = tr("[ INFO ]  - Duplicate exit lock identifiers found in room id: %1, this is an\n"
+                    const QString infoMsg = tr("[ INFO ]  - Duplicate exit lock identifiers found in roomID: %1, this is an\n"
                                          "anomaly but has been cleaned up easily.")
                                               .arg(itRoom.key());
                     mpMap->postMessage(infoMsg);
@@ -1049,13 +1049,13 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
                     const int missingRoomId = itMissingRoom.next();
                     roomList.append(QString::number(missingRoomId));
                     mpMap->appendRoomErrorMsg(missingRoomId,
-                                              tr("[ INFO ]  - This room claims to be in area id: %1, but that did not have a record of it."
+                                              tr("[ INFO ]  - This room claims to be in areaID: %1, but that did not have a record of it."
                                                  "  The area has been updated to include this room.")
                                                       .arg(itArea.key()),
                                               true);
                 }
                 if (mudlet::self()->showMapAuditErrors()) {
-                    const QString infoMsg = tr("[ INFO ]  - In area with id: %1 there were %2 rooms missing from those it\n"
+                    const QString infoMsg = tr("[ INFO ]  - In area with areaID: %1 there were %2 rooms missing from those it\n"
                                          "should be recording as possessing, they were:\n%3\nthey have been added.")
                                               .arg(itArea.key())
                                               .arg(missingRooms.count())
@@ -1084,13 +1084,13 @@ void TRoomDB::auditRooms(QHash<int, int>& roomRemapping, QHash<int, int>& areaRe
                     const int extraRoomId = itExtraRoom.next();
                     roomList.append(QString::number(extraRoomId));
                     mpMap->appendRoomErrorMsg(extraRoomId,
-                                              tr("[ INFO ]  - This room was claimed by area id: %1, but it does not belong there."
+                                              tr("[ INFO ]  - This room was claimed by areaID: %1, but it does not belong there."
                                                  "  The area has been updated to not include this room.")
                                                       .arg(itArea.key()),
                                               true);
                 }
                 if (mudlet::self()->showMapAuditErrors()) {
-                    const QString infoMsg = tr("[ INFO ]  - In area with id: %1 there were %2 extra rooms compared to those it\n"
+                    const QString infoMsg = tr("[ INFO ]  - In area with areaID: %1 there were %2 extra rooms compared to those it\n"
                                          "should be recording as possessing, they were:\n%3\nthey have been removed.")
                                               .arg(itArea.key())
                                               .arg(extraRooms.count())
