@@ -183,13 +183,6 @@ int main(int argc, char* argv[])
     QAccessible::installFactory(TAccessibleConsole::consoleFactory);
     QAccessible::installFactory(TAccessibleTextEdit::textEditFactory);
 
-#if defined(Q_OS_WINDOWS) && defined(INCLUDE_UPDATER)
-    auto abortLaunch = runUpdate();
-    if (abortLaunch) {
-        return 0;
-    }
-#endif
-
     // Turn the cursor into the waiting one during startup, so something shows
     // activity even if the quiet, no splashscreen startup has been used
     app->setOverrideCursor(QCursor(Qt::WaitCursor));
@@ -218,6 +211,14 @@ int main(int argc, char* argv[])
     mudlet::start();
     // Detect config path before any files are read
     mudlet::self()->setupConfig();
+
+#if defined(Q_OS_WINDOWS) && defined(INCLUDE_UPDATER)
+    // Check for pending updates after config is loaded so we can access QSettings properly
+    auto abortLaunch = runUpdate();
+    if (abortLaunch) {
+        return 0;
+    }
+#endif
 
     QPointer<QTranslator> commandLineTranslator(loadTranslationsForCommandLine());
     QCommandLineParser parser;
@@ -765,6 +766,20 @@ bool runUpdate()
     QDir updateDir;
 
     if (updatedInstaller.exists() && updatedInstaller.isFile() && updatedInstaller.isExecutable()) {
+        // Check if automatic updates are still enabled before running the installer
+        // User may have disabled updates after download but before restart
+        QSettings* pSettings = mudlet::getQSettings();
+        bool autoUpdatesEnabled = pSettings->value(qsl("DBLSQD/autoDownload"), false).toBool();
+
+        if (!autoUpdatesEnabled) {
+            // User has disabled automatic updates, so don't run the installer
+            qDebug() << "Update installer found but automatic updates are disabled - removing installer";
+            if (!updateDir.remove(updatedInstaller.absoluteFilePath())) {
+                qWarning() << "Couldn't delete unused installer:" << updatedInstaller.absoluteFilePath();
+            }
+            return false;
+        }
+
         // Verify the new installer is accessible before trying to move it
         if (!isFileAccessible(updatedInstaller.absoluteFilePath())) {
             qWarning() << "New installer exists but is locked, cannot proceed with update:" << updatedInstaller.absoluteFilePath();
