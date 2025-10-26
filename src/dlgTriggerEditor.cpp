@@ -410,9 +410,26 @@ dlgTriggerEditor::dlgTriggerEditor(Host* pH)
     auto* provider = new edbee::StringTextAutoCompleteProvider();
     //QScopedPointer<edbee::StringTextAutoCompleteProvider> provider(new edbee::StringTextAutoCompleteProvider);
 
+    // Helper lambda to determine if a function has parameters based on its signature
+    auto hasParameters = [](const QString& signature) -> bool {
+        // Parse signature to check if function has parameters
+        // Signatures are in format: "functionName()" or "functionName(param1, param2)" or "result = functionName(params)"
+        int openParen = signature.indexOf('(');
+        int closeParen = signature.indexOf(')', openParen);
+        if (openParen != -1 && closeParen != -1) {
+            QString params = signature.mid(openParen + 1, closeParen - openParen - 1).trimmed();
+            // Empty params, or params that are just whitespace, mean no parameters
+            return !params.isEmpty();
+        }
+        return false; // No parentheses found, assume it's not a function or has no params
+    };
+
     // Add lua functions and reserved lua terms to an AutoComplete provider
     for (const QString& key : mudlet::smLuaFunctionNames.keys()) {
-        provider->add(key, 3, mudlet::smLuaFunctionNames.value(key).toString());
+        QString signature = mudlet::smLuaFunctionNames.value(key).toString();
+        QString insertText = key + qsl("()");
+        int cursorOffset = hasParameters(signature) ? 1 : 0;
+        provider->add(key, 3, signature, QString(), insertText, cursorOffset);
     }
 
     // Lua reserved keywords (highest priority for basic syntax)
@@ -437,163 +454,163 @@ dlgTriggerEditor::dlgTriggerEditor(Host* pH)
 
     // Standard Lua library functions (priority 4 - between Mudlet functions and keywords)
     // String library
-    provider->add(qsl("string.byte"), 4, qsl("string.byte(s [, i [, j]])"));
-    provider->add(qsl("string.char"), 4, qsl("string.char(...)"));
-    provider->add(qsl("string.dump"), 4, qsl("string.dump(function)"));
-    provider->add(qsl("string.find"), 4, qsl("string.find(s, pattern [, init [, plain]])"));
-    provider->add(qsl("string.format"), 4, qsl("string.format(formatstring, ...)"));
-    provider->add(qsl("string.gmatch"), 4, qsl("string.gmatch(s, pattern)"));
-    provider->add(qsl("string.gsub"), 4, qsl("string.gsub(s, pattern, repl [, n])"));
-    provider->add(qsl("string.len"), 4, qsl("string.len(s)"));
-    provider->add(qsl("string.lower"), 4, qsl("string.lower(s)"));
-    provider->add(qsl("string.match"), 4, qsl("string.match(s, pattern [, init])"));
-    provider->add(qsl("string.rep"), 4, qsl("string.rep(s, n)"));
-    provider->add(qsl("string.reverse"), 4, qsl("string.reverse(s)"));
-    provider->add(qsl("string.sub"), 4, qsl("string.sub(s, i [, j])"));
-    provider->add(qsl("string.upper"), 4, qsl("string.upper(s)"));
+    provider->add(qsl("string.byte"), 4, qsl("string.byte(s [, i [, j]])"), QString(), qsl("string.byte()"), 1);
+    provider->add(qsl("string.char"), 4, qsl("string.char(...)"), QString(), qsl("string.char()"), 1);
+    provider->add(qsl("string.dump"), 4, qsl("string.dump(function)"), QString(), qsl("string.dump()"), 1);
+    provider->add(qsl("string.find"), 4, qsl("string.find(s, pattern [, init [, plain]])"), QString(), qsl("string.find()"), 1);
+    provider->add(qsl("string.format"), 4, qsl("string.format(formatstring, ...)"), QString(), qsl("string.format()"), 1);
+    provider->add(qsl("string.gmatch"), 4, qsl("string.gmatch(s, pattern)"), QString(), qsl("string.gmatch()"), 1);
+    provider->add(qsl("string.gsub"), 4, qsl("string.gsub(s, pattern, repl [, n])"), QString(), qsl("string.gsub()"), 1);
+    provider->add(qsl("string.len"), 4, qsl("string.len(s)"), QString(), qsl("string.len()"), 1);
+    provider->add(qsl("string.lower"), 4, qsl("string.lower(s)"), QString(), qsl("string.lower()"), 1);
+    provider->add(qsl("string.match"), 4, qsl("string.match(s, pattern [, init])"), QString(), qsl("string.match()"), 1);
+    provider->add(qsl("string.rep"), 4, qsl("string.rep(s, n)"), QString(), qsl("string.rep()"), 1);
+    provider->add(qsl("string.reverse"), 4, qsl("string.reverse(s)"), QString(), qsl("string.reverse()"), 1);
+    provider->add(qsl("string.sub"), 4, qsl("string.sub(s, i [, j])"), QString(), qsl("string.sub()"), 1);
+    provider->add(qsl("string.upper"), 4, qsl("string.upper(s)"), QString(), qsl("string.upper()"), 1);
 
     // Table library
-    provider->add(qsl("table.concat"), 4, qsl("table.concat(list [, sep [, i [, j]]])"));
-    provider->add(qsl("table.insert"), 4, qsl("table.insert(list, [pos,] value)"));
-    provider->add(qsl("table.pack"), 4, qsl("table.pack(...)"));
-    provider->add(qsl("table.remove"), 4, qsl("table.remove(list [, pos])"));
-    provider->add(qsl("table.sort"), 4, qsl("table.sort(list [, comp])"));
-    provider->add(qsl("table.unpack"), 4, qsl("table.unpack(list [, i [, j]])"));
+    provider->add(qsl("table.concat"), 4, qsl("table.concat(list [, sep [, i [, j]]])"), QString(), qsl("table.concat()"), 1);
+    provider->add(qsl("table.insert"), 4, qsl("table.insert(list, [pos,] value)"), QString(), qsl("table.insert()"), 1);
+    provider->add(qsl("table.pack"), 4, qsl("table.pack(...)"), QString(), qsl("table.pack()"), 1);
+    provider->add(qsl("table.remove"), 4, qsl("table.remove(list [, pos])"), QString(), qsl("table.remove()"), 1);
+    provider->add(qsl("table.sort"), 4, qsl("table.sort(list [, comp])"), QString(), qsl("table.sort()"), 1);
+    provider->add(qsl("table.unpack"), 4, qsl("table.unpack(list [, i [, j]])"), QString(), qsl("table.unpack()"), 1);
 
     // Math library
-    provider->add(qsl("math.abs"), 4, qsl("math.abs(x)"));
-    provider->add(qsl("math.acos"), 4, qsl("math.acos(x)"));
-    provider->add(qsl("math.asin"), 4, qsl("math.asin(x)"));
-    provider->add(qsl("math.atan"), 4, qsl("math.atan(x)"));
-    provider->add(qsl("math.atan2"), 4, qsl("math.atan2(y, x)"));
-    provider->add(qsl("math.ceil"), 4, qsl("math.ceil(x)"));
-    provider->add(qsl("math.cos"), 4, qsl("math.cos(x)"));
-    provider->add(qsl("math.cosh"), 4, qsl("math.cosh(x)"));
-    provider->add(qsl("math.deg"), 4, qsl("math.deg(x)"));
-    provider->add(qsl("math.exp"), 4, qsl("math.exp(x)"));
-    provider->add(qsl("math.floor"), 4, qsl("math.floor(x)"));
-    provider->add(qsl("math.fmod"), 4, qsl("math.fmod(x, y)"));
-    provider->add(qsl("math.frexp"), 4, qsl("math.frexp(x)"));
-    provider->add(qsl("math.huge"), 4, qsl("math.huge"));
-    provider->add(qsl("math.ldexp"), 4, qsl("math.ldexp(m, e)"));
-    provider->add(qsl("math.log"), 4, qsl("math.log(x [, base])"));
-    provider->add(qsl("math.log10"), 4, qsl("math.log10(x)"));
-    provider->add(qsl("math.max"), 4, qsl("math.max(x, ...)"));
-    provider->add(qsl("math.min"), 4, qsl("math.min(x, ...)"));
-    provider->add(qsl("math.modf"), 4, qsl("math.modf(x)"));
-    provider->add(qsl("math.pi"), 4, qsl("math.pi"));
-    provider->add(qsl("math.pow"), 4, qsl("math.pow(x, y)"));
-    provider->add(qsl("math.rad"), 4, qsl("math.rad(x)"));
-    provider->add(qsl("math.random"), 4, qsl("math.random([m [, n]])"));
-    provider->add(qsl("math.randomseed"), 4, qsl("math.randomseed(x)"));
-    provider->add(qsl("math.sin"), 4, qsl("math.sin(x)"));
-    provider->add(qsl("math.sinh"), 4, qsl("math.sinh(x)"));
-    provider->add(qsl("math.sqrt"), 4, qsl("math.sqrt(x)"));
-    provider->add(qsl("math.tan"), 4, qsl("math.tan(x)"));
-    provider->add(qsl("math.tanh"), 4, qsl("math.tanh(x)"));
+    provider->add(qsl("math.abs"), 4, qsl("math.abs(x)"), QString(), qsl("math.abs()"), 1);
+    provider->add(qsl("math.acos"), 4, qsl("math.acos(x)"), QString(), qsl("math.acos()"), 1);
+    provider->add(qsl("math.asin"), 4, qsl("math.asin(x)"), QString(), qsl("math.asin()"), 1);
+    provider->add(qsl("math.atan"), 4, qsl("math.atan(x)"), QString(), qsl("math.atan()"), 1);
+    provider->add(qsl("math.atan2"), 4, qsl("math.atan2(y, x)"), QString(), qsl("math.atan2()"), 1);
+    provider->add(qsl("math.ceil"), 4, qsl("math.ceil(x)"), QString(), qsl("math.ceil()"), 1);
+    provider->add(qsl("math.cos"), 4, qsl("math.cos(x)"), QString(), qsl("math.cos()"), 1);
+    provider->add(qsl("math.cosh"), 4, qsl("math.cosh(x)"), QString(), qsl("math.cosh()"), 1);
+    provider->add(qsl("math.deg"), 4, qsl("math.deg(x)"), QString(), qsl("math.deg()"), 1);
+    provider->add(qsl("math.exp"), 4, qsl("math.exp(x)"), QString(), qsl("math.exp()"), 1);
+    provider->add(qsl("math.floor"), 4, qsl("math.floor(x)"), QString(), qsl("math.floor()"), 1);
+    provider->add(qsl("math.fmod"), 4, qsl("math.fmod(x, y)"), QString(), qsl("math.fmod()"), 1);
+    provider->add(qsl("math.frexp"), 4, qsl("math.frexp(x)"), QString(), qsl("math.frexp()"), 1);
+    provider->add(qsl("math.huge"), 4, qsl("math.huge")); // No brackets - it's a constant
+    provider->add(qsl("math.ldexp"), 4, qsl("math.ldexp(m, e)"), QString(), qsl("math.ldexp()"), 1);
+    provider->add(qsl("math.log"), 4, qsl("math.log(x [, base])"), QString(), qsl("math.log()"), 1);
+    provider->add(qsl("math.log10"), 4, qsl("math.log10(x)"), QString(), qsl("math.log10()"), 1);
+    provider->add(qsl("math.max"), 4, qsl("math.max(x, ...)"), QString(), qsl("math.max()"), 1);
+    provider->add(qsl("math.min"), 4, qsl("math.min(x, ...)"), QString(), qsl("math.min()"), 1);
+    provider->add(qsl("math.modf"), 4, qsl("math.modf(x)"), QString(), qsl("math.modf()"), 1);
+    provider->add(qsl("math.pi"), 4, qsl("math.pi")); // No brackets - it's a constant
+    provider->add(qsl("math.pow"), 4, qsl("math.pow(x, y)"), QString(), qsl("math.pow()"), 1);
+    provider->add(qsl("math.rad"), 4, qsl("math.rad(x)"), QString(), qsl("math.rad()"), 1);
+    provider->add(qsl("math.random"), 4, qsl("math.random([m [, n]])"), QString(), qsl("math.random()"), 1);
+    provider->add(qsl("math.randomseed"), 4, qsl("math.randomseed(x)"), QString(), qsl("math.randomseed()"), 1);
+    provider->add(qsl("math.sin"), 4, qsl("math.sin(x)"), QString(), qsl("math.sin()"), 1);
+    provider->add(qsl("math.sinh"), 4, qsl("math.sinh(x)"), QString(), qsl("math.sinh()"), 1);
+    provider->add(qsl("math.sqrt"), 4, qsl("math.sqrt(x)"), QString(), qsl("math.sqrt()"), 1);
+    provider->add(qsl("math.tan"), 4, qsl("math.tan(x)"), QString(), qsl("math.tan()"), 1);
+    provider->add(qsl("math.tanh"), 4, qsl("math.tanh(x)"), QString(), qsl("math.tanh()"), 1);
 
     // IO library
-    provider->add(qsl("io.close"), 4, qsl("io.close([file])"));
-    provider->add(qsl("io.flush"), 4, qsl("io.flush()"));
-    provider->add(qsl("io.input"), 4, qsl("io.input([file])"));
-    provider->add(qsl("io.lines"), 4, qsl("io.lines([filename, ...])"));
-    provider->add(qsl("io.open"), 4, qsl("io.open(filename [, mode])"));
-    provider->add(qsl("io.output"), 4, qsl("io.output([file])"));
-    provider->add(qsl("io.popen"), 4, qsl("io.popen(prog [, mode])"));
-    provider->add(qsl("io.read"), 4, qsl("io.read(...)"));
-    provider->add(qsl("io.tmpfile"), 4, qsl("io.tmpfile()"));
-    provider->add(qsl("io.type"), 4, qsl("io.type(obj)"));
-    provider->add(qsl("io.write"), 4, qsl("io.write(...)"));
+    provider->add(qsl("io.close"), 4, qsl("io.close([file])"), QString(), qsl("io.close()"), 1);
+    provider->add(qsl("io.flush"), 4, qsl("io.flush()"), QString(), qsl("io.flush()"), 0);
+    provider->add(qsl("io.input"), 4, qsl("io.input([file])"), QString(), qsl("io.input()"), 1);
+    provider->add(qsl("io.lines"), 4, qsl("io.lines([filename, ...])"), QString(), qsl("io.lines()"), 1);
+    provider->add(qsl("io.open"), 4, qsl("io.open(filename [, mode])"), QString(), qsl("io.open()"), 1);
+    provider->add(qsl("io.output"), 4, qsl("io.output([file])"), QString(), qsl("io.output()"), 1);
+    provider->add(qsl("io.popen"), 4, qsl("io.popen(prog [, mode])"), QString(), qsl("io.popen()"), 1);
+    provider->add(qsl("io.read"), 4, qsl("io.read(...)"), QString(), qsl("io.read()"), 1);
+    provider->add(qsl("io.tmpfile"), 4, qsl("io.tmpfile()"), QString(), qsl("io.tmpfile()"), 0);
+    provider->add(qsl("io.type"), 4, qsl("io.type(obj)"), QString(), qsl("io.type()"), 1);
+    provider->add(qsl("io.write"), 4, qsl("io.write(...)"), QString(), qsl("io.write()"), 1);
 
     // OS library
-    provider->add(qsl("os.clock"), 4, qsl("os.clock()"));
-    provider->add(qsl("os.date"), 4, qsl("os.date([format [, time]])"));
-    provider->add(qsl("os.difftime"), 4, qsl("os.difftime(t2, t1)"));
-    provider->add(qsl("os.execute"), 4, qsl("os.execute([command])"));
-    provider->add(qsl("os.exit"), 4, qsl("os.exit([code [, close]])"));
-    provider->add(qsl("os.getenv"), 4, qsl("os.getenv(varname)"));
-    provider->add(qsl("os.remove"), 4, qsl("os.remove(filename)"));
-    provider->add(qsl("os.rename"), 4, qsl("os.rename(oldname, newname)"));
-    provider->add(qsl("os.setlocale"), 4, qsl("os.setlocale(locale [, category])"));
-    provider->add(qsl("os.time"), 4, qsl("os.time([table])"));
-    provider->add(qsl("os.tmpname"), 4, qsl("os.tmpname()"));
+    provider->add(qsl("os.clock"), 4, qsl("os.clock()"), QString(), qsl("os.clock()"), 0);
+    provider->add(qsl("os.date"), 4, qsl("os.date([format [, time]])"), QString(), qsl("os.date()"), 1);
+    provider->add(qsl("os.difftime"), 4, qsl("os.difftime(t2, t1)"), QString(), qsl("os.difftime()"), 1);
+    provider->add(qsl("os.execute"), 4, qsl("os.execute([command])"), QString(), qsl("os.execute()"), 1);
+    provider->add(qsl("os.exit"), 4, qsl("os.exit([code [, close]])"), QString(), qsl("os.exit()"), 1);
+    provider->add(qsl("os.getenv"), 4, qsl("os.getenv(varname)"), QString(), qsl("os.getenv()"), 1);
+    provider->add(qsl("os.remove"), 4, qsl("os.remove(filename)"), QString(), qsl("os.remove()"), 1);
+    provider->add(qsl("os.rename"), 4, qsl("os.rename(oldname, newname)"), QString(), qsl("os.rename()"), 1);
+    provider->add(qsl("os.setlocale"), 4, qsl("os.setlocale(locale [, category])"), QString(), qsl("os.setlocale()"), 1);
+    provider->add(qsl("os.time"), 4, qsl("os.time([table])"), QString(), qsl("os.time()"), 1);
+    provider->add(qsl("os.tmpname"), 4, qsl("os.tmpname()"), QString(), qsl("os.tmpname()"), 0);
 
     // Coroutine library
-    provider->add(qsl("coroutine.create"), 4, qsl("coroutine.create(f)"));
-    provider->add(qsl("coroutine.resume"), 4, qsl("coroutine.resume(co [, val1, ...])"));
-    provider->add(qsl("coroutine.running"), 4, qsl("coroutine.running()"));
-    provider->add(qsl("coroutine.status"), 4, qsl("coroutine.status(co)"));
-    provider->add(qsl("coroutine.wrap"), 4, qsl("coroutine.wrap(f)"));
-    provider->add(qsl("coroutine.yield"), 4, qsl("coroutine.yield(...)"));
+    provider->add(qsl("coroutine.create"), 4, qsl("coroutine.create(f)"), QString(), qsl("coroutine.create()"), 1);
+    provider->add(qsl("coroutine.resume"), 4, qsl("coroutine.resume(co [, val1, ...])"), QString(), qsl("coroutine.resume()"), 1);
+    provider->add(qsl("coroutine.running"), 4, qsl("coroutine.running()"), QString(), qsl("coroutine.running()"), 0);
+    provider->add(qsl("coroutine.status"), 4, qsl("coroutine.status(co)"), QString(), qsl("coroutine.status()"), 1);
+    provider->add(qsl("coroutine.wrap"), 4, qsl("coroutine.wrap(f)"), QString(), qsl("coroutine.wrap()"), 1);
+    provider->add(qsl("coroutine.yield"), 4, qsl("coroutine.yield(...)"), QString(), qsl("coroutine.yield()"), 1);
 
     // Debug library
-    provider->add(qsl("debug.debug"), 4, qsl("debug.debug()"));
-    provider->add(qsl("debug.gethook"), 4, qsl("debug.gethook([thread])"));
-    provider->add(qsl("debug.getinfo"), 4, qsl("debug.getinfo([thread,] f [, what])"));
-    provider->add(qsl("debug.getlocal"), 4, qsl("debug.getlocal([thread,] f, local)"));
-    provider->add(qsl("debug.getmetatable"), 4, qsl("debug.getmetatable(value)"));
-    provider->add(qsl("debug.getregistry"), 4, qsl("debug.getregistry()"));
-    provider->add(qsl("debug.getupvalue"), 4, qsl("debug.getupvalue(f, up)"));
-    provider->add(qsl("debug.getuservalue"), 4, qsl("debug.getuservalue(u)"));
-    provider->add(qsl("debug.sethook"), 4, qsl("debug.sethook([thread,] hook, mask [, count])"));
-    provider->add(qsl("debug.setlocal"), 4, qsl("debug.setlocal([thread,] level, local, value)"));
-    provider->add(qsl("debug.setmetatable"), 4, qsl("debug.setmetatable(value, table)"));
-    provider->add(qsl("debug.setupvalue"), 4, qsl("debug.setupvalue(f, up, value)"));
-    provider->add(qsl("debug.setuservalue"), 4, qsl("debug.setuservalue(udata, value)"));
-    provider->add(qsl("debug.traceback"), 4, qsl("debug.traceback([thread,] [message [, level]])"));
-    provider->add(qsl("debug.upvalueid"), 4, qsl("debug.upvalueid(f, n)"));
-    provider->add(qsl("debug.upvaluejoin"), 4, qsl("debug.upvaluejoin(f1, n1, f2, n2)"));
+    provider->add(qsl("debug.debug"), 4, qsl("debug.debug()"), QString(), qsl("debug.debug()"), 0);
+    provider->add(qsl("debug.gethook"), 4, qsl("debug.gethook([thread])"), QString(), qsl("debug.gethook()"), 1);
+    provider->add(qsl("debug.getinfo"), 4, qsl("debug.getinfo([thread,] f [, what])"), QString(), qsl("debug.getinfo()"), 1);
+    provider->add(qsl("debug.getlocal"), 4, qsl("debug.getlocal([thread,] f, local)"), QString(), qsl("debug.getlocal()"), 1);
+    provider->add(qsl("debug.getmetatable"), 4, qsl("debug.getmetatable(value)"), QString(), qsl("debug.getmetatable()"), 1);
+    provider->add(qsl("debug.getregistry"), 4, qsl("debug.getregistry()"), QString(), qsl("debug.getregistry()"), 0);
+    provider->add(qsl("debug.getupvalue"), 4, qsl("debug.getupvalue(f, up)"), QString(), qsl("debug.getupvalue()"), 1);
+    provider->add(qsl("debug.getuservalue"), 4, qsl("debug.getuservalue(u)"), QString(), qsl("debug.getuservalue()"), 1);
+    provider->add(qsl("debug.sethook"), 4, qsl("debug.sethook([thread,] hook, mask [, count])"), QString(), qsl("debug.sethook()"), 1);
+    provider->add(qsl("debug.setlocal"), 4, qsl("debug.setlocal([thread,] level, local, value)"), QString(), qsl("debug.setlocal()"), 1);
+    provider->add(qsl("debug.setmetatable"), 4, qsl("debug.setmetatable(value, table)"), QString(), qsl("debug.setmetatable()"), 1);
+    provider->add(qsl("debug.setupvalue"), 4, qsl("debug.setupvalue(f, up, value)"), QString(), qsl("debug.setupvalue()"), 1);
+    provider->add(qsl("debug.setuservalue"), 4, qsl("debug.setuservalue(udata, value)"), QString(), qsl("debug.setuservalue()"), 1);
+    provider->add(qsl("debug.traceback"), 4, qsl("debug.traceback([thread,] [message [, level]])"), QString(), qsl("debug.traceback()"), 1);
+    provider->add(qsl("debug.upvalueid"), 4, qsl("debug.upvalueid(f, n)"), QString(), qsl("debug.upvalueid()"), 1);
+    provider->add(qsl("debug.upvaluejoin"), 4, qsl("debug.upvaluejoin(f1, n1, f2, n2)"), QString(), qsl("debug.upvaluejoin()"), 1);
 
     // Package library
-    provider->add(qsl("package.config"), 4, qsl("package.config"));
-    provider->add(qsl("package.cpath"), 4, qsl("package.cpath"));
-    provider->add(qsl("package.loaded"), 4, qsl("package.loaded"));
-    provider->add(qsl("package.loadlib"), 4, qsl("package.loadlib(libname, funcname)"));
-    provider->add(qsl("package.path"), 4, qsl("package.path"));
-    provider->add(qsl("package.preload"), 4, qsl("package.preload"));
-    provider->add(qsl("package.searchers"), 4, qsl("package.searchers"));
-    provider->add(qsl("package.searchpath"), 4, qsl("package.searchpath(name, path [, sep [, rep]])"));
+    provider->add(qsl("package.config"), 4, qsl("package.config")); // Constant
+    provider->add(qsl("package.cpath"), 4, qsl("package.cpath")); // Variable
+    provider->add(qsl("package.loaded"), 4, qsl("package.loaded")); // Table
+    provider->add(qsl("package.loadlib"), 4, qsl("package.loadlib(libname, funcname)"), QString(), qsl("package.loadlib()"), 1);
+    provider->add(qsl("package.path"), 4, qsl("package.path")); // Variable
+    provider->add(qsl("package.preload"), 4, qsl("package.preload")); // Table
+    provider->add(qsl("package.searchers"), 4, qsl("package.searchers")); // Table
+    provider->add(qsl("package.searchpath"), 4, qsl("package.searchpath(name, path [, sep [, rep]])"), QString(), qsl("package.searchpath()"), 1);
 
     // Mudlet framework namespaced functions (priority 4 - same as Lua stdlib)
     // Geyser UI Framework
-    provider->add(qsl("Geyser.Container:new"), 4, qsl("Geyser.Container:new(cons, container)"));
-    provider->add(qsl("Geyser.Window:new"), 4, qsl("Geyser.Window:new(cons, container)"));
-    provider->add(qsl("Geyser.Label:new"), 4, qsl("Geyser.Label:new(cons, container)"));
-    provider->add(qsl("Geyser.MiniConsole:new"), 4, qsl("Geyser.MiniConsole:new(cons, container)"));
-    provider->add(qsl("Geyser.Button:new"), 4, qsl("Geyser.Button:new(cons, container)"));
-    provider->add(qsl("Geyser.Gauge:new"), 4, qsl("Geyser.Gauge:new(cons, container)"));
-    provider->add(qsl("Geyser.Mapper:new"), 4, qsl("Geyser.Mapper:new(cons, container)"));
-    provider->add(qsl("Geyser.UserWindow:new"), 4, qsl("Geyser.UserWindow:new(cons)"));
-    provider->add(qsl("Geyser.CommandLine:new"), 4, qsl("Geyser.CommandLine:new(cons, container)"));
-    provider->add(qsl("Geyser.HBox:new"), 4, qsl("Geyser.HBox:new(cons, container)"));
-    provider->add(qsl("Geyser.VBox:new"), 4, qsl("Geyser.VBox:new(cons, container)"));
-    provider->add(qsl("Geyser.ScrollBox:new"), 4, qsl("Geyser.ScrollBox:new(cons, container)"));
-    provider->add(qsl("Geyser.ScrollBox:new2"), 4, qsl("Geyser.ScrollBox:new2()"));
-    provider->add(qsl("Geyser.StyleSheet:new"), 4, qsl("Geyser.StyleSheet:new(stylesheet, parent, target)"));
+    provider->add(qsl("Geyser.Container:new"), 4, qsl("Geyser.Container:new(cons, container)"), QString(), qsl("Geyser.Container:new()"), 1);
+    provider->add(qsl("Geyser.Window:new"), 4, qsl("Geyser.Window:new(cons, container)"), QString(), qsl("Geyser.Window:new()"), 1);
+    provider->add(qsl("Geyser.Label:new"), 4, qsl("Geyser.Label:new(cons, container)"), QString(), qsl("Geyser.Label:new()"), 1);
+    provider->add(qsl("Geyser.MiniConsole:new"), 4, qsl("Geyser.MiniConsole:new(cons, container)"), QString(), qsl("Geyser.MiniConsole:new()"), 1);
+    provider->add(qsl("Geyser.Button:new"), 4, qsl("Geyser.Button:new(cons, container)"), QString(), qsl("Geyser.Button:new()"), 1);
+    provider->add(qsl("Geyser.Gauge:new"), 4, qsl("Geyser.Gauge:new(cons, container)"), QString(), qsl("Geyser.Gauge:new()"), 1);
+    provider->add(qsl("Geyser.Mapper:new"), 4, qsl("Geyser.Mapper:new(cons, container)"), QString(), qsl("Geyser.Mapper:new()"), 1);
+    provider->add(qsl("Geyser.UserWindow:new"), 4, qsl("Geyser.UserWindow:new(cons)"), QString(), qsl("Geyser.UserWindow:new()"), 1);
+    provider->add(qsl("Geyser.CommandLine:new"), 4, qsl("Geyser.CommandLine:new(cons, container)"), QString(), qsl("Geyser.CommandLine:new()"), 1);
+    provider->add(qsl("Geyser.HBox:new"), 4, qsl("Geyser.HBox:new(cons, container)"), QString(), qsl("Geyser.HBox:new()"), 1);
+    provider->add(qsl("Geyser.VBox:new"), 4, qsl("Geyser.VBox:new(cons, container)"), QString(), qsl("Geyser.VBox:new()"), 1);
+    provider->add(qsl("Geyser.ScrollBox:new"), 4, qsl("Geyser.ScrollBox:new(cons, container)"), QString(), qsl("Geyser.ScrollBox:new()"), 1);
+    provider->add(qsl("Geyser.ScrollBox:new2"), 4, qsl("Geyser.ScrollBox:new2()"), QString(), qsl("Geyser.ScrollBox:new2()"), 0);
+    provider->add(qsl("Geyser.StyleSheet:new"), 4, qsl("Geyser.StyleSheet:new(stylesheet, parent, target)"), QString(), qsl("Geyser.StyleSheet:new()"), 1);
 
     // Geyser namespace functions
-    provider->add(qsl("Geyser.Color.parse"), 4, qsl("Geyser.Color.parse(color)"));
-    provider->add(qsl("Geyser.Color.hex"), 4, qsl("Geyser.Color.hex(color)"));
-    provider->add(qsl("Geyser.Color.hexa"), 4, qsl("Geyser.Color.hexa(color)"));
-    provider->add(qsl("Geyser.Color.hhex"), 4, qsl("Geyser.Color.hhex(color)"));
-    provider->add(qsl("Geyser.Color.hhexa"), 4, qsl("Geyser.Color.hhexa(color)"));
-    provider->add(qsl("Geyser.Color.hdec"), 4, qsl("Geyser.Color.hdec(color)"));
-    provider->add(qsl("Geyser.Color.hdeca"), 4, qsl("Geyser.Color.hdeca(color)"));
+    provider->add(qsl("Geyser.Color.parse"), 4, qsl("Geyser.Color.parse(color)"), QString(), qsl("Geyser.Color.parse()"), 1);
+    provider->add(qsl("Geyser.Color.hex"), 4, qsl("Geyser.Color.hex(color)"), QString(), qsl("Geyser.Color.hex()"), 1);
+    provider->add(qsl("Geyser.Color.hexa"), 4, qsl("Geyser.Color.hexa(color)"), QString(), qsl("Geyser.Color.hexa()"), 1);
+    provider->add(qsl("Geyser.Color.hhex"), 4, qsl("Geyser.Color.hhex(color)"), QString(), qsl("Geyser.Color.hhex()"), 1);
+    provider->add(qsl("Geyser.Color.hhexa"), 4, qsl("Geyser.Color.hhexa(color)"), QString(), qsl("Geyser.Color.hhexa()"), 1);
+    provider->add(qsl("Geyser.Color.hdec"), 4, qsl("Geyser.Color.hdec(color)"), QString(), qsl("Geyser.Color.hdec()"), 1);
+    provider->add(qsl("Geyser.Color.hdeca"), 4, qsl("Geyser.Color.hdeca(color)"), QString(), qsl("Geyser.Color.hdeca()"), 1);
 
     // Adjustable Container Framework
-    provider->add(qsl("Adjustable.Container:new"), 4, qsl("Adjustable.Container:new(cons, container)"));
+    provider->add(qsl("Adjustable.Container:new"), 4, qsl("Adjustable.Container:new(cons, container)"), QString(), qsl("Adjustable.Container:new()"), 1);
 
     // Database Framework
-    provider->add(qsl("db.create"), 4, qsl("db.create(db_name, schema)"));
-    provider->add(qsl("db.query"), 4, qsl("db.query(db_name, query, ...)"));
-    provider->add(qsl("db.insert"), 4, qsl("db.insert(db_name, sheet_name, values)"));
-    provider->add(qsl("db.update"), 4, qsl("db.update(db_name, sheet_name, values, query)"));
-    provider->add(qsl("db.delete"), 4, qsl("db.delete(db_name, sheet_name, query)"));
-    provider->add(qsl("db.fetch"), 4, qsl("db.fetch(db_name, query, ...)"));
-    provider->add(qsl("db.aggregate"), 4, qsl("db.aggregate(db_name, query, ...)"));
+    provider->add(qsl("db.create"), 4, qsl("db.create(db_name, schema)"), QString(), qsl("db.create()"), 1);
+    provider->add(qsl("db.query"), 4, qsl("db.query(db_name, query, ...)"), QString(), qsl("db.query()"), 1);
+    provider->add(qsl("db.insert"), 4, qsl("db.insert(db_name, sheet_name, values)"), QString(), qsl("db.insert()"), 1);
+    provider->add(qsl("db.update"), 4, qsl("db.update(db_name, sheet_name, values, query)"), QString(), qsl("db.update()"), 1);
+    provider->add(qsl("db.delete"), 4, qsl("db.delete(db_name, sheet_name, query)"), QString(), qsl("db.delete()"), 1);
+    provider->add(qsl("db.fetch"), 4, qsl("db.fetch(db_name, query, ...)"), QString(), qsl("db.fetch()"), 1);
+    provider->add(qsl("db.aggregate"), 4, qsl("db.aggregate(db_name, query, ...)"), QString(), qsl("db.aggregate()"), 1);
 
     // DateTime utilities
-    provider->add(qsl("datetime.parse"), 4, qsl("datetime.parse(format, date_string)"));
+    provider->add(qsl("datetime.parse"), 4, qsl("datetime.parse(format, date_string)"), QString(), qsl("datetime.parse()"), 1);
 
     // Set the newly filled provider to be used by our Edbee instance
     edbee::Edbee::instance()->autoCompleteProviderList()->setParentProvider(provider);
