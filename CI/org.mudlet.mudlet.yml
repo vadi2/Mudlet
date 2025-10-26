@@ -60,8 +60,6 @@ modules:
         tag: 0.20.4
         type: git
         url: https://gitlab.gnome.org/GNOME/libsecret.git
-    cleanup:
-      - /bin/secret-tool
 
   - name: libzip
     buildsystem: cmake-ninja
@@ -181,8 +179,12 @@ modules:
 
   - name: mudlet
     buildsystem: cmake-ninja
+    build-options:
+      env:
+        PKG_CONFIG_PATH: /app/lib/pkgconfig:/app/share/pkgconfig
     config-opts:
       - -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - -DCMAKE_PREFIX_PATH=/app
     sources:
       - type: dir
         path: ../
