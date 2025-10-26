@@ -80,7 +80,9 @@ modules:
   - name: pugixml
     buildsystem: cmake-ninja
     config-opts:
-      - -DBUILD_SHARED_LIBS=on .
+      - -DBUILD_SHARED_LIBS=ON
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
     sources:
       - type: archive
         url: https://github.com/zeux/pugixml/releases/download/v1.11.4/pugixml-1.11.4.tar.gz
