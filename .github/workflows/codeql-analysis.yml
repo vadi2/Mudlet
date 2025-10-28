@@ -8,18 +8,28 @@ name: "CodeQL"
 on:
   push:
     branches: [development, main]
-    paths:
-      - 'src/**'
-      - 'test/**'
-      - '3rdparty/**'
-      - 'translations/**'
-      - 'CI/**'
-      - 'cmake/**'
-      - 'CMakeLists.txt'
-      - '**.cmake'
-      - '**.pro'
-      - '.github/workflows/codeql-analysis.yml'
-      - '.github/codeql/**'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE/**'
+      - '.github/dependabot.yml'
+      - '.github/workflows/generate-changelog.yml'
+      - '.github/workflows/update-translations.yml'
+      - '.github/workflows/update-geyser-docs.yml'
+      - '.github/workflows/update-autocompletion.yml'
+      - '.github/workflows/update-3rdparty.yml'
+      - '.github/workflows/tag-pull-requests.yml'
+      - '.github/workflows/check_pr_labels.yml'
+      - '.github/workflows/dangerjs.yml'
+      - '.github/workflows/codespell-analysis.yml'
+      - '.github/workflows/link-ptbs-to-dblsqd.yml'
+      - '.github/workflows/generate-coder-attribution.yml'
+      - '.github/workflows/update-en-us-plural.yml'
+      - '.github/workflows/qridlayout-ordering.yml'
+      - 'LICENSE*'
+      - '.gitignore'
+      - '.gitattributes'
   schedule:
     - cron: '0 7 * * 3'
   workflow_dispatch:
