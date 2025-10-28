@@ -3,7 +3,29 @@ on:
   push:
     branches: [master, development, release-*]
     tags: [Mudlet-*]
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - '3rdparty/**'
+      - 'translations/**'
+      - 'CI/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '**.cmake'
+      - '**.pro'
+      - '.github/workflows/build-mudlet-win.yml'
   pull_request:
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - '3rdparty/**'
+      - 'translations/**'
+      - 'CI/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '**.cmake'
+      - '**.pro'
+      - '.github/workflows/build-mudlet-win.yml'
   workflow_dispatch:
     inputs:
       scheduled:

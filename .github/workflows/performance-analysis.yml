@@ -3,6 +3,17 @@ name: "Performance analysis"
 on:
   push:
     branches: development
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - '3rdparty/**'
+      - 'translations/**'
+      - 'CI/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '**.cmake'
+      - '**.pro'
+      - '.github/workflows/performance-analysis.yml'
   workflow_dispatch:
 
 jobs:

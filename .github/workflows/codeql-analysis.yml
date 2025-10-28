@@ -8,6 +8,18 @@ name: "CodeQL"
 on:
   push:
     branches: [development, main]
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - '3rdparty/**'
+      - 'translations/**'
+      - 'CI/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '**.cmake'
+      - '**.pro'
+      - '.github/workflows/codeql-analysis.yml'
+      - '.github/codeql/**'
   schedule:
     - cron: '0 7 * * 3'
   workflow_dispatch:
