@@ -1,0 +1,257 @@
+FEATURE CALLOUT SYSTEM - INTERACTION FLOW DIAGRAM
+=================================================
+
+1. INITIALIZATION
+─────────────────
+
+    mudlet::mudlet()
+         │
+         ├─→ Creates TFeatureCalloutManager
+         │
+    Host::onProfileLoaded()
+         │
+         └─→ Sets profile context on manager
+
+
+2. SHOWING A CALLOUT
+─────────────────────
+
+    Application Code
+         │
+         │ TFeatureCallout config
+         ▼
+    TFeatureCalloutManager::showCallout()
+         │
+         ├─→ Check if permanently dismissed?
+         │   └─→ YES: return early
+         │
+         ├─→ Find top-level parent of target
+         │
+         ├─→ Create TCalloutOverlay (child of parent)
+         │        │
+         │        ├─→ Install event filter on target
+         │        │
+         │        └─→ Create TCalloutPopup (child of overlay)
+         │                 │
+         │                 ├─→ Setup title label
+         │                 ├─→ Setup message label
+         │                 ├─→ Setup buttons (dismiss, action)
+         │                 └─→ Calculate size and position
+         │
+         ├─→ Store in mActiveCallouts hash
+         │
+         └─→ Show overlay (raises to top, shows popup)
+
+
+3. TARGET WIDGET MOVES/RESIZES
+───────────────────────────────
+
+    Target Widget Events (Move/Resize)
+         │
+         │ Filtered by
+         ▼
+    TCalloutOverlay::eventFilter()
+         │
+         └─→ QTimer::singleShot(0, updatePosition)
+                  │
+                  ▼
+             TCalloutOverlay::updatePosition()
+                  │
+                  ├─→ Calculate new target rect
+                  ├─→ Calculate new popup position
+                  └─→ Move popup to new position
+
+
+4. PAINTING THE OVERLAY
+────────────────────────
+
+    TCalloutOverlay::paintEvent()
+         │
+         ├─→ Style == Spotlight?
+         │   ├─→ Fill with semi-transparent overlay
+         │   ├─→ Clear spotlight area (transparent)
+         │   └─→ Draw border around target
+         │
+         ├─→ Style == Attention?
+         │   └─→ Draw animated border (pulsing)
+         │
+         └─→ Style == Default/Minimal?
+             └─→ No overlay painting
+
+
+    TCalloutPopup::paintEvent()
+         │
+         ├─→ Draw background (rounded rect)
+         ├─→ Draw border
+         └─→ Draw arrow pointing at target
+
+
+5. USER DISMISSES CALLOUT
+──────────────────────────
+
+    User Clicks Dismiss Button
+         │
+         ▼
+    TCalloutPopup::dismissClicked() signal
+         │
+         ▼
+    TCalloutOverlay::slot_dismiss()
+         │
+         ├─→ Emit dismissed(calloutId, false)
+         │
+         ▼
+    TFeatureCalloutManager::slot_calloutDismissed()
+         │
+         ├─→ Hide and delete overlay
+         ├─→ Remove from mActiveCallouts
+         └─→ Emit calloutDismissed() signal
+
+
+6. USER DISMISSES PERMANENTLY
+──────────────────────────────
+
+    User Clicks "Don't Show Again"
+         │
+         ▼
+    TCalloutPopup::dismissPermanentlyClicked() signal
+         │
+         ▼
+    TCalloutOverlay::slot_dismissPermanently()
+         │
+         ├─→ Emit dismissed(calloutId, true)
+         │
+         ▼
+    TFeatureCalloutManager::slot_calloutDismissed()
+         │
+         ├─→ Add to mPermanentlyDismissed set
+         ├─→ saveDismissedState() → QSettings
+         ├─→ Hide and delete overlay
+         ├─→ Remove from mActiveCallouts
+         └─→ Emit calloutDismissed() signal
+
+
+7. AUTO-HIDE TIMER
+──────────────────
+
+    TCalloutOverlay::showCallout()
+         │
+         └─→ autoHideMs > 0?
+             └─→ Start QTimer
+                  │
+                  │ After N milliseconds
+                  ▼
+             TCalloutOverlay::slot_autoHide()
+                  │
+                  └─→ hideCallout(false)
+
+
+8. TARGET WIDGET DESTROYED
+───────────────────────────
+
+    Target QWidget::~QWidget()
+         │
+         │ QEvent::Destroy
+         ▼
+    TCalloutOverlay::eventFilter()
+         │
+         ├─→ Set mTargetDestroyed = true
+         └─→ hideCallout(false)
+
+
+9. CLEANUP ON APPLICATION EXIT
+───────────────────────────────
+
+    mudlet::~mudlet()
+         │
+         └─→ TFeatureCalloutManager::~TFeatureCalloutManager()
+                  │
+                  ├─→ saveDismissedState()
+                  │
+                  └─→ hideAllCallouts()
+                       │
+                       └─→ Qt parent-child cleanup deletes overlays
+
+
+MEMORY MANAGEMENT NOTES
+========================
+
+• TCalloutOverlay is a child of the top-level window
+  → Automatically deleted when window closes
+
+• TCalloutPopup is a child of TCalloutOverlay
+  → Automatically deleted when overlay is deleted
+
+• QPointer used for target widget reference
+  → Becomes null if target is deleted
+  → No dangling pointer issues
+
+• Manager stores raw pointers in hash
+  → But owns the overlays via Qt parent-child
+  → Hash is just for lookup
+
+• Event filters are removed before overlay deletion
+  → Prevents accessing deleted overlays
+
+
+THREADING NOTES
+===============
+
+• Mudlet is single-threaded (Qt main thread)
+• All callout operations happen on main thread
+• QTimer callbacks execute on main thread
+• No thread synchronization needed
+• Event filters run on main thread
+
+
+SETTINGS PERSISTENCE FLOW
+==========================
+
+Load (on profile open):
+    TFeatureCalloutManager::setProfileHost()
+         │
+         └─→ loadDismissedState()
+                  │
+                  └─→ Read from QSettings
+                       Format: "Profile_<name>/FeatureCallouts/dismissed/<id>"
+
+Save (on dismissal or app close):
+    TFeatureCalloutManager::saveDismissedState()
+         │
+         └─→ Write to QSettings
+                  │
+                  └─→ One key per dismissed callout
+
+
+EXAMPLE: SPOTLIGHT EFFECT
+==========================
+
+1. Overlay fills entire parent window
+2. Paint semi-transparent black (overlayColor)
+3. Use QPainter::CompositionMode_Clear to "cut out" target area
+4. Result: Everything dimmed except target widget
+5. Draw colored border around target for emphasis
+6. Popup floats beside target with arrow
+
+
+EXAMPLE: MULTI-STEP TOUR
+=========================
+
+    User starts tour
+         │
+         ▼
+    Show callout #1 → User clicks "Next"
+         │
+         ▼
+    Hide callout #1, Show callout #2 → User clicks "Next"
+         │
+         ▼
+    Hide callout #2, Show callout #3 → User clicks "Finish"
+         │
+         ▼
+    Hide callout #3, Tour complete
+
+Each step is a separate TFeatureCallout with:
+• Different target widget
+• Sequential ID (tour-step-1, tour-step-2, etc.)
+• "Next" or "Finish" action button
+• onAction callback to show next step
