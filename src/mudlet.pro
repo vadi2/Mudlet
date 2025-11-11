@@ -462,12 +462,16 @@ unix:!macx {
 # installation details for the unix case:
         LUA.path = $${LUA_DEFAULT_DIR}
         LUA_GEYSER.path = $${LUA.path}/geyser
+        LUA_ENABLE_ACCESSIBILITY.path = $${LUA.path}/enable-accessibility
+        LUA_GENERIC_MAPPER.path = $${LUA.path}/generic-mapper
         LUA_TRANSLATIONS.path = $${LUA.path}/translations
         LUA_LCF.path = $${LUA.path}/lcf
         LUA_TESTS.path = $${LUA.path}/tests
 # and say what will happen:
         message("Lua files will be installed to "$${LUA.path}"...")
         message("Geyser lua files will be installed to "$${LUA_GEYSER.path}"...")
+        message("Enable-accessibility lua files will be installed to "$${LUA_ENABLE_ACCESSIBILITY.path}"...")
+        message("Generic-mapper lua files will be installed to "$${LUA_GENERIC_MAPPER.path}"...")
         message("Lua Code Formatter lua files will be installed to "$${LUA_LCF.path}"...")
         message("Test lua files will be installed to "$${LUA_TESTS.path}"...")
     }
@@ -1079,8 +1083,10 @@ TRANSLATIONS = $$files(../translations/translated/*.ts)
 
 # Main lua files:
 LUA.files = \
+    $${PWD}/mudlet-lua/lua/CoreMudlet.lua \
     $${PWD}/mudlet-lua/lua/CursorShapes.lua \
     $${PWD}/mudlet-lua/lua/DB.lua \
+    $${PWD}/mudlet-lua/lua/DateTime.lua \
     $${PWD}/mudlet-lua/lua/DebugTools.lua \
     $${PWD}/mudlet-lua/lua/GMCP.lua \
     $${PWD}/mudlet-lua/lua/GUIUtils.lua \
@@ -1118,6 +1124,16 @@ LUA_GEYSER.files = \
     $${PWD}/mudlet-lua/lua/geyser/GeyserWindow.lua \
     $${PWD}/mudlet-lua/lua/geyser/GeyserButton.lua
 LUA_GEYSER.depends = mudlet
+
+# Enable-accessibility lua files:
+LUA_ENABLE_ACCESSIBILITY.files = \
+    $${PWD}/mudlet-lua/lua/enable-accessibility/config.lua
+LUA_ENABLE_ACCESSIBILITY.depends = mudlet
+
+# Generic-mapper lua files:
+LUA_GENERIC_MAPPER.files = \
+    $${PWD}/mudlet-lua/lua/generic-mapper/versions.lua
+LUA_GENERIC_MAPPER.depends = mudlet
 
 LUA_TRANSLATIONS.files = \
     $${PWD}/../translations/lua/*
@@ -1785,6 +1801,8 @@ INSTALLS += \
         target \
         LUA \
         LUA_GEYSER \
+        LUA_ENABLE_ACCESSIBILITY \
+        LUA_GENERIC_MAPPER \
         LUA_TRANSLATIONS \
         LUA_LCF \
         LUA_LCF_L1_GET__AST \
