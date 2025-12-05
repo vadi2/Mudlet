@@ -158,7 +158,8 @@ mudlet::mudlet()
             }
         }
 #else
-        mBuildType = BuildType::NotUpdateable;
+        // Distro packages without updater: still use Release type for empty app-build.txt
+        mBuildType = mAppBuild.isEmpty() ? BuildType::Release : BuildType::NotUpdateable;
 #endif
     } else {
         qWarning().nospace().noquote() << "mudlet::mudlet() WARNING - failed to open app-build.txt for reading: " << gitShaFile.errorString();
