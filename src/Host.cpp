@@ -2853,9 +2853,12 @@ void Host::processGMCPDiscordStatus(const QJsonObject& discordInfo)
 
     auto largeImages = discordInfo.value(qsl("largeimage"));
     if (largeImages != QJsonValue::Undefined) {
-        auto largeImage = largeImages.toArray().first();
-        if (largeImage != QJsonValue::Undefined) {
-            pMudlet->mDiscord.setLargeImage(this, largeImage.toString());
+        const auto largeImagesArray = largeImages.toArray();
+        if (!largeImagesArray.isEmpty()) {
+            auto largeImage = largeImagesArray.first();
+            if (largeImage != QJsonValue::Undefined) {
+                pMudlet->mDiscord.setLargeImage(this, largeImage.toString());
+            }
         }
     }
 
@@ -2866,9 +2869,12 @@ void Host::processGMCPDiscordStatus(const QJsonObject& discordInfo)
 
     auto smallImages = discordInfo.value(qsl("smallimage"));
     if (smallImages != QJsonValue::Undefined) {
-        auto smallImage = smallImages.toArray().first();
-        if (smallImage != QJsonValue::Undefined) {
-            pMudlet->mDiscord.setSmallImage(this, smallImage.toString());
+        const auto smallImagesArray = smallImages.toArray();
+        if (!smallImagesArray.isEmpty()) {
+            auto smallImage = smallImagesArray.first();
+            if (smallImage != QJsonValue::Undefined) {
+                pMudlet->mDiscord.setSmallImage(this, smallImage.toString());
+            }
         }
     }
 

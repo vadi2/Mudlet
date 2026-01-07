@@ -1352,8 +1352,13 @@ void mudlet::scanForMudletTranslations(const QString& path)
         QFile file(qsl(":/translation-stats.json"));
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             const QByteArray saveData = file.readAll();
-            const QJsonDocument loadDoc(QJsonDocument::fromJson(saveData));
-            translationStats = loadDoc.object();
+            QJsonParseError parseError;
+            const QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &parseError));
+            if (loadDoc.isNull() || !loadDoc.isObject()) {
+                qWarning() << "Failed to parse translation statistics JSON:" << parseError.errorString();
+            } else {
+                translationStats = loadDoc.object();
+            }
             file.close();
         } else {
             qWarning() << "translation statistics file isn't available, won't show stats in preferences";

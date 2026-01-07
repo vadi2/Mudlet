@@ -3229,6 +3229,11 @@ void cTelnet::processTelnetCommand(const std::string& telnetCommand)
                     payload.remove(0, 9);
                 }
 
+                if (payload.size() < 2) {
+                    qWarning() << "cTelnet::processSocketData() WARN - CHARSET payload too short to parse";
+                    return;
+                }
+
                 auto characterSetList = payload.split(payload[1]); // Second character is the separator.
                 QByteArray acceptedCharacterSet;
 
@@ -3670,7 +3675,13 @@ void cTelnet::setATCPVariables(const QByteArray& msg)
     mpHost->mLuaInterpreter.setAtcpTable(var, arg);
     if (var.startsWith(QLatin1String("RoomNum"))) {
         if (mpHost->mpMap) {
-            mpHost->mpMap->mRoomIdHash[mProfileName] = arg.toInt();
+            bool ok = false;
+            int roomId = arg.toInt(&ok);
+            if (!ok) {
+                qWarning() << "cTelnet::setATCPVariables() WARN - failed to parse RoomNum value:" << arg;
+                return;
+            }
+            mpHost->mpMap->mRoomIdHash[mProfileName] = roomId;
 #if defined(INCLUDE_3DMAPPER)
             if (mpHost->mpMap->mpM && mpHost->mpMap->mpMapper) {
                 mpHost->mpMap->mpM->update();
@@ -3970,23 +3981,35 @@ void cTelnet::setMSPVariables(const QByteArray& msg)
                 }
 
                 if (mspVAR == "V") {
-                    mediaData.setMediaVolume(mspVAL.toInt());
+                    bool ok = false;
+                    int volume = mspVAL.toInt(&ok);
+                    if (ok) {
+                        mediaData.setMediaVolume(volume);
+                    }
                 } else if (mspVAR == "L") {
-                    mediaData.setMediaLoops(mspVAL.toInt());
-
-                    if (mediaData.mediaLoops() < TMediaData::MediaLoopsRepeat || mediaData.mediaLoops() == 0) {
-                        mediaData.setMediaLoops(TMediaData::MediaLoopsDefault);
+                    bool ok = false;
+                    int loops = mspVAL.toInt(&ok);
+                    if (ok) {
+                        mediaData.setMediaLoops(loops);
+                        if (mediaData.mediaLoops() < TMediaData::MediaLoopsRepeat || mediaData.mediaLoops() == 0) {
+                            mediaData.setMediaLoops(TMediaData::MediaLoopsDefault);
+                        }
                     }
                 } else if (mspVAR == "P") {
-                    mediaData.setMediaPriority(mspVAL.toInt());
-
-                    if (mediaData.mediaPriority() > TMediaData::MediaPriorityMax) {
-                        mediaData.setMediaPriority(TMediaData::MediaPriorityMax);
-                    } else if (mediaData.mediaPriority() < TMediaData::MediaPriorityMin) {
-                        mediaData.setMediaPriority(TMediaData::MediaPriorityMin);
+                    bool ok = false;
+                    int priority = mspVAL.toInt(&ok);
+                    if (ok) {
+                        mediaData.setMediaPriority(priority);
+                        if (mediaData.mediaPriority() > TMediaData::MediaPriorityMax) {
+                            mediaData.setMediaPriority(TMediaData::MediaPriorityMax);
+                        } else if (mediaData.mediaPriority() < TMediaData::MediaPriorityMin) {
+                            mediaData.setMediaPriority(TMediaData::MediaPriorityMin);
+                        }
                     }
                 } else if (mspVAR == "C") {
-                    if (mspVAL.toInt() == 0) {
+                    bool ok = false;
+                    int continueVal = mspVAL.toInt(&ok);
+                    if (ok && continueVal == 0) {
                         mediaData.setMediaContinue(TMediaData::MediaContinueRestart);
                     } else {
                         mediaData.setMediaContinue(TMediaData::MediaContinueDefault);
@@ -4184,17 +4207,23 @@ void cTelnet::postMessage(QString msg)
 
         QStringList body = messageStack.first().split(QChar('\n'));
 
-        qint8 openBraceIndex = body.at(0).indexOf(QLatin1String("["));
-        qint8 closeBraceIndex = body.at(0).indexOf(QLatin1String("]"));
-        qint8 hyphenIndex = body.at(0).indexOf(QLatin1String("- "));
+        if (body.isEmpty()) {
+            messageStack.removeFirst();
+            continue;
+        }
+
+        const QString& firstLine = body.at(0);
+        qint8 openBraceIndex = firstLine.indexOf(QLatin1String("["));
+        qint8 closeBraceIndex = firstLine.indexOf(QLatin1String("]"));
+        qint8 hyphenIndex = firstLine.indexOf(QLatin1String("- "));
         if (openBraceIndex >= 0 && closeBraceIndex > 0 && closeBraceIndex < hyphenIndex) {
             quint8 prefixLength = hyphenIndex + 1;
-            while (body.at(0).at(prefixLength) == ' ') {
+            while (prefixLength < firstLine.length() && firstLine.at(prefixLength) == ' ') {
                 ++prefixLength;
             }
 
-            QString prefix = body.at(0).left(prefixLength).toUpper();
-            QString firstLineTail = body.at(0).mid(prefixLength);
+            QString prefix = firstLine.left(prefixLength).toUpper();
+            QString firstLineTail = firstLine.mid(prefixLength);
             body.removeFirst();
             //: Keep the capitalisation, the translated text at 7 letters max so it aligns nicely
             if (prefix.contains(tr("ERROR")) || prefix.contains(QLatin1String("ERROR"))) {
