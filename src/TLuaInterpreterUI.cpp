@@ -1475,7 +1475,11 @@ int TLuaInterpreter::getWindowWrap(lua_State* L)
 int TLuaInterpreter::hasFocus(lua_State* L)
 {
     const Host& host = getHostFromLua(L);
-    lua_pushboolean(L, host.mpConsole->hasFocus()); //FIXME
+    if (!host.mpConsole) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+    lua_pushboolean(L, host.mpConsole->hasFocus());
     return 1;
 }
 
@@ -1826,6 +1830,10 @@ int TLuaInterpreter::lowerWindow(lua_State* L)
 {
     const QString windowName {WINDOW_NAME(L, 1)};
     const Host& host = getHostFromLua(L);
+    if (!host.mpConsole) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
     lua_pushboolean(L, host.mpConsole->lowerWindow(windowName));
     return 1;
 }
@@ -1929,6 +1937,10 @@ int TLuaInterpreter::raiseWindow(lua_State* L)
 {
     const QString windowName {WINDOW_NAME(L, 1)};
     const Host& host = getHostFromLua(L);
+    if (!host.mpConsole) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
     lua_pushboolean(L, host.mpConsole->raiseWindow(windowName));
     return 1;
 }
