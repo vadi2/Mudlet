@@ -1772,7 +1772,7 @@ QString cTelnet::getNewEnvironANSI()
 
 QString cTelnet::getNewEnvironVT100()
 {
-    return qsl("0");
+    return mpHost->mEnableVT100 ? qsl("1") : qsl("0");
 }
 
 QString cTelnet::getNewEnviron256Colors()
@@ -4398,6 +4398,9 @@ void cTelnet::gotRest(std::string& mud_data)
         trackMXPElementDetection(mud_data);
     }
 
+#if defined(DEBUG_TELNET) && (DEBUG_TELNET & 2)
+    qDebug().noquote() << "cTelnet::processSocketData() - mGA_Driver:" << mGA_Driver << "mud_data size:" << mud_data.size();
+#endif
     if (!mGA_Driver) {
         size_t i = mud_data.rfind('\n');
 
@@ -4466,7 +4469,10 @@ void cTelnet::postData()
     if (!mpHost || mpHost->isClosingDown() || !mpHost->mpConsole) {
         return;
     }
-    
+
+#if defined(DEBUG_TELNET) && (DEBUG_TELNET & 2)
+    qDebug().noquote() << "cTelnet::postData() - mMudData size:" << mMudData.size() << "bytes";
+#endif
     // All data goes through main console's printOnDisplay which calls
     // translateToPlainText - MXP DEST routing happens inside that process
     mpHost->mpConsole->printOnDisplay(mMudData, true);
@@ -4738,6 +4744,9 @@ void cTelnet::slot_socketReadyToBeRead()
     char in_buffer[BUFFER_SIZE + 10];
 
     int amount = mpSocket->read(in_buffer, BUFFER_SIZE);
+#if defined(DEBUG_TELNET) && (DEBUG_TELNET & 2)
+    qDebug().noquote() << "cTelnet::slot_socketReadyToBeRead() - read" << amount << "bytes from socket";
+#endif
     processSocketData(in_buffer, amount);
 }
 

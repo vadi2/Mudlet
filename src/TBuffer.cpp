@@ -960,11 +960,12 @@ void TBuffer::translateToPlainText(std::string& incoming, const bool isFromServe
             // that far (it will be the ']' character!)
             while (spanEnd < localBufferLength
                    && (spanEnd == 0 || localBuffer[spanEnd-1] != '\033')
-                   && (localBuffer[spanEnd] != '\\')) {
+                   && (localBuffer[spanEnd] != '\\')
+                   && (localBuffer[spanEnd] != TN_BELL)) {
                 ++spanEnd;
             }
 
-            if (localBuffer[spanEnd] != '\\') {
+            if (localBuffer[spanEnd] != '\\' && localBuffer[spanEnd] != TN_BELL) {
                 // The last character in the buffer is NOT the expected ST
                 // - therefore we have probably got a split between
                 // data packets and are not in a position to process the
@@ -974,7 +975,10 @@ void TBuffer::translateToPlainText(std::string& incoming, const bool isFromServe
                 return;
             }
 
-            decodeOSC(QString(localBuffer.substr(localBufferPosition, spanEnd - spanStart - 1).c_str()));
+            // For TN_BELL terminator, content ends at spanEnd; for ESC \ terminator, content ends at spanEnd-1 (before ESC)
+            const bool isBelTerminator = (localBuffer[spanEnd] == TN_BELL);
+            const size_t contentLength = isBelTerminator ? (spanEnd - spanStart) : (spanEnd - spanStart - 1);
+            decodeOSC(QString(localBuffer.substr(localBufferPosition, contentLength).c_str()));
             mGotOSC = false;
             localBufferPosition += 1 + spanEnd - spanStart;
             // Go around while loop again:
