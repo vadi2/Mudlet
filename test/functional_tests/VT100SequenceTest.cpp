@@ -162,6 +162,113 @@ private slots:
         QCOMPARE(getTestLine(buf), expected);
     }
 
+    void test_VerticalPositionAbsolute()
+    {
+        // CSI 2 d positions cursor at row 2, keeping same column
+        // First line has "AAA", then VPA to row 2, write "BBB"
+        QString message("AAA\x1B[2dBBB\n");
+
+        mpServer->setWelcomeMessage(message);
+        startProfile(mpHostname, mpLocalhost, mpPort, true);
+        QSignalSpy(mudlet::self()->getActiveHost()->mpConsole, &TMainConsole::signal_newDataAlert).wait(200);
+
+        auto& buf = mudlet::self()->getActiveHost()->mpConsole->buffer;
+        // Should have created two lines - find "BBB" on a separate line
+        bool foundBBB = false;
+        for (int i = 0; i <= buf.getLastLineNumber(); ++i) {
+            if (buf.line(i) == "BBB") {
+                foundBBB = true;
+                break;
+            }
+        }
+        QVERIFY(foundBBB);
+    }
+
+    void test_MultiRowCursorPositioning()
+    {
+        // Test cursor positioning to different rows creates separate lines
+        QString message("Line1\x1B[2;1HLine2\x1B[3;1HLine3\n");
+
+        mpServer->setWelcomeMessage(message);
+        startProfile(mpHostname, mpLocalhost, mpPort, true);
+        QSignalSpy(mudlet::self()->getActiveHost()->mpConsole, &TMainConsole::signal_newDataAlert).wait(200);
+
+        auto& buf = mudlet::self()->getActiveHost()->mpConsole->buffer;
+        // Verify all three lines exist
+        int foundLines = 0;
+        for (int i = 0; i <= buf.getLastLineNumber(); ++i) {
+            const QString line = buf.line(i);
+            if (line == "Line1" || line == "Line2" || line == "Line3") {
+                foundLines++;
+            }
+        }
+        QCOMPARE(foundLines, 3);
+    }
+
+    void test_CharsetDesignatorStripped()
+    {
+        // ESC ( B (US ASCII charset) should be stripped, not displayed
+        QString message("Hello\x1B(BWorld\n");
+        QString expected("HelloWorld");
+
+        mpServer->setWelcomeMessage(message);
+        startProfile(mpHostname, mpLocalhost, mpPort, true);
+        QSignalSpy(mudlet::self()->getActiveHost()->mpConsole, &TMainConsole::signal_newDataAlert).wait(200);
+
+        auto& buf = mudlet::self()->getActiveHost()->mpConsole->buffer;
+        QCOMPARE(getTestLine(buf), expected);
+    }
+
+    void test_BackspaceMoveCursor()
+    {
+        // Backspace should move cursor back, allowing overwrite
+        QString message("ABC\bX\n");
+        QString expected("ABX");
+
+        mpServer->setWelcomeMessage(message);
+        startProfile(mpHostname, mpLocalhost, mpPort, true);
+        QSignalSpy(mudlet::self()->getActiveHost()->mpConsole, &TMainConsole::signal_newDataAlert).wait(200);
+
+        auto& buf = mudlet::self()->getActiveHost()->mpConsole->buffer;
+        QCOMPARE(getTestLine(buf), expected);
+    }
+
+    void test_PrivateModesSilentlyHandled()
+    {
+        // DEC private modes like CSI ? 1049 h should be handled without error
+        // and not affect text output
+        QString message("\x1B[?1049hHello\x1B[?1049l\n");
+
+        mpServer->setWelcomeMessage(message);
+        startProfile(mpHostname, mpLocalhost, mpPort, true);
+        QSignalSpy(mudlet::self()->getActiveHost()->mpConsole, &TMainConsole::signal_newDataAlert).wait(200);
+
+        auto& buf = mudlet::self()->getActiveHost()->mpConsole->buffer;
+        // The text "Hello" should appear (possibly after screen clear effects)
+        bool foundHello = false;
+        for (int i = 0; i <= buf.getLastLineNumber(); ++i) {
+            if (buf.line(i).contains("Hello")) {
+                foundHello = true;
+                break;
+            }
+        }
+        QVERIFY(foundHello);
+    }
+
+    void test_SetModeResetModeSilentlyHandled()
+    {
+        // Normal SM/RM sequences like CSI 4 l should be silently handled
+        QString message("\x1B[4lHello\x1B[4h\n");
+        QString expected("Hello");
+
+        mpServer->setWelcomeMessage(message);
+        startProfile(mpHostname, mpLocalhost, mpPort, true);
+        QSignalSpy(mudlet::self()->getActiveHost()->mpConsole, &TMainConsole::signal_newDataAlert).wait(200);
+
+        auto& buf = mudlet::self()->getActiveHost()->mpConsole->buffer;
+        QCOMPARE(getTestLine(buf), expected);
+    }
+
     void cleanup()
     {
         delete mpServer;

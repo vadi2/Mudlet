@@ -666,6 +666,35 @@ void TBuffer::translateToPlainText(std::string& incoming, const bool isFromServe
             continue;
         }
 
+        if (mGotESC && mpHost->mEnableVT100) {
+            // Handle other ESC sequences when VT100 is enabled
+            if (ch == '(' || ch == ')' || ch == '*' || ch == '+') {
+                // SCS - Select Character Set: ESC ( X, ESC ) X, ESC * X, ESC + X
+                // These designate character sets for G0-G3
+                // Skip the designator and the charset identifier (next char)
+                mGotESC = false;
+                ++localBufferPosition;  // Skip the '(' or ')' etc.
+                if (localBufferPosition < localBufferLength) {
+                    ++localBufferPosition;  // Skip the charset identifier (e.g., 'B' for US ASCII)
+                }
+                continue;
+            } else if (ch == '=' || ch == '>') {
+                // DECKPAM/DECKPNM - Keypad Application/Numeric Mode
+                mGotESC = false;
+                ++localBufferPosition;
+                continue;
+            }
+        }
+
+        // Handle backspace (0x08) in VT100 mode - move cursor back one column
+        if (mpHost->mEnableVT100 && ch == '\b') {
+            if (mVT100.mCursorCol > 0) {
+                mVT100.mCursorCol--;
+            }
+            ++localBufferPosition;
+            continue;
+        }
+
         if (mGotCSI) {
             // Lookahead and try and see what we are processing
             // At the start of a CSI sequence the only valid character is one of:
@@ -686,9 +715,70 @@ void TBuffer::translateToPlainText(std::string& incoming, const bool isFromServe
             // Test whether the first byte is within the usable subset of the
             // allowed value - or not:
             if (cParameter.indexOf(localBuffer[spanStart]) == -1 && cParameterInitial.indexOf(localBuffer[spanStart]) >= 0) {
-                // Oh dear, the CSI parameter string sequence begins with one of
-                // the reserved characters ('<', '=', '>' or '?') which we
-                // can/do not handle
+                // The CSI parameter string sequence begins with one of the
+                // reserved characters ('<', '=', '>' or '?'). Handle '?' for
+                // DEC private modes when VT100 is enabled.
+                if (mpHost->mEnableVT100 && localBuffer[spanStart] == '?') {
+                    // Scan past the '?' to find mode numbers and final byte
+                    size_t privateSpanEnd = spanStart + 1;
+                    while (privateSpanEnd < localBufferLength && cParameter.indexOf(localBuffer[privateSpanEnd]) >= 0) {
+                        ++privateSpanEnd;
+                    }
+
+                    if (privateSpanEnd < localBufferLength) {
+                        const quint8 finalByte = static_cast<unsigned char>(localBuffer[privateSpanEnd]);
+                        if (finalByte == 'h' || finalByte == 'l') {
+                            // DEC Private Mode Set/Reset: CSI ? Pn h or CSI ? Pn l
+                            const int dataLength = privateSpanEnd - spanStart - 1;  // Skip the '?'
+                            const QString params = QString::fromLatin1(localBuffer.substr(localBufferPosition + 1, dataLength).c_str(), dataLength);
+                            const QStringList modes = params.split(QLatin1Char(';'));
+                            const bool isSet = (finalByte == 'h');
+
+                            for (const QString& modeStr : modes) {
+                                bool isOk = false;
+                                const int mode = modeStr.toInt(&isOk);
+                                if (!isOk) {
+                                    continue;
+                                }
+                                switch (mode) {
+                                case 1:
+                                    // DECCKM - Cursor Keys Mode (application/normal)
+                                    // Currently ignored but acknowledged
+                                    break;
+                                case 7:
+                                    // DECAWM - Auto-wrap Mode
+                                    // Currently ignored but acknowledged
+                                    break;
+                                case 25:
+                                    // DECTCEM - Text Cursor Enable Mode
+                                    // Currently ignored but acknowledged
+                                    break;
+                                case 1049:
+                                    // Alternate screen buffer (xterm)
+                                    mVT100.mAlternateScreen = isSet;
+                                    if (isSet) {
+                                        // Entering alternate screen - clear it
+                                        clearScreen(2);
+                                        mVT100.mCursorRow = 0;
+                                        mVT100.mCursorCol = 0;
+                                    }
+                                    break;
+                                default:
+                                    // Unhandled private mode - silently ignore
+                                    break;
+                                }
+                            }
+
+                            localBufferPosition += 1 + privateSpanEnd - spanStart;
+                            mGotCSI = false;
+                            continue;
+                        }
+                    } else {
+                        // Incomplete sequence - wait for more data
+                        mIncompleteSequenceBytes = localBuffer.substr(spanStart);
+                        return;
+                    }
+                }
 
                 qDebug().noquote().nospace() << "TBuffer::translateToPlainText(...) INFO - detected a private/reserved CSI sequence beginning with \"CSI" << localBuffer.substr(spanStart, spanEnd - spanStart).c_str() << "\" which Mudlet cannot interpret.";
                 // So skip over it as far as we can - will still possibly have
@@ -780,7 +870,8 @@ void TBuffer::translateToPlainText(std::string& incoming, const bool isFromServe
                         }
 
                         // VT100 uses 1-based coordinates, convert to 0-based
-                        mVT100.mCursorRow = qBound(0, row - 1, getScreenRows() - 1);
+                        const int targetRow = qBound(0, row - 1, getScreenRows() - 1);
+                        vt100PositionToRow(targetRow);
                         mVT100.mCursorCol = qBound(0, col - 1, getScreenCols() - 1);
                     }
                 }
@@ -799,7 +890,8 @@ void TBuffer::translateToPlainText(std::string& incoming, const bool isFromServe
                                 count = 1;
                             }
                         }
-                        mVT100.mCursorRow = qMax(0, mVT100.mCursorRow - count);
+                        const int targetRow = qMax(0, mVT100.mCursorRow - count);
+                        vt100PositionToRow(targetRow);
                     }
                 }
                     break;
@@ -817,7 +909,8 @@ void TBuffer::translateToPlainText(std::string& incoming, const bool isFromServe
                                 count = 1;
                             }
                         }
-                        mVT100.mCursorRow = qMin(getScreenRows() - 1, mVT100.mCursorRow + count);
+                        const int targetRow = qMin(getScreenRows() - 1, mVT100.mCursorRow + count);
+                        vt100PositionToRow(targetRow);
                     }
                 }
                     break;
@@ -865,6 +958,26 @@ void TBuffer::translateToPlainText(std::string& incoming, const bool isFromServe
                             }
                         }
                         mVT100.mCursorCol = qMax(0, mVT100.mCursorCol - count);
+                    }
+                }
+                    break;
+
+                case static_cast<quint8>('d'): {
+                    // VPA - Vertical Position Absolute: CSI Pn d
+                    if (mpHost->mEnableVT100) {
+                        const int dataLength = spanEnd - spanStart;
+                        const QByteArray temp = QByteArray::fromRawData(localBuffer.substr(localBufferPosition, dataLength).c_str(), dataLength);
+                        int row = 1;
+                        if (!temp.isEmpty()) {
+                            bool isOk = false;
+                            row = temp.toInt(&isOk);
+                            if (!isOk || row < 1) {
+                                row = 1;
+                            }
+                        }
+                        // VT100 uses 1-based coordinates, convert to 0-based
+                        const int targetRow = qBound(0, row - 1, getScreenRows() - 1);
+                        vt100PositionToRow(targetRow);
                     }
                 }
                     break;
@@ -921,6 +1034,46 @@ void TBuffer::translateToPlainText(std::string& incoming, const bool isFromServe
                         qDebug().noquote().nospace() << "TBuffer::translateToPlainText(...) INFO - ED (erase in display) sequence of form CSI" << temp << "J received,\nrejecting as incompatible with Mudlet (enable VT100 mode in settings to support this).";
                     } else {
                         qDebug().noquote().nospace() << "TBuffer::translateToPlainText(...) INFO - Invalid ED (erase in display) sequence of form CSI" << temp << "J received,\nwhich Mudlet will ignore.";
+                    }
+                }
+                    break;
+
+                case static_cast<quint8>('r'): {
+                    // DECSTBM - Set Scrolling Region: CSI Pt ; Pb r
+                    if (mpHost->mEnableVT100) {
+                        const int dataLength = spanEnd - spanStart;
+                        const QString params = QString::fromLatin1(localBuffer.substr(localBufferPosition, dataLength).c_str(), dataLength);
+                        const QStringList parts = params.split(QLatin1Char(';'));
+
+                        const int screenRows = getScreenRows();
+                        int top = 1;
+                        int bottom = screenRows;
+                        if (parts.size() >= 1 && !parts[0].isEmpty()) {
+                            top = parts[0].toInt();
+                        }
+                        if (parts.size() >= 2 && !parts[1].isEmpty()) {
+                            bottom = parts[1].toInt();
+                        }
+
+                        // VT100 uses 1-based coordinates, convert to 0-based
+                        mVT100.mScrollTop = qBound(0, top - 1, screenRows - 1);
+                        mVT100.mScrollBottom = qBound(0, bottom - 1, screenRows - 1);
+
+                        // Setting scroll region also homes the cursor
+                        mVT100.mCursorRow = 0;
+                        mVT100.mCursorCol = 0;
+                    }
+                }
+                    break;
+
+                case static_cast<quint8>('h'):
+                case static_cast<quint8>('l'): {
+                    // SM/RM - Set/Reset Mode: CSI Pn h or CSI Pn l
+                    // Note: Private modes (CSI ? Pn h/l) are handled earlier
+                    if (mpHost->mEnableVT100) {
+                        // Standard ANSI modes - currently we acknowledge but don't act on them
+                        // Mode 4 = IRM (Insert/Replace Mode) - most common
+                        // These are silently ignored as they don't affect Mudlet's rendering model
                     }
                 }
                     break;
@@ -7466,5 +7619,46 @@ void TBuffer::flushPendingTriggers()
     }
 
     mPendingTriggerLines.clear();
+}
+
+void TBuffer::vt100PositionToRow(int targetRow)
+{
+    // When VT100 cursor moves to a different row, commit current line
+    // and create new lines as needed to reach the target row
+    if (targetRow == mVT100.mCursorRow) {
+        return;
+    }
+
+    // Commit the current line content if any
+    if (!mMudLine.isEmpty()) {
+        if (!lineBuffer.back().isEmpty()) {
+            lineBuffer << mMudLine;
+            buffer.push_back(mMudBuffer);
+            timeBuffer << QTime::currentTime().toString(mudlet::smTimeStampFormat);
+            promptBuffer << false;
+        } else {
+            lineBuffer.back() = mMudLine;
+            buffer.back() = mMudBuffer;
+            timeBuffer.back() = QTime::currentTime().toString(mudlet::smTimeStampFormat);
+            promptBuffer.back() = false;
+        }
+        mMudLine.clear();
+        mMudBuffer.clear();
+    }
+
+    // Calculate how many new lines we need to create
+    const int rowDiff = targetRow - mVT100.mCursorRow;
+    if (rowDiff > 0) {
+        // Moving forward - create empty lines for the gap
+        for (int i = 0; i < rowDiff; ++i) {
+            std::deque<TChar> const newLine;
+            buffer.push_back(newLine);
+            lineBuffer.push_back(QString());
+            timeBuffer.push_back(QString());
+            promptBuffer << false;
+        }
+    }
+
+    mVT100.mCursorRow = targetRow;
 }
 

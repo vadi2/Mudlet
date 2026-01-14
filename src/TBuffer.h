@@ -190,6 +190,9 @@ struct VT100State {
     int mCursorCol = 0;
     int mSavedCursorRow = 0;
     int mSavedCursorCol = 0;
+    int mScrollTop = 0;
+    int mScrollBottom = -1;  // -1 means use screen height
+    bool mAlternateScreen = false;
 };
 
 class WrapInfo
@@ -502,6 +505,7 @@ public:
     void clearLineRange(int row, int startCol, int endCol);
     void clearScreen(int mode);
     void flushPendingTriggers();
+    void vt100PositionToRow(int targetRow);
     int getScreenRows() const;
     int getScreenCols() const;
 
