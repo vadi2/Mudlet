@@ -1344,9 +1344,9 @@ COMMIT_LINE:
         if (mpHost->mEnableVT100 && mVT100.mCursorRow == 0 && !isTwoTCharsNeeded) {
             const int cursorCol = mVT100.mCursorCol;
             const int lineLen = mMudLine.length();
+            const QChar appendedChar = mMudLine.back();
 
             if (cursorCol < lineLen - 1) {
-                QChar appendedChar = mMudLine.back();
                 mMudLine.chop(1);
                 mMudLine[cursorCol] = appendedChar;
                 mMudBuffer[cursorCol] = c;
@@ -1360,7 +1360,7 @@ COMMIT_LINE:
                     mMudLine.append(QChar::Space);
                     mMudBuffer.push_back(spaceChar);
                 }
-                mMudLine.append(QChar::fromLatin1(ch));
+                mMudLine.append(appendedChar);
                 mMudBuffer.push_back(c);
             }
             mVT100.mCursorCol++;
@@ -7464,47 +7464,3 @@ void TBuffer::flushPendingTriggers()
     mPendingTriggerLines.clear();
 }
 
-void TBuffer::writeCharAtCursor(QChar ch, const TChar& charFormat)
-{
-    const TChar spaceChar(mBackGroundColor, mBackGroundColor, TChar::None);
-
-    if (mVT100.mCursorRow == 0) {
-        const int col = mVT100.mCursorCol;
-        const int lineLen = mMudLine.length();
-
-        if (col < lineLen) {
-            mMudLine[col] = ch;
-            mMudBuffer[col] = charFormat;
-        } else {
-            const int padCount = col - lineLen;
-            for (int i = 0; i < padCount; ++i) {
-                mMudLine.append(QChar::Space);
-                mMudBuffer.push_back(spaceChar);
-            }
-            mMudLine.append(ch);
-            mMudBuffer.push_back(charFormat);
-        }
-        mVT100.mCursorCol++;
-    } else {
-        const int absoluteRow = mScreenStartLine + mVT100.mCursorRow;
-        if (absoluteRow >= 0 && absoluteRow < static_cast<int>(buffer.size())) {
-            const int col = mVT100.mCursorCol;
-            QString& line = lineBuffer[absoluteRow];
-            std::deque<TChar>& charBuf = buffer[absoluteRow];
-
-            if (col < line.length()) {
-                line[col] = ch;
-                charBuf[col] = charFormat;
-            } else {
-                const int padCount = col - line.length();
-                for (int i = 0; i < padCount; ++i) {
-                    line.append(QChar::Space);
-                    charBuf.push_back(spaceChar);
-                }
-                line.append(ch);
-                charBuf.push_back(charFormat);
-            }
-            mVT100.mCursorCol++;
-        }
-    }
-}

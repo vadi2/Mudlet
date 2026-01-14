@@ -504,7 +504,6 @@ public:
     void flushPendingTriggers();
     int getScreenRows() const;
     int getScreenCols() const;
-    void writeCharAtCursor(QChar ch, const TChar& charFormat);
 
     // OSC 8 hyperlink documentation examples - triggered by secret phrase
     void injectOSC8DocumentationExamples();
