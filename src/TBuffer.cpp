@@ -762,55 +762,165 @@ void TBuffer::translateToPlainText(std::string& incoming, const bool isFromServe
 
                     break;
 
+                case static_cast<quint8>('H'):
+                case static_cast<quint8>('f'): {
+                    // CUP - Cursor Position: CSI Pr ; Pc H or CSI Pr ; Pc f
+                    if (mpHost->mEnableVT100) {
+                        const int dataLength = spanEnd - spanStart;
+                        const QString params = QString::fromLatin1(localBuffer.substr(localBufferPosition, dataLength).c_str(), dataLength);
+                        const QStringList parts = params.split(QLatin1Char(';'));
+
+                        int row = 1;
+                        int col = 1;
+                        if (parts.size() >= 1 && !parts[0].isEmpty()) {
+                            row = parts[0].toInt();
+                        }
+                        if (parts.size() >= 2 && !parts[1].isEmpty()) {
+                            col = parts[1].toInt();
+                        }
+
+                        // VT100 uses 1-based coordinates, convert to 0-based
+                        mVT100.mCursorRow = qBound(0, row - 1, getScreenRows() - 1);
+                        mVT100.mCursorCol = qBound(0, col - 1, getScreenCols() - 1);
+                    }
+                }
+                    break;
+
+                case static_cast<quint8>('A'): {
+                    // CUU - Cursor Up: CSI Pn A
+                    if (mpHost->mEnableVT100) {
+                        const int dataLength = spanEnd - spanStart;
+                        const QByteArray temp = QByteArray::fromRawData(localBuffer.substr(localBufferPosition, dataLength).c_str(), dataLength);
+                        int count = 1;
+                        if (!temp.isEmpty()) {
+                            bool isOk = false;
+                            count = temp.toInt(&isOk);
+                            if (!isOk || count < 1) {
+                                count = 1;
+                            }
+                        }
+                        mVT100.mCursorRow = qMax(0, mVT100.mCursorRow - count);
+                    }
+                }
+                    break;
+
+                case static_cast<quint8>('B'): {
+                    // CUD - Cursor Down: CSI Pn B
+                    if (mpHost->mEnableVT100) {
+                        const int dataLength = spanEnd - spanStart;
+                        const QByteArray temp = QByteArray::fromRawData(localBuffer.substr(localBufferPosition, dataLength).c_str(), dataLength);
+                        int count = 1;
+                        if (!temp.isEmpty()) {
+                            bool isOk = false;
+                            count = temp.toInt(&isOk);
+                            if (!isOk || count < 1) {
+                                count = 1;
+                            }
+                        }
+                        mVT100.mCursorRow = qMin(getScreenRows() - 1, mVT100.mCursorRow + count);
+                    }
+                }
+                    break;
+
                 case static_cast<quint8>('C'): {
-                    // A workaround for the ONE cursor movement command we CAN
-                    // emulate - the CUF Cursor forward one:
-                    // Needed for mud.durismud.com see forum message topic:
-                    // https://forums.mudlet.org/viewtopic.php?f=9&t=22887
+                    // CUF - Cursor Forward: CSI Pn C
                     const int dataLength = spanEnd - spanStart;
                     const QByteArray temp = QByteArray::fromRawData(localBuffer.substr(localBufferPosition, dataLength).c_str(), dataLength);
                     bool isOk = false;
-                    const int spacesNeeded = temp.toInt(&isOk);
-                    if (isOk && spacesNeeded > 0) {
-                        // Note: we are using the background color for the
-                        // foreground color as well so that we are transparent:
-                        const TChar c(mBackGroundColor, mBackGroundColor, computeCurrentAttributeFlags());
-                        for (int spaceCount = 0; spaceCount < spacesNeeded; ++spaceCount) {
-                            mMudLine.append(QChar::Space);
-                            mMudBuffer.push_back(c);
-                        }
-                        // For debugging:
-//                        qDebug().noquote().nospace() << "TBuffer::translateToPlainText(...) INFO - CUF (cursor forward) sequence of form CSI" << temp << "C received, converting into " << spacesNeeded << " spaces.";
-                    } else {
-                        qDebug().noquote().nospace() << "TBuffer::translateToPlainText(...) INFO - Unhandled sequence of form CSI..." << temp << "C received, that is supposed to be a CUF (cursor forward) sequence but doesn't make sense, Mudlet will ignore it.";
+                    int count = temp.isEmpty() ? 1 : temp.toInt(&isOk);
+                    if (!isOk || count < 1) {
+                        count = 1;
                     }
 
+                    if (mpHost->mEnableVT100) {
+                        mVT100.mCursorCol = qMin(getScreenCols() - 1, mVT100.mCursorCol + count);
+                    } else {
+                        // Legacy workaround: convert to spaces
+                        // Needed for mud.durismud.com see forum message topic:
+                        // https://forums.mudlet.org/viewtopic.php?f=9&t=22887
+                        if (count > 0) {
+                            // Note: we are using the background color for the
+                            // foreground color as well so that we are transparent:
+                            const TChar c(mBackGroundColor, mBackGroundColor, computeCurrentAttributeFlags());
+                            for (int spaceCount = 0; spaceCount < count; ++spaceCount) {
+                                mMudLine.append(QChar::Space);
+                                mMudBuffer.push_back(c);
+                            }
+                        }
+                    }
+                }
+                    break;
+
+                case static_cast<quint8>('D'): {
+                    // CUB - Cursor Back: CSI Pn D
+                    if (mpHost->mEnableVT100) {
+                        const int dataLength = spanEnd - spanStart;
+                        const QByteArray temp = QByteArray::fromRawData(localBuffer.substr(localBufferPosition, dataLength).c_str(), dataLength);
+                        int count = 1;
+                        if (!temp.isEmpty()) {
+                            bool isOk = false;
+                            count = temp.toInt(&isOk);
+                            if (!isOk || count < 1) {
+                                count = 1;
+                            }
+                        }
+                        mVT100.mCursorCol = qMax(0, mVT100.mCursorCol - count);
+                    }
+                }
+                    break;
+
+                case static_cast<quint8>('K'): {
+                    // EL - Erase in Line: CSI Pn K
+                    if (mpHost->mEnableVT100) {
+                        const int dataLength = spanEnd - spanStart;
+                        const QByteArray temp = QByteArray::fromRawData(localBuffer.substr(localBufferPosition, dataLength).c_str(), dataLength);
+                        int mode = 0;
+                        if (!temp.isEmpty()) {
+                            bool isOk = false;
+                            mode = temp.toInt(&isOk);
+                            if (!isOk) {
+                                mode = 0;
+                            }
+                        }
+
+                        const int screenCols = getScreenCols();
+                        switch (mode) {
+                        case 0:
+                            clearLineRange(mVT100.mCursorRow, mVT100.mCursorCol, screenCols - 1);
+                            break;
+                        case 1:
+                            clearLineRange(mVT100.mCursorRow, 0, mVT100.mCursorCol);
+                            break;
+                        case 2:
+                            clearLineRange(mVT100.mCursorRow, 0, screenCols - 1);
+                            break;
+                        default:
+                            break;
+                        }
+                    }
                 }
                     break;
 
                 case static_cast<quint8>('J'): {
-                    /*
-                     * Also seen in output from mud.durismud.com see 'C' case above:
-                     * Is ED 'Erase Display' command and has three variants:
-                     * * 0 (or omitted): clear from cursor to end of screen
-                     *   - which is a NOP for us!
-                     * * 1: clear from cursor to beginning of screen
-                     *   - which is a NWIH for us!
-                     * * 2: clear entire screen and delete all lines saved in
-                     *   scrollback buffer - which is again a NWIH for us...!
-                     */
+                    // ED - Erase in Display: CSI Pn J
                     const int dataLength = spanEnd - spanStart;
                     const QByteArray temp = QByteArray::fromRawData(localBuffer.substr(localBufferPosition, dataLength).c_str(), dataLength);
-                    bool isOk = false;
-                    const int argValue = temp.toInt(&isOk);
-                    if (isOk) {
-                        if (argValue >= 0 && argValue < 3) {
-                            qDebug().noquote().nospace() << "TBuffer::translateToPlainText(...) INFO - ED (erase in display) sequence of form CSI" << temp << "J received,\nrejecting as incompatible with Mudlet.";
-                        } else {
-                            qDebug().noquote().nospace() << "TBuffer::translateToPlainText(...) INFO - Invalid ED (erase in display) sequence of form CSI" << temp << "J received,\nwhich Mudlet will ignore.";
+                    int mode = 0;
+                    if (!temp.isEmpty()) {
+                        bool isOk = false;
+                        mode = temp.toInt(&isOk);
+                        if (!isOk) {
+                            mode = 0;
                         }
+                    }
+
+                    if (mpHost->mEnableVT100 && mode >= 0 && mode <= 2) {
+                        clearScreen(mode);
+                    } else if (mode >= 0 && mode < 3) {
+                        // Legacy behavior: log and ignore
+                        qDebug().noquote().nospace() << "TBuffer::translateToPlainText(...) INFO - ED (erase in display) sequence of form CSI" << temp << "J received,\nrejecting as incompatible with Mudlet (enable VT100 mode in settings to support this).";
                     } else {
-                        qDebug().noquote().nospace() << "TBuffer::translateToPlainText(...) INFO - Unhandled sequence of form CSI..." << temp << "J received, that is supposed to\nbe a ED (erase in display) sequence but it doesn't make sense, Mudlet will ignore it.";
+                        qDebug().noquote().nospace() << "TBuffer::translateToPlainText(...) INFO - Invalid ED (erase in display) sequence of form CSI" << temp << "J received,\nwhich Mudlet will ignore.";
                     }
                 }
                     break;
@@ -1231,7 +1341,37 @@ COMMIT_LINE:
             c.mBgColor = mpHost->mMxpClient.getBgColor();
         }
 
-        if (isTwoTCharsNeeded) {
+        if (mpHost->mEnableVT100 && mVT100.mCursorRow == 0 && !isTwoTCharsNeeded) {
+            const int cursorCol = mVT100.mCursorCol;
+            const int lineLen = mMudLine.length();
+
+            if (cursorCol < lineLen - 1) {
+                QChar appendedChar = mMudLine.back();
+                mMudLine.chop(1);
+                mMudLine[cursorCol] = appendedChar;
+                mMudBuffer[cursorCol] = c;
+            } else if (cursorCol == lineLen - 1) {
+                mMudBuffer.push_back(c);
+            } else {
+                mMudLine.chop(1);
+                const int padCount = cursorCol - mMudLine.length();
+                const TChar spaceChar(mBackGroundColor, mBackGroundColor, TChar::None);
+                for (int i = 0; i < padCount; ++i) {
+                    mMudLine.append(QChar::Space);
+                    mMudBuffer.push_back(spaceChar);
+                }
+                mMudLine.append(QChar::fromLatin1(ch));
+                mMudBuffer.push_back(c);
+            }
+            mVT100.mCursorCol++;
+
+            if (mHyperlinkActive) {
+                if (mCurrentHyperlinkText.isEmpty()) {
+                    mCurrentHyperlinkStartColumn = cursorCol;
+                }
+                mCurrentHyperlinkText += QString(QChar(ch));
+            }
+        } else if (isTwoTCharsNeeded) {
             // CHECK: Do we need to duplicate stuff for mMXP_LINK_MODE - yes I think we do:
             mMudBuffer.push_back(c);
             mMudBuffer.push_back(c);
@@ -1386,7 +1526,11 @@ bool TBuffer::commitLine(char ch, size_t& localBufferPosition)
         mMudBuffer.clear();
         const int line = lineBuffer.size() - 1;
         if (!mSkipTriggerProcessing) {
-            mpHost->mpConsole->runTriggers(line);
+            if (mDeferTriggers && mpHost->mEnableVT100) {
+                mPendingTriggerLines.insert(line);
+            } else {
+                mpHost->mpConsole->runTriggers(line);
+            }
         }
 
         // Only use of TBuffer::wrap(), breaks up new text
@@ -7179,5 +7323,188 @@ void TBuffer::updateLinkCharacters(int linkIndex)
         mpConsole->mUpperPane->repaint();
         mpConsole->mLowerPane->updateScreenView();
         mpConsole->mLowerPane->repaint();
+    }
+}
+
+void TBuffer::setVT100Enabled(bool enabled)
+{
+    mVT100.mEnabled = enabled;
+    if (enabled) {
+        mScreenStartLine = static_cast<int>(buffer.size());
+        mVT100.mCursorRow = 0;
+        mVT100.mCursorCol = 0;
+        mDeferTriggers = true;
+    } else {
+        mDeferTriggers = false;
+        flushPendingTriggers();
+    }
+}
+
+int TBuffer::getScreenRows() const
+{
+    if (mpConsole && mpConsole->mUpperPane) {
+        const QFontMetrics fm(mpConsole->mUpperPane->font());
+        const int fontHeight = fm.height();
+        if (fontHeight > 0) {
+            return mpConsole->mUpperPane->height() / fontHeight;
+        }
+    }
+    return 24;
+}
+
+int TBuffer::getScreenCols() const
+{
+    return mWrapAt > 0 ? mWrapAt : 80;
+}
+
+void TBuffer::clearLineRange(int row, int startCol, int endCol)
+{
+    const TChar spaceChar(mBackGroundColor, mBackGroundColor, TChar::None);
+
+    if (row == 0 && !mMudLine.isEmpty()) {
+        const int lineLength = mMudLine.length();
+        startCol = qMax(0, startCol);
+        endCol = qMin(endCol, lineLength - 1);
+
+        if (startCol > endCol || startCol >= lineLength) {
+            return;
+        }
+
+        for (int col = startCol; col <= endCol; ++col) {
+            mMudLine[col] = QChar::Space;
+            if (col < static_cast<int>(mMudBuffer.size())) {
+                mMudBuffer[col] = spaceChar;
+            }
+        }
+
+        if (endCol >= lineLength - 1) {
+            int lastNonSpace = mMudLine.length() - 1;
+            for (; lastNonSpace >= 0 && mMudLine[lastNonSpace] == QChar::Space; --lastNonSpace) {
+            }
+            mMudLine.truncate(lastNonSpace + 1);
+            for (int i = mMudBuffer.size() - 1; i > lastNonSpace; --i) {
+                mMudBuffer.pop_back();
+            }
+        }
+        return;
+    }
+
+    const int absoluteRow = mScreenStartLine + row;
+    if (absoluteRow < 0 || absoluteRow >= static_cast<int>(buffer.size())) {
+        return;
+    }
+
+    QString& line = lineBuffer[absoluteRow];
+    std::deque<TChar>& charBuffer = buffer[absoluteRow];
+
+    const int lineLength = line.length();
+    startCol = qMax(0, startCol);
+    endCol = qMin(endCol, lineLength - 1);
+
+    if (startCol > endCol || startCol >= lineLength) {
+        return;
+    }
+
+    for (int col = startCol; col <= endCol; ++col) {
+        line[col] = QChar::Space;
+        if (col < static_cast<int>(charBuffer.size())) {
+            charBuffer[col] = spaceChar;
+        }
+    }
+}
+
+void TBuffer::clearScreen(int mode)
+{
+    const int screenRows = getScreenRows();
+    const int screenCols = getScreenCols();
+
+    switch (mode) {
+    case 0:
+        clearLineRange(mVT100.mCursorRow, mVT100.mCursorCol, screenCols - 1);
+        for (int row = mVT100.mCursorRow + 1; row < screenRows; ++row) {
+            clearLineRange(row, 0, screenCols - 1);
+        }
+        break;
+
+    case 1:
+        clearLineRange(mVT100.mCursorRow, 0, mVT100.mCursorCol);
+        for (int row = 0; row < mVT100.mCursorRow; ++row) {
+            clearLineRange(row, 0, screenCols - 1);
+        }
+        break;
+
+    case 2:
+        for (int row = 0; row < screenRows; ++row) {
+            clearLineRange(row, 0, screenCols - 1);
+        }
+        mVT100.mCursorRow = 0;
+        mVT100.mCursorCol = 0;
+        break;
+
+    default:
+        break;
+    }
+}
+
+void TBuffer::flushPendingTriggers()
+{
+    if (!mpConsole || mPendingTriggerLines.isEmpty()) {
+        return;
+    }
+
+    QList<int> sortedLines = mPendingTriggerLines.values();
+    std::sort(sortedLines.begin(), sortedLines.end());
+
+    for (int line : sortedLines) {
+        if (line >= 0 && line < static_cast<int>(lineBuffer.size())) {
+            mpHost->mpConsole->runTriggers(line);
+        }
+    }
+
+    mPendingTriggerLines.clear();
+}
+
+void TBuffer::writeCharAtCursor(QChar ch, const TChar& charFormat)
+{
+    const TChar spaceChar(mBackGroundColor, mBackGroundColor, TChar::None);
+
+    if (mVT100.mCursorRow == 0) {
+        const int col = mVT100.mCursorCol;
+        const int lineLen = mMudLine.length();
+
+        if (col < lineLen) {
+            mMudLine[col] = ch;
+            mMudBuffer[col] = charFormat;
+        } else {
+            const int padCount = col - lineLen;
+            for (int i = 0; i < padCount; ++i) {
+                mMudLine.append(QChar::Space);
+                mMudBuffer.push_back(spaceChar);
+            }
+            mMudLine.append(ch);
+            mMudBuffer.push_back(charFormat);
+        }
+        mVT100.mCursorCol++;
+    } else {
+        const int absoluteRow = mScreenStartLine + mVT100.mCursorRow;
+        if (absoluteRow >= 0 && absoluteRow < static_cast<int>(buffer.size())) {
+            const int col = mVT100.mCursorCol;
+            QString& line = lineBuffer[absoluteRow];
+            std::deque<TChar>& charBuf = buffer[absoluteRow];
+
+            if (col < line.length()) {
+                line[col] = ch;
+                charBuf[col] = charFormat;
+            } else {
+                const int padCount = col - line.length();
+                for (int i = 0; i < padCount; ++i) {
+                    line.append(QChar::Space);
+                    charBuf.push_back(spaceChar);
+                }
+                line.append(ch);
+                charBuf.push_back(charFormat);
+            }
+            mVT100.mCursorCol++;
+        }
     }
 }

@@ -505,6 +505,7 @@ public:
     bool mEnableCHARSET = true;
     bool mEnableNAWS = true;
     bool mEnableNEWENVIRON = true;
+    bool mEnableVT100 = false;
     bool mPromptedForMXPProcessorOn = false;
     bool mAskTlsAvailable = true;
     bool mPromptedForVersionInTTYPE = false;

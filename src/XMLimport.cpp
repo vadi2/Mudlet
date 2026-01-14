@@ -729,6 +729,7 @@ void XMLimport::readHost(Host* pHost)
     setBoolAttributeWithDefault(qsl("mEnableNAWS"), pHost->mEnableNAWS, true);
     setBoolAttributeWithDefault(qsl("mEnableCHARSET"), pHost->mEnableCHARSET, getBoolValueFromLegacyAttributeOrDefault(qsl("mFORCE_CHARSET_NEGOTIATION_OFF"), true, true));
     setBoolAttributeWithDefault(qsl("mEnableNEWENVIRON"), pHost->mEnableNEWENVIRON, getBoolValueFromLegacyAttributeOrDefault(qsl("forceNewEnvironNegotiationOff"), true, true));
+    setBoolAttributeWithDefault(qsl("mEnableVT100"), pHost->mEnableVT100, false);
 
     setBoolAttribute(qsl("autoClearCommandLineAfterSend"), pHost->mAutoClearCommandLineAfterSend);
     setBoolAttributeWithDefault(qsl("disablePasswordMasking"), pHost->mDisablePasswordMasking, false);

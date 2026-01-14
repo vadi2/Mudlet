@@ -1754,6 +1754,10 @@ QString cTelnet::getNewEnvironMTTS()
         terminalStandards |= MTTS_STD_MNES;
     }
 
+    if (mpHost->mEnableVT100) {
+        terminalStandards |= MTTS_STD_VT100;
+    }
+
 #if !defined(QT_NO_SSL)
     terminalStandards |= MTTS_STD_SSL;
 #endif
@@ -4332,6 +4336,11 @@ void cTelnet::gotPrompt(std::string& mud_data)
     }
 
     postData();
+
+    if (mpHost->mEnableVT100 && mpHost->mpConsole) {
+        mpHost->mpConsole->buffer.flushPendingTriggers();
+    }
+
     mMudData = "";
     mIsTimerPosting = false;
 }
@@ -4440,6 +4449,11 @@ void cTelnet::slot_timerPosting()
     }
 
     postData();
+
+    if (mpHost->mEnableVT100 && mpHost->mpConsole) {
+        mpHost->mpConsole->buffer.flushPendingTriggers();
+    }
+
     mMudData = "";
     mIsTimerPosting = false;
     if (mpHost && mpHost->mpConsole) {

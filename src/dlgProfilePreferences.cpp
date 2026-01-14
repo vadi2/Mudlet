@@ -968,6 +968,11 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
     mEnableNEWENVIRON->setChecked(pHost->mEnableNEWENVIRON);
     protocolMenu->addAction(mEnableNEWENVIRON);
 
+    mEnableVT100 = new QAction(tr("VT100: Cursor Positioning"), nullptr);
+    mEnableVT100->setCheckable(true);
+    mEnableVT100->setChecked(pHost->mEnableVT100);
+    protocolMenu->addAction(mEnableVT100);
+
     pushButton_chooseProtocols->setMenu(protocolMenu);
 
     groupBox_purgeMediaCache->setVisible(true);
@@ -2995,6 +3000,7 @@ void dlgProfilePreferences::slot_saveAndClose()
         pHost->mEnableNAWS = mEnableNAWS->isChecked();
         pHost->mEnableCHARSET = mEnableCHARSET->isChecked();
         pHost->mEnableNEWENVIRON = mEnableNEWENVIRON->isChecked();
+        pHost->mEnableVT100 = mEnableVT100->isChecked();
         pHost->mMapperUseAntiAlias = mMapperUseAntiAlias->isChecked();
         pHost->mMapperShowRoomBorders = checkbox_mMapperShowRoomBorders->isChecked();
         mudlet::self()->mDrawUpperLowerLevels = checkBox_drawUpperLowerLevels->isChecked();

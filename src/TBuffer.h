@@ -184,6 +184,14 @@ struct HyperlinkStyling {
 
 } // namespace Mudlet
 
+struct VT100State {
+    bool mEnabled = false;
+    int mCursorRow = 0;
+    int mCursorCol = 0;
+    int mSavedCursorRow = 0;
+    int mSavedCursorCol = 0;
+};
+
 class WrapInfo
 {
     friend class TBuffer;
@@ -489,6 +497,15 @@ public:
     void logRemainingOutput();
     void appendLog(const QString &text);
 
+    void setVT100Enabled(bool enabled);
+    bool isVT100Enabled() const { return mVT100.mEnabled; }
+    void clearLineRange(int row, int startCol, int endCol);
+    void clearScreen(int mode);
+    void flushPendingTriggers();
+    int getScreenRows() const;
+    int getScreenCols() const;
+    void writeCharAtCursor(QChar ch, const TChar& charFormat);
+
     // OSC 8 hyperlink documentation examples - triggered by secret phrase
     void injectOSC8DocumentationExamples();
 
@@ -680,6 +697,11 @@ private:
 
     // Track links that need selection styling applied after buffer commit
     QSet<int> mPendingSelectionStyling;
+
+    VT100State mVT100;
+    int mScreenStartLine = 0;
+    bool mDeferTriggers = false;
+    QSet<int> mPendingTriggerLines;
 
 public:
     // Methods for link state management (used by TTextEdit event handlers)

@@ -237,6 +237,7 @@ private:
     QPointer<QAction> mEnableNAWS;
     QPointer<QAction> mEnableCHARSET;
     QPointer<QAction> mEnableNEWENVIRON;
+    QPointer<QAction> mEnableVT100;
 
     QString mLogDirPath;
     // Needed to remember the state on construction so that we can sent the same
