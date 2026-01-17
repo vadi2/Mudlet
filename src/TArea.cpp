@@ -990,6 +990,25 @@ void TArea::set2DMapZoom(const qreal zoom)
     }
 }
 
+bool TArea::isZLevelVisibleInViewport(int z, qreal viewMinX, qreal viewMaxX, qreal viewMinY, qreal viewMaxY) const
+{
+    if (!xminForZ.contains(z)) {
+        return false;
+    }
+
+    const qreal zMinX = xminForZ.value(z);
+    const qreal zMaxX = xmaxForZ.value(z);
+    const qreal zMinY = yminForZ.value(z);
+    const qreal zMaxY = ymaxForZ.value(z);
+
+    const bool isVisible = !(zMaxX < viewMinX || zMinX > viewMaxX || zMaxY < viewMinY || zMinY > viewMaxY);
+    if (!isVisible) {
+        qDebug() << "TArea: z-level" << z << "bounds (x:" << zMinX << "-" << zMaxX << ", y:" << zMinY << "-" << zMaxY
+                 << ") outside viewport (x:" << viewMinX << "-" << viewMaxX << ", y:" << viewMinY << "-" << viewMaxY << ")";
+    }
+    return isVisible;
+}
+
 void TArea::clean()
 {
     if (mIsDirty) {
