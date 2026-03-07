@@ -4252,8 +4252,8 @@ void cTelnet::postMessage(QString msg)
                     mpHost->mpConsole->print(body.join('\n').append('\n'), QColor(190, 100, 50), mpHost->mBgColor); // Orange-ish
                 }
             } else if (prefix.contains(tr("CHAT")) || prefix.contains(QLatin1String("CHAT"))) {
-                mpHost->mpConsole->print(prefix, QColor(255, 255, 50), mpHost->mBgColor);                   // Bright yellow
-                mpHost->mpConsole->print(firstLineTail.append('\n'), QColor(0, 160, 0), mpHost->mBgColor);  // Light Green
+                mpHost->mpConsole->print(prefix, QColor(255, 255, 50), mpHost->mBgColor);                  // Bright yellow
+                mpHost->mpConsole->print(firstLineTail.append('\n'), QColor(0, 160, 0), mpHost->mBgColor); // Light Green
                 for (int _i = 0; _i < body.size(); ++_i) {
                     QString temp = body.at(_i);
                     temp.replace('\t', QLatin1String("        "));
@@ -4724,8 +4724,6 @@ void cTelnet::processSocketData(char* in_buffer, int amount, const bool loopback
     // TODO: https://github.com/Mudlet/Mudlet/issues/5780 (3 of 7) - investigate switching from using `char[]` to `std::array<char>`
     char out_buffer[BUFFER_SIZE + 10];
 
-    in_buffer[amount + 1] = '\0';
-
     if (amount == -1) {
         return;
     }
@@ -4733,6 +4731,8 @@ void cTelnet::processSocketData(char* in_buffer, int amount, const bool loopback
     if (amount == 0) {
         return;
     }
+
+    in_buffer[amount] = '\0';
 
     std::string cleandata;
     // Pre-allocate for worst case: decompressed data can be much larger than input
