@@ -139,6 +139,9 @@ TDetachedWindow::~TDetachedWindow()
     }
 
     mDockWidgetMap.clear();
+    // Null out mpMapDockWidget since its dock widget was already scheduled for
+    // deletion in the loop above — it's a raw pointer so won't self-clear
+    mpMapDockWidget = nullptr;
 
     if (mpMapDockWidget) {
         // Restore main mapper if this detached window had an active map
