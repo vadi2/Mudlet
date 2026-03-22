@@ -2014,6 +2014,7 @@ void mudlet::closeHost(const QString& name)
 
     mpTabBar->removeTab(name);
     // PLACEMARKER: Host destruction (1) - from all sources
+    mDiscord.resetData(pH);
     int hostCount = mHostManager.getHostCount();
     emit signal_hostDestroyed(pH, --hostCount);
     // This is what kills the Host instance:
@@ -4767,6 +4768,7 @@ mudlet::~mudlet()
 
     if (mpHunspell_sharedDictionary) {
         saveDictionary(getMudletPath(enums::mainDataItemPath, qsl("mudlet")), mWordSet_shared);
+        Hunspell_destroy(mpHunspell_sharedDictionary);
         mpHunspell_sharedDictionary = nullptr;
     }
     if (!mTranslatorsLoadedList.isEmpty()) {
