@@ -51,7 +51,7 @@ std::pair<bool, QString> TLuaInterpreter::aiEnabled(lua_State* L)
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#aiChat
 int TLuaInterpreter::aiChat(lua_State* L)
 {
-    auto& host = getHostFromLua(L);
+    QPointer<Host> pHost = &getHostFromLua(L);
     mudlet* pMudlet = mudlet::self();
 
     auto result = aiEnabled(L);
@@ -118,7 +118,11 @@ int TLuaInterpreter::aiChat(lua_State* L)
     auto* aiManager = pMudlet->getAIManager();
 
     // Always use event-based approach (async)
-    aiManager->chatCompletion(request, [&host, eventName](const LlamafileManager::ApiResponse& response) {
+    aiManager->chatCompletion(request, [pHost, eventName](const LlamafileManager::ApiResponse& response) {
+        if (!pHost) {
+            return;
+        }
+
         TEvent event{};
 
         // Add event name as first argument
@@ -148,7 +152,7 @@ int TLuaInterpreter::aiChat(lua_State* L)
         event.mArgumentList.append(content);
         event.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
 
-        host.raiseEvent(event);
+        pHost->raiseEvent(event);
     });
 
     lua_pushboolean(L, true);
@@ -158,7 +162,7 @@ int TLuaInterpreter::aiChat(lua_State* L)
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#aiPrompt
 int TLuaInterpreter::aiPrompt(lua_State* L)
 {
-    auto& host = getHostFromLua(L);
+    QPointer<Host> pHost = &getHostFromLua(L);
     mudlet* pMudlet = mudlet::self();
 
     auto result = aiEnabled(L);
@@ -212,7 +216,11 @@ int TLuaInterpreter::aiPrompt(lua_State* L)
 
     auto* aiManager = pMudlet->getAIManager();
 
-    aiManager->textCompletion(request, [&host, eventName](const LlamafileManager::ApiResponse& response) {
+    aiManager->textCompletion(request, [pHost, eventName](const LlamafileManager::ApiResponse& response) {
+        if (!pHost) {
+            return;
+        }
+
         TEvent event{};
 
         // Add event name as first argument
@@ -243,7 +251,7 @@ int TLuaInterpreter::aiPrompt(lua_State* L)
         event.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
 
         qDebug() << "event for aiPrompt:" << event;
-        host.raiseEvent(event);
+        pHost->raiseEvent(event);
     });
 
     lua_pushboolean(L, true);
@@ -253,7 +261,7 @@ int TLuaInterpreter::aiPrompt(lua_State* L)
 // Documentation: https://wiki.mudlet.org/w/Manual:Lua_Functions#aiPromptStream
 int TLuaInterpreter::aiPromptStream(lua_State* L)
 {
-    auto& host = getHostFromLua(L);
+    QPointer<Host> pHost = &getHostFromLua(L);
     mudlet* pMudlet = mudlet::self();
 
     auto result = aiEnabled(L);
@@ -311,7 +319,11 @@ int TLuaInterpreter::aiPromptStream(lua_State* L)
     aiManager->textCompletionStream(
             request,
             // Chunk callback - fired for each streaming chunk
-            [&host, eventName](const QString& chunk, bool isComplete) {
+            [pHost, eventName](const QString& chunk, bool isComplete) {
+                if (!pHost) {
+                    return;
+                }
+
                 TEvent event{};
 
                 // Add event name as first argument
@@ -344,10 +356,14 @@ int TLuaInterpreter::aiPromptStream(lua_State* L)
                 event.mArgumentList.append(content);
                 event.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
 
-                host.raiseEvent(event);
+                pHost->raiseEvent(event);
             },
             // Error callback - fired on error
-            [&host, eventName](const QString& error) {
+            [pHost, eventName](const QString& error) {
+                if (!pHost) {
+                    return;
+                }
+
                 TEvent event{};
 
                 // Add event name as first argument
@@ -370,7 +386,7 @@ int TLuaInterpreter::aiPromptStream(lua_State* L)
                 event.mArgumentList.append(QString());
                 event.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
 
-                host.raiseEvent(event);
+                pHost->raiseEvent(event);
             });
 
     lua_pushboolean(L, true);
