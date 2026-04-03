@@ -98,13 +98,8 @@ dlgProfilePreferences::dlgProfilePreferences(QWidget* pParentWidget, Host* pHost
     groupBox_discordPrivacy->hide();
 
     connect(comboBox_discordMode, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
-        const bool enablePrivacy = (index == static_cast<int>(Host::DiscordShowGameDetails));
-        comboBox_discordLargeIconPrivacy->setEnabled(enablePrivacy);
-        comboBox_discordSmallIconPrivacy->setEnabled(enablePrivacy);
-        checkBox_discordServerAccessToDetail->setEnabled(enablePrivacy);
-        checkBox_discordServerAccessToState->setEnabled(enablePrivacy);
-        checkBox_discordServerAccessToPartyInfo->setEnabled(enablePrivacy);
-        checkBox_discordServerAccessToTimerInfo->setEnabled(enablePrivacy);
+        const bool showPrivacy = (index == static_cast<int>(Host::DiscordShowGameDetails));
+        widget_discordPrivacyOptions->setVisible(showPrivacy);
     });
 
     // As we demonstrate the options that these next two checkboxes control in
@@ -860,13 +855,7 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
         Host::DiscordOptionFlags const discordFlags = pHost->mDiscordAccessFlags;
         groupBox_discordPrivacy->show();
 
-        const bool enablePrivacy = (pHost->mDiscordMode == Host::DiscordShowGameDetails);
-        comboBox_discordLargeIconPrivacy->setEnabled(enablePrivacy);
-        comboBox_discordSmallIconPrivacy->setEnabled(enablePrivacy);
-        checkBox_discordServerAccessToDetail->setEnabled(enablePrivacy);
-        checkBox_discordServerAccessToState->setEnabled(enablePrivacy);
-        checkBox_discordServerAccessToPartyInfo->setEnabled(enablePrivacy);
-        checkBox_discordServerAccessToTimerInfo->setEnabled(enablePrivacy);
+        widget_discordPrivacyOptions->setVisible(pHost->mDiscordMode == Host::DiscordShowGameDetails);
 
         if ((discordFlags & Host::DiscordSetLargeIcon) && (discordFlags & Host::DiscordSetLargeIconText)) {
             comboBox_discordLargeIconPrivacy->setCurrentIndex(0);
@@ -884,10 +873,10 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
             comboBox_discordSmallIconPrivacy->setCurrentIndex(2);
         }
 
-        checkBox_discordServerAccessToDetail->setChecked(!(discordFlags & Host::DiscordSetDetail));
-        checkBox_discordServerAccessToState->setChecked(!(discordFlags & Host::DiscordSetState));
-        checkBox_discordServerAccessToPartyInfo->setChecked(!(discordFlags & Host::DiscordSetPartyInfo));
-        checkBox_discordServerAccessToTimerInfo->setChecked(!(discordFlags & Host::DiscordSetTimeInfo));
+        checkBox_discordServerAccessToDetail->setChecked(discordFlags & Host::DiscordSetDetail);
+        checkBox_discordServerAccessToState->setChecked(discordFlags & Host::DiscordSetState);
+        checkBox_discordServerAccessToPartyInfo->setChecked(discordFlags & Host::DiscordSetPartyInfo);
+        checkBox_discordServerAccessToTimerInfo->setChecked(discordFlags & Host::DiscordSetTimeInfo);
         lineEdit_discordUserName->setText(pHost->mRequiredDiscordUserName);
         const QString currentDiscordUser = Discord::getLoggedInUserName();
         if (!currentDiscordUser.isEmpty()) {
@@ -1309,7 +1298,7 @@ void dlgProfilePreferences::initWithHost(Host* pHost)
                         break;
                     default: {
                     } // There are a significant number of other errors
-                        // that are not handled here!
+                    // that are not handled here!
                     }
                 }
             }
@@ -1683,10 +1672,10 @@ void dlgProfilePreferences::clearHostDetails()
     comboBox_discordMode->setCurrentIndex(static_cast<int>(Host::DiscordShowGameDetails));
     comboBox_discordLargeIconPrivacy->setCurrentIndex(0);
     comboBox_discordSmallIconPrivacy->setCurrentIndex(0);
-    checkBox_discordServerAccessToDetail->setChecked(false);
-    checkBox_discordServerAccessToState->setChecked(false);
-    checkBox_discordServerAccessToPartyInfo->setChecked(false);
-    checkBox_discordServerAccessToTimerInfo->setChecked(false);
+    checkBox_discordServerAccessToDetail->setChecked(true);
+    checkBox_discordServerAccessToState->setChecked(true);
+    checkBox_discordServerAccessToPartyInfo->setChecked(true);
+    checkBox_discordServerAccessToTimerInfo->setChecked(true);
     lineEdit_discordUserName->clear();
     label_discordCurrentUser->clear();
 
@@ -3205,10 +3194,10 @@ void dlgProfilePreferences::slot_saveAndClose()
         pHost->mDiscordAccessFlags = static_cast<Host::DiscordOptionFlags>(
                 (hideLargeIcon ? Host::DiscordNoOption : Host::DiscordSetLargeIcon) | (hideLargeIconText ? Host::DiscordNoOption : Host::DiscordSetLargeIconText)
                 | (hideSmallIcon ? Host::DiscordNoOption : Host::DiscordSetSmallIcon) | (hideSmallIconText ? Host::DiscordNoOption : Host::DiscordSetSmallIconText)
-                | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordNoOption : Host::DiscordSetDetail)
-                | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordNoOption : Host::DiscordSetState)
-                | (checkBox_discordServerAccessToPartyInfo->isChecked() ? Host::DiscordNoOption : Host::DiscordSetPartyInfo)
-                | (checkBox_discordServerAccessToTimerInfo->isChecked() ? Host::DiscordNoOption : Host::DiscordSetTimeInfo));
+                | (checkBox_discordServerAccessToDetail->isChecked() ? Host::DiscordSetDetail : Host::DiscordNoOption)
+                | (checkBox_discordServerAccessToState->isChecked() ? Host::DiscordSetState : Host::DiscordNoOption)
+                | (checkBox_discordServerAccessToPartyInfo->isChecked() ? Host::DiscordSetPartyInfo : Host::DiscordNoOption)
+                | (checkBox_discordServerAccessToTimerInfo->isChecked() ? Host::DiscordSetTimeInfo : Host::DiscordNoOption));
 
         pHost->setDiscordMode(static_cast<Host::DiscordMode>(comboBox_discordMode->currentIndex()));
 
@@ -3224,7 +3213,7 @@ void dlgProfilePreferences::slot_saveAndClose()
         bool ok;
         quint16 port = lineEdit_mmcpPort->text().toUShort(&ok);
         pHost->mMMCPChatPort = ok ? port : csDefaultMMCPHostPort;
-        
+
         /* Possible inclusion in 4.21
         pHost->mMMCPAutostartServer = checkBox_mmcpAutostartServer->isChecked();
         pHost->mMMCPAutoAcceptCalls = checkBox_mmcpAutoAcceptCalls->isChecked();

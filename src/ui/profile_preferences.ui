@@ -3451,9 +3451,19 @@ you can use it but there could be issues with aligning columns of text</string>
          <property name="title">
           <string>Discord Rich Presence</string>
          </property>
-         <layout class="QGridLayout" name="gridLayout_groupBox_discordRichPresence">
-          <item row="0" column="0">
-           <layout class="QHBoxLayout">
+         <layout class="QVBoxLayout" name="verticalLayout_groupBox_discordRichPresence">
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_discordMode">
+            <item>
+             <widget class="QLabel" name="label_discordMode">
+              <property name="text">
+               <string>Mode:</string>
+              </property>
+              <property name="buddy">
+               <cstring>comboBox_discordMode</cstring>
+              </property>
+             </widget>
+            </item>
             <item>
              <widget class="QComboBox" name="comboBox_discordMode">
               <property name="sizePolicy">
@@ -3509,7 +3519,7 @@ you can use it but there could be issues with aligning columns of text</string>
                <item>
                 <widget class="QLabel" name="label_discordUserName">
                  <property name="text">
-                  <string>Restrict to:</string>
+                  <string>Only for user:</string>
                  </property>
                  <property name="buddy">
                   <cstring>lineEdit_discordUserName</cstring>
@@ -3572,102 +3582,142 @@ you can use it but there could be issues with aligning columns of text</string>
             </item>
            </layout>
           </item>
-          <item row="0" column="1">
-           <widget class="QComboBox" name="comboBox_discordLargeIconPrivacy">
-            <property name="sizeAdjustPolicy">
-             <enum>QComboBox::SizeAdjustPolicy::AdjustToContents</enum>
-            </property>
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <item>
-             <property name="text">
-              <string>Don't hide large icon or tooltip</string>
+          <item>
+           <widget class="QWidget" name="widget_discordPrivacyOptions" native="true">
+            <layout class="QGridLayout" name="gridLayout_discordPrivacy">
+             <property name="leftMargin">
+              <number>0</number>
              </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide large icon tooltip</string>
+             <property name="topMargin">
+              <number>0</number>
              </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide large icon and tooltip</string>
+             <property name="rightMargin">
+              <number>0</number>
              </property>
-            </item>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <layout class="QHBoxLayout">
-            <item>
-             <widget class="QCheckBox" name="checkBox_discordServerAccessToDetail">
-              <property name="text">
-               <string>Hide detail</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="checkBox_discordServerAccessToState">
-              <property name="text">
-               <string>Hide state</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="checkBox_discordServerAccessToPartyInfo">
-              <property name="text">
-               <string>Hide party details</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="checkBox_discordServerAccessToTimerInfo">
-              <property name="text">
-               <string>Hide timer</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <spacer>
-              <property name="orientation">
-               <enum>Qt::Orientation::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>20</width>
-                <height>20</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-           </layout>
-          </item>
-          <item row="1" column="1">
-           <widget class="QComboBox" name="comboBox_discordSmallIconPrivacy">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <item>
-             <property name="text">
-              <string>Don't hide small icon or tooltip</string>
+             <property name="bottomMargin">
+              <number>0</number>
              </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide small icon tooltip</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Hide small icon and tooltip</string>
-             </property>
-            </item>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_discordLargeIcon">
+               <property name="text">
+                <string>Large icon:</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+               </property>
+               <property name="buddy">
+                <cstring>comboBox_discordLargeIconPrivacy</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QComboBox" name="comboBox_discordLargeIconPrivacy">
+               <property name="sizeAdjustPolicy">
+                <enum>QComboBox::SizeAdjustPolicy::AdjustToContents</enum>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <item>
+                <property name="text">
+                 <string>Show icon and tooltip</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Show icon, hide tooltip</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Hide icon and tooltip</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <widget class="QCheckBox" name="checkBox_discordServerAccessToDetail">
+               <property name="text">
+                <string>Show detail text</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="3">
+              <widget class="QCheckBox" name="checkBox_discordServerAccessToState">
+               <property name="text">
+                <string>Show state text</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_discordSmallIcon">
+               <property name="text">
+                <string>Small icon:</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+               </property>
+               <property name="buddy">
+                <cstring>comboBox_discordSmallIconPrivacy</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QComboBox" name="comboBox_discordSmallIconPrivacy">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <item>
+                <property name="text">
+                 <string>Show icon and tooltip</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Show icon, hide tooltip</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>Hide icon and tooltip</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item row="1" column="2">
+              <widget class="QCheckBox" name="checkBox_discordServerAccessToPartyInfo">
+               <property name="text">
+                <string>Show party info</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="3">
+              <widget class="QCheckBox" name="checkBox_discordServerAccessToTimerInfo">
+               <property name="text">
+                <string>Show elapsed time</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="4">
+              <spacer>
+               <property name="orientation">
+                <enum>Qt::Orientation::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
            </widget>
           </item>
          </layout>
