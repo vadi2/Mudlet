@@ -3623,12 +3623,12 @@ you can use it but there could be issues with aligning columns of text</string>
                </property>
                <item>
                 <property name="text">
-                 <string>Show icon and tooltip</string>
+                 <string>Show all</string>
                 </property>
                </item>
                <item>
                 <property name="text">
-                 <string>Show icon, hide tooltip</string>
+                 <string>Hide tooltip</string>
                 </property>
                </item>
                <item>
@@ -3641,14 +3641,14 @@ you can use it but there could be issues with aligning columns of text</string>
              <item row="0" column="2">
               <widget class="QCheckBox" name="checkBox_discordServerAccessToDetail">
                <property name="text">
-                <string>Show detail text</string>
+                <string>Hide detail text</string>
                </property>
               </widget>
              </item>
              <item row="0" column="3">
               <widget class="QCheckBox" name="checkBox_discordServerAccessToState">
                <property name="text">
-                <string>Show state text</string>
+                <string>Hide state text</string>
                </property>
               </widget>
              </item>
@@ -3675,12 +3675,12 @@ you can use it but there could be issues with aligning columns of text</string>
                </property>
                <item>
                 <property name="text">
-                 <string>Show icon and tooltip</string>
+                 <string>Show all</string>
                 </property>
                </item>
                <item>
                 <property name="text">
-                 <string>Show icon, hide tooltip</string>
+                 <string>Hide tooltip</string>
                 </property>
                </item>
                <item>
@@ -3693,14 +3693,14 @@ you can use it but there could be issues with aligning columns of text</string>
              <item row="1" column="2">
               <widget class="QCheckBox" name="checkBox_discordServerAccessToPartyInfo">
                <property name="text">
-                <string>Show party info</string>
+                <string>Hide party info</string>
                </property>
               </widget>
              </item>
              <item row="1" column="3">
               <widget class="QCheckBox" name="checkBox_discordServerAccessToTimerInfo">
                <property name="text">
-                <string>Show elapsed time</string>
+                <string>Hide elapsed time</string>
                </property>
               </widget>
              </item>
