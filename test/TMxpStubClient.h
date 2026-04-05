@@ -20,266 +20,215 @@
 #ifndef MUDLET_TEST_TMXPSTUBCLIENT_H
 #define MUDLET_TEST_TMXPSTUBCLIENT_H
 
-#include <qdebug.h>
-#include "TMxpContext.h"
-#include "TMxpClient.h"
 #include "TMediaData.h"
+#include "TMxpClient.h"
+#include "TMxpContext.h"
+#include <qdebug.h>
 
 class TMxpStubContext : public TMxpContext {
 public:
-    TMxpElementRegistry mElementRegistry;
-    QMap<QString, QVector<QString>> mSupportedElements;
-    TEntityResolver mEntityResolver;
+  TMxpElementRegistry mElementRegistry;
+  QMap<QString, QVector<QString>> mSupportedElements;
+  TEntityResolver mEntityResolver;
 
-    TMxpElementRegistry& getElementRegistry() override
-    {
-        return mElementRegistry;
-    }
-    QMap<QString, QVector<QString>>& getSupportedElements() override
-    {
-        return mSupportedElements;
-    }
+  TMxpElementRegistry &getElementRegistry() override {
+    return mElementRegistry;
+  }
+  QMap<QString, QVector<QString>> &getSupportedElements() override {
+    return mSupportedElements;
+  }
 
-    TMxpTagHandlerResult handleTag(TMxpContext& ctx, TMxpClient& client, MxpTag* tag) override
-    {
-        return MXP_TAG_HANDLED;
-    }
+  TMxpTagHandlerResult handleTag(TMxpContext &ctx, TMxpClient &client,
+                                 MxpTag *tag) override {
+    return MXP_TAG_HANDLED;
+  }
 
-    void handleContent(char ch) override
-    {
+  void handleContent(char ch) override {}
 
-    }
+  TMxpTagHandler &getMainHandler() override { return *this; }
 
-    TMxpTagHandler& getMainHandler() override
-    {
-        return *this;
-    }
-
-    TEntityResolver& getEntityResolver() override
-    {
-        return mEntityResolver;
-    }
+  TEntityResolver &getEntityResolver() override { return mEntityResolver; }
 };
 
 class TMxpStubClient : public TMxpClient {
 public:
-    QString version = "Stub-1.0";
-    bool linkMode;
+  QString version = "Stub-1.0";
+  bool linkMode;
 
-    QString sentToServer;
+  QString sentToServer;
 
-    QString fgColor, bgColor;
+  QString fgColor, bgColor;
 
-    QStringList mHrefs, mHints;
+  QStringList mHrefs, mHints;
 
-    QString mExpireName;
+  QString mLinkFunctionName;
+  QStringList mLinkFunctionArgs;
 
-    QString mPublishedEntityName, mPublishedEntityValue;
+  QString mExpireName;
 
-    QString style;
+  QString mPublishedEntityName, mPublishedEntityValue;
 
-    // Count how many of this format have been stacked/applied on top of each other
-    unsigned int boldCounter = 0;
-    unsigned int italicCounter = 0;
-    unsigned int underlineCounter = 0;
-    unsigned int strikeOutCounter = 0;
+  QString style;
 
-    QString getVersion() override
-    {
-        return version;
+  // Count how many of this format have been stacked/applied on top of each
+  // other
+  unsigned int boldCounter = 0;
+  unsigned int italicCounter = 0;
+  unsigned int underlineCounter = 0;
+  unsigned int strikeOutCounter = 0;
+
+  QString getVersion() override { return version; }
+
+  void sendToServer(QString &str) override { sentToServer.append(str); }
+  void setLinkMode(bool val) override { this->linkMode = val; }
+  void setFlag(const QString &elementName, const QMap<QString, QString> &params,
+               const QString &content) override {}
+  void pushColor(const QString &fgColor, const QString &bgColor) override {
+    this->fgColor = fgColor;
+    this->bgColor = bgColor;
+  }
+  void popColor() override {
+    fgColor.clear();
+    bgColor.clear();
+  }
+  void pushFont(const QString &fontFace, const QString &fontSize) override {}
+  void popFont() override {}
+
+  void setBold(bool bold) override {
+    if (bold) {
+      boldCounter++;
+    } else if (boldCounter > 0) {
+      boldCounter--;
     }
+  }
 
-    void sendToServer(QString& str) override
-    {
-        sentToServer.append(str);
+  void setItalic(bool italic) override {
+    if (italic) {
+      italicCounter++;
+    } else if (italicCounter > 0) {
+      italicCounter--;
     }
-    void setLinkMode(bool val) override
-    {
-        this->linkMode = val;
-    }
-    void setFlag(const QString& elementName, const QMap<QString, QString>& params, const QString& content) override
-    {
+  }
 
+  void setUnderline(bool underline) override {
+    if (underline) {
+      underlineCounter++;
+    } else if (underlineCounter > 0) {
+      underlineCounter--;
     }
-    void pushColor(const QString& fgColor, const QString& bgColor) override
-    {
-        this->fgColor = fgColor;
-        this->bgColor = bgColor;
-    }
-    void popColor() override
-    {
-        fgColor.clear();
-        bgColor.clear();
-    }
-    void pushFont(const QString& fontFace, const QString& fontSize) override
-    {
+  }
 
+  void setStrikeOut(bool strikeOut) override {
+    if (strikeOut) {
+      strikeOutCounter++;
+    } else if (strikeOutCounter > 0) {
+      strikeOutCounter--;
     }
-    void popFont() override
-    {
+  }
 
-    }
+  bool bold() override { return boldCounter > 0; }
+  bool italic() override { return italicCounter > 0; }
+  bool underline() override { return underlineCounter > 0; }
+  bool strikeOut() override { return strikeOutCounter > 0; }
 
-    void setBold(bool bold) override
-    {
-        if (bold) {
-            boldCounter++;
-        } else if (boldCounter > 0) {
-            boldCounter--;
-        }
-    }
+  void resetTextProperties() override {}
 
-    void setItalic(bool italic) override
-    {
-        if (italic) {
-            italicCounter++;
-        } else if (italicCounter > 0) {
-            italicCounter--;
-        }
-    }
+  void setStyle(const QString &val) override { style = val; }
+  QString getStyle() override { return style; }
 
-    void setUnderline(bool underline) override
-    {
-        if (underline) {
-            underlineCounter++;
-        } else if (underlineCounter > 0) {
-            underlineCounter--;
-        }
-    }
+  int setLink(const QStringList &hrefs, const QStringList &hints) override {
+    mHrefs = hrefs;
+    mHints = hints;
 
-    void setStrikeOut(bool strikeOut) override
-    {
-        if (strikeOut) {
-            strikeOutCounter++;
-        } else if (strikeOutCounter > 0) {
-            strikeOutCounter--;
-        }
-    }
+    return 1;
+  }
 
-    bool bold() override
-    {
-        return boldCounter > 0;
-    }
-    bool italic() override
-    {
-        return italicCounter > 0;
-    }
-    bool underline() override
-    {
-        return underlineCounter > 0;
-    }
-    bool strikeOut() override
-    {
-        return strikeOutCounter > 0;
-    }
+  int setLink(const QStringList &hrefs, const QStringList &hints,
+              const QString &expireName) override {
+    mHrefs = hrefs;
+    mHints = hints;
+    mExpireName = expireName;
 
-    void resetTextProperties() override
-    {
+    return 1;
+  }
+
+  int setLinkFunction(const QString &functionName, const QStringList &args,
+                      const QStringList &hints,
+                      const QString &expireName = QString()) override {
+    mLinkFunctionName = functionName;
+    mLinkFunctionArgs = args;
+    mHrefs = args;
+    mHints = hints;
+    if (!expireName.isEmpty()) {
+      mExpireName = expireName;
     }
+    return 1;
+  }
 
-    void setStyle(const QString& val) override
-    {
-        style = val;
-    }
-    QString getStyle() override
-    {
-        return style;
-    }
+  void expireLinks(const QString &expireName) override {
+    qDebug().noquote() << qsl("expireLinks([%1])").arg(expireName);
+  }
 
-    int setLink(const QStringList& hrefs, const QStringList& hints) override
-    {
-        mHrefs = hrefs;
-        mHints = hints;
+  bool getLink(int id, QStringList **href, QStringList **hint) override {
+    *href = &mHrefs;
+    *hint = &mHints;
 
-        return 1;
-    }
+    return true;
+  }
 
-    int setLink(const QStringList& hrefs, const QStringList& hints, const QString& expireName) override
-    {
-        mHrefs = hrefs;
-        mHints = hints;
-        mExpireName = expireName;
+  void playMedia(TMediaData &mediaData) override {}
 
-        return 1;
-    }
+  void stopMedia(TMediaData &mediaData) override {}
 
-    void expireLinks(const QString& expireName) override
-    {
-        qDebug().noquote() << qsl("expireLinks([%1])").arg(expireName);
-    }
+  void publishEntity(const QString &name, const QString &value) override {
+    qDebug().noquote() << qsl("publishEntity([%1], [%2])").arg(name, value);
+    mPublishedEntityName = name;
+    mPublishedEntityValue = value;
+  }
 
-    bool getLink(int id, QStringList** href, QStringList** hint) override
-    {
-        *href = &mHrefs;
-        *hint = &mHints;
+  void setVariable(const QString &name, const QString &value) override {}
 
-        return true;
-    }
+  // MXP Frame/Dest tracking
+  bool createMxpFrameCalled = false;
+  QString lastCreatedFrameName;
+  QMap<QString, QString> lastFrameAttributes;
 
-    void playMedia(TMediaData& mediaData) override
-    {
+  bool setMxpDestinationCalled = false;
+  QString lastDestinationName;
+  bool lastDestinationEol = false;
+  bool lastDestinationEof = false;
 
-    }
+  bool clearMxpDestinationCalled = false;
 
-    void stopMedia(TMediaData& mediaData) override
-    {
+  bool createMxpFrame(const QString &name,
+                      const QMap<QString, QString> &attributes) override {
+    createMxpFrameCalled = true;
+    lastCreatedFrameName = name;
+    lastFrameAttributes = attributes;
+    return false;
+  }
 
-    }
+  bool setMxpDestination(const QString &frameName, bool eol,
+                         bool eof) override {
+    setMxpDestinationCalled = true;
+    lastDestinationName = frameName;
+    lastDestinationEol = eol;
+    lastDestinationEof = eof;
+    return false;
+  }
 
-    void publishEntity(const QString& name, const QString& value) override
-    {
-        qDebug().noquote() << qsl("publishEntity([%1], [%2])").arg(name, value);
-        mPublishedEntityName = name;
-        mPublishedEntityValue = value;
-    }
+  void clearMxpDestination() override { clearMxpDestinationCalled = true; }
 
-    void setVariable(const QString& name, const QString& value) override {}
-
-    // MXP Frame/Dest tracking
-    bool createMxpFrameCalled = false;
-    QString lastCreatedFrameName;
-    QMap<QString, QString> lastFrameAttributes;
-    
-    bool setMxpDestinationCalled = false;
-    QString lastDestinationName;
-    bool lastDestinationEol = false;
-    bool lastDestinationEof = false;
-    
-    bool clearMxpDestinationCalled = false;
-    
-    bool createMxpFrame(const QString& name, const QMap<QString, QString>& attributes) override
-    {
-        createMxpFrameCalled = true;
-        lastCreatedFrameName = name;
-        lastFrameAttributes = attributes;
-        return false;
-    }
-    
-    bool setMxpDestination(const QString& frameName, bool eol, bool eof) override
-    {
-        setMxpDestinationCalled = true;
-        lastDestinationName = frameName;
-        lastDestinationEol = eol;
-        lastDestinationEof = eof;
-        return false;
-    }
-    
-    void clearMxpDestination() override
-    {
-        clearMxpDestinationCalled = true;
-    }
-    
-    void resetMxpTracking()
-    {
-        createMxpFrameCalled = false;
-        lastCreatedFrameName.clear();
-        lastFrameAttributes.clear();
-        setMxpDestinationCalled = false;
-        lastDestinationName.clear();
-        lastDestinationEol = false;
-        lastDestinationEof = false;
-        clearMxpDestinationCalled = false;
-    }
+  void resetMxpTracking() {
+    createMxpFrameCalled = false;
+    lastCreatedFrameName.clear();
+    lastFrameAttributes.clear();
+    setMxpDestinationCalled = false;
+    lastDestinationName.clear();
+    lastDestinationEol = false;
+    lastDestinationEof = false;
+    clearMxpDestinationCalled = false;
+  }
 };
 
-#endif //MUDLET_TEST_TMXPSTUBCLIENT_H
+#endif // MUDLET_TEST_TMXPSTUBCLIENT_H

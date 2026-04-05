@@ -19,15 +19,32 @@
 
 #include "TMxpMudlet.h"
 #include "Host.h"
+#include "TLuaInterpreter.h"
 #include "TMedia.h"
 #include "TConsole.h"
 #include "TLinkStore.h"
+
+extern "C" {
+#include <lauxlib.h>
+#include <lua.h>
+#include <lualib.h>
+}
 
 #include <QSet>
 #include <QStack>
 
 static const QString PLACEHOLDER_TEXT = QLatin1String("&text;");
 
+// C callback for MXP link closures. When called, retrieves the Lua function
+// and its string argument from upvalues and calls function(argument).
+// This ensures the href is always treated as data, never as code.
+static int mxpLinkCallback(lua_State* L)
+{
+    lua_pushvalue(L, lua_upvalueindex(1)); // push the Lua function (send/openUrl/printCmdLine)
+    lua_pushvalue(L, lua_upvalueindex(2)); // push the href string argument
+    lua_call(L, 1, 0);
+    return 0;
+}
 
 QString TMxpMudlet::getVersion()
 {
@@ -81,6 +98,27 @@ int TMxpMudlet::setLink(const QStringList& links, const QStringList& hints, cons
 void TMxpMudlet::expireLinks(const QString& expireName)
 {
     getLinkStore().expireLinks(expireName, mpHost);
+}
+
+int TMxpMudlet::setLinkFunction(const QString& functionName, const QStringList& args, const QStringList& hints, const QString& expireName)
+{
+    lua_State* L = mpHost->getLuaInterpreter()->pGlobalLua;
+
+    QStringList emptyCommands;
+    QVector<int> luaRefs;
+
+    for (const auto& arg : args) {
+        lua_getglobal(L, functionName.toUtf8().constData());
+        lua_pushstring(L, arg.toUtf8().constData());
+        lua_pushcclosure(L, mxpLinkCallback, 2);
+        luaRefs << luaL_ref(L, LUA_REGISTRYINDEX);
+        emptyCommands << QString();
+    }
+
+    if (!expireName.isEmpty()) {
+        return getLinkStore().addLinks(emptyCommands, hints, mpHost, luaRefs, expireName);
+    }
+    return getLinkStore().addLinks(emptyCommands, hints, mpHost, luaRefs);
 }
 
 bool TMxpMudlet::getLink(int id, QStringList** links, QStringList** hints)

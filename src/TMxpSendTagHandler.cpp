@@ -64,18 +64,33 @@ TMxpTagHandlerResult TMxpSendTagHandler::handleStartTag(TMxpContext& ctx, TMxpCl
 
     for (int i = 0; i < hrefs.size(); i++) {
         hrefs[i] = ctx.getEntityResolver().interpolate(hrefs[i]);
-        hrefs[i] = qsl("%1([[%2]])").arg(command, hrefs[i]);
 
         if (i < hints.size()) {
             hints[i] = ctx.getEntityResolver().interpolate(hints[i]);
         }
     }
 
-    // Use the version of setLink that supports expire names
-    if (!expireName.isEmpty()) {
-        mLinkId = client.setLink(hrefs, hints, expireName);
+    if (mIsHrefInContent) {
+        // When &text; is present, the href values need to be replaced with the
+        // tag content later (in handleEndTag). Build code strings so that
+        // updateHrefInLinks can do in-place replacement on the link store.
+        // This is safe because &text; content comes from the same server.
+        for (int i = 0; i < hrefs.size(); i++) {
+            hrefs[i] = qsl("%1([[%2]])").arg(command, hrefs[i]);
+        }
+        if (!expireName.isEmpty()) {
+            mLinkId = client.setLink(hrefs, hints, expireName);
+        } else {
+            mLinkId = client.setLink(hrefs, hints);
+        }
     } else {
-        mLinkId = client.setLink(hrefs, hints);
+        // Use setLinkFunction to safely bind the command and arguments as Lua closures,
+        // preventing code injection via the href values
+        if (!expireName.isEmpty()) {
+            mLinkId = client.setLinkFunction(command, hrefs, hints, expireName);
+        } else {
+            mLinkId = client.setLinkFunction(command, hrefs, hints);
+        }
     }
 
     // Only set link mode if a link was actually created

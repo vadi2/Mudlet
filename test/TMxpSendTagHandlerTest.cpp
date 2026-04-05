@@ -28,11 +28,12 @@ private slots:
       processor.processMxpInput(ch, true);
     }
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    QCOMPARE(stub.mHrefs[0], "send([[áéíóúñ]])");
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("áéíóúñ"));
 
     QCOMPARE(stub.mHints.size(), 1);
-    QCOMPARE(stub.mHints[0], "áéíóúñ");
+    QCOMPARE(stub.mHints[0], qsl("áéíóúñ"));
   }
 
   void testSendHrefUTF8() {
@@ -48,11 +49,12 @@ private slots:
       processor.handleNode(processor, stub, node.get());
     }
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    QCOMPARE(stub.mHrefs[0], "send([[áéíóúñ]])");
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("áéíóúñ"));
 
     QCOMPARE(stub.mHints.size(), 1);
-    QCOMPARE(stub.mHints[0], "áéíóúñ");
+    QCOMPARE(stub.mHints[0], qsl("áéíóúñ"));
   }
 
   void testStaticText() {
@@ -71,15 +73,18 @@ private slots:
     tagHandler.handleContent("Zugg");
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    QCOMPARE(stub.mHrefs[0], "printCmdLine([[tell Zugg ]])");
+    QCOMPARE(stub.mLinkFunctionName, qsl("printCmdLine"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("tell Zugg "));
 
     QCOMPARE(stub.mHints.size(), 1);
-    QCOMPARE(stub.mHints[0], "tell Zugg ");
+    QCOMPARE(stub.mHints[0], qsl("tell Zugg "));
   }
 
   void testSimpleSend() {
     // <SEND>north</SEND>
+    // This uses &text; placeholder, so falls back to code strings for
+    // deferred content replacement
     TMxpStubContext ctx;
     TMxpStubClient stub;
 
@@ -94,14 +99,16 @@ private slots:
     tagHandler.handleTag(ctx, stub, &endTag);
 
     QCOMPARE(stub.mHrefs.size(), 1);
-    QCOMPARE(stub.mHrefs[0], "send([[north]])");
+    QCOMPARE(stub.mHrefs[0], qsl("send([[north]])"));
 
     QCOMPARE(stub.mHints.size(), 1);
-    QCOMPARE(stub.mHints[0], "north");
+    QCOMPARE(stub.mHints[0], qsl("north"));
   }
 
   void testSendPrompt() {
     // <SEND href="&text;" PROMPT>north</SEND>
+    // This uses &text; placeholder, so falls back to code strings for
+    // deferred content replacement
     TMxpStubContext ctx;
     TMxpStubClient stub;
 
@@ -117,14 +124,16 @@ private slots:
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
     QCOMPARE(stub.mHrefs.size(), 1);
-    QCOMPARE(stub.mHrefs[0], "printCmdLine([[north]])");
+    QCOMPARE(stub.mHrefs[0], qsl("printCmdLine([[north]])"));
 
     QCOMPARE(stub.mHints.size(), 1);
-    QCOMPARE(stub.mHints[0], "north");
+    QCOMPARE(stub.mHints[0], qsl("north"));
   }
 
   void testSendHrefTextEntity() {
     // Example from Age of Elements
+    // This uses &text; placeholder, so falls back to code strings for
+    // deferred content replacement
     QString input = "<send 'push &text;' HINT='push button'>button</send>";
 
     TMxpTagProcessor processor;
@@ -136,10 +145,10 @@ private slots:
     }
 
     QCOMPARE(stub.mHrefs.size(), 1);
-    QCOMPARE(stub.mHrefs[0], "send([[push button]])");
+    QCOMPARE(stub.mHrefs[0], qsl("send([[push button]])"));
 
     QCOMPARE(stub.mHints.size(), 1);
-    QCOMPARE(stub.mHints[0], "push button");
+    QCOMPARE(stub.mHints[0], qsl("push button"));
   }
 
   void testResolvingEntity() {
@@ -159,11 +168,12 @@ private slots:
     tagHandler.handleContent("TAG CONTENT");
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    QCOMPARE(stub.mHrefs[0], "send([[say I am Gandalf]])");
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("say I am Gandalf"));
 
     QCOMPARE(stub.mHints.size(), 1);
-    QCOMPARE(stub.mHints[0], "say I am Gandalf");
+    QCOMPARE(stub.mHints[0], qsl("say I am Gandalf"));
   }
 
   void testResolvingEntityWithPipe() {
@@ -191,13 +201,14 @@ private slots:
     tagHandler.handleContent("TAG CONTENT");
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 2);
-    QCOMPARE(stub.mHrefs[0], "send([[look]])");
-    QCOMPARE(stub.mHrefs[1], "send([[say hello]])");
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 2);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("look"));
+    QCOMPARE(stub.mLinkFunctionArgs[1], qsl("say hello"));
 
     QCOMPARE(stub.mHints.size(), 2);
-    QCOMPARE(stub.mHints[0], "LOOK AROUND");
-    QCOMPARE(stub.mHints[1], "SAY HELLO");
+    QCOMPARE(stub.mHints[0], qsl("LOOK AROUND"));
+    QCOMPARE(stub.mHints[1], qsl("SAY HELLO"));
 
     // Now add top menu entries
 
@@ -208,15 +219,16 @@ private slots:
     tagHandler.handleContent("TAG CONTENT");
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 3);
-    QCOMPARE(stub.mHrefs[0], "send([[who]])");
-    QCOMPARE(stub.mHrefs[1], "send([[look]])");
-    QCOMPARE(stub.mHrefs[2], "send([[say hello]])");
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 3);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("who"));
+    QCOMPARE(stub.mLinkFunctionArgs[1], qsl("look"));
+    QCOMPARE(stub.mLinkFunctionArgs[2], qsl("say hello"));
 
     QCOMPARE(stub.mHints.size(), 3);
-    QCOMPARE(stub.mHints[0], "WHO IS ONLINE?");
-    QCOMPARE(stub.mHints[1], "LOOK AROUND");
-    QCOMPARE(stub.mHints[2], "SAY HELLO");
+    QCOMPARE(stub.mHints[0], qsl("WHO IS ONLINE?"));
+    QCOMPARE(stub.mHints[1], qsl("LOOK AROUND"));
+    QCOMPARE(stub.mHints[2], qsl("SAY HELLO"));
 
     // Finally add something to the end of the menu
 
@@ -229,19 +241,20 @@ private slots:
     tagHandler.handleContent("TAG CONTENT");
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 5);
-    QCOMPARE(stub.mHrefs[0], "send([[who]])");
-    QCOMPARE(stub.mHrefs[1], "send([[look]])");
-    QCOMPARE(stub.mHrefs[2], "send([[say hello]])");
-    QCOMPARE(stub.mHrefs[3], "send([[knock at door]])");
-    QCOMPARE(stub.mHrefs[4], "send([[break door]])");
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 5);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("who"));
+    QCOMPARE(stub.mLinkFunctionArgs[1], qsl("look"));
+    QCOMPARE(stub.mLinkFunctionArgs[2], qsl("say hello"));
+    QCOMPARE(stub.mLinkFunctionArgs[3], qsl("knock at door"));
+    QCOMPARE(stub.mLinkFunctionArgs[4], qsl("break door"));
 
     QCOMPARE(stub.mHints.size(), 5);
-    QCOMPARE(stub.mHints[0], "WHO IS ONLINE?");
-    QCOMPARE(stub.mHints[1], "LOOK AROUND");
-    QCOMPARE(stub.mHints[2], "SAY HELLO");
-    QCOMPARE(stub.mHints[3], "KNOCK AT THE DOOR");
-    QCOMPARE(stub.mHints[4], "BREAK THE DOOR");
+    QCOMPARE(stub.mHints[0], qsl("WHO IS ONLINE?"));
+    QCOMPARE(stub.mHints[1], qsl("LOOK AROUND"));
+    QCOMPARE(stub.mHints[2], qsl("SAY HELLO"));
+    QCOMPARE(stub.mHints[3], qsl("KNOCK AT THE DOOR"));
+    QCOMPARE(stub.mHints[4], qsl("BREAK THE DOOR"));
   }
 
   void testSendHrefHintMismatch() {
@@ -263,13 +276,14 @@ private slots:
     tagHandler.handleContent("3091");
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 2);
-    QCOMPARE(stub.mHrefs[0], "send([[PROBE SUSPENDERS30901]])");
-    QCOMPARE(stub.mHrefs[1], "send([[BUY SUSPENDERS30901]])");
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 2);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("PROBE SUSPENDERS30901"));
+    QCOMPARE(stub.mLinkFunctionArgs[1], qsl("BUY SUSPENDERS30901"));
 
     QCOMPARE(stub.mHints.size(), 2);
-    QCOMPARE(stub.mHints[0], "PROBE SUSPENDERS30901");
-    QCOMPARE(stub.mHints[1], "BUY SUSPENDERS30901");
+    QCOMPARE(stub.mHints[0], qsl("PROBE SUSPENDERS30901"));
+    QCOMPARE(stub.mHints[1], qsl("BUY SUSPENDERS30901"));
   }
 
   void testSendExpireHref() {
@@ -291,11 +305,12 @@ private slots:
     tagHandler.handleContent("East");
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    QCOMPARE(stub.mHrefs[0], "send([[east]])");
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("east"));
 
     QCOMPARE(stub.mHints.size(), 1);
-    QCOMPARE(stub.mHints[0], "east"); // Should be "east", not "HREF"
+    QCOMPARE(stub.mHints[0], qsl("east")); // Should be "east", not "HREF"
   }
 
   void testSendExpireHrefWithoutHint() {
@@ -315,18 +330,19 @@ private slots:
     tagHandler.handleContent("West");
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    QCOMPARE(stub.mHrefs[0], "send([[west]])");
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("west"));
 
     QCOMPARE(stub.mHints.size(), 1);
-    QCOMPARE(stub.mHints[0], "west"); // Should be "west"
+    QCOMPARE(stub.mHints[0], qsl("west")); // Should be "west"
   }
 
   void testSendHrefWithLuaBracketInjection() {
     // A malicious server could craft a SEND href containing ]] to break out of
-    // the Lua long-bracket string and inject arbitrary code.
-    // The href value is interpolated raw into send([[...]]), so ]] terminates
-    // the string early, allowing code injection.
+    // a Lua long-bracket string and inject arbitrary code.
+    // With the closure-based fix, the href is stored as data (never compiled as
+    // code), so injection is impossible regardless of content.
     TMxpStubContext ctx;
     TMxpStubClient stub;
 
@@ -342,19 +358,20 @@ private slots:
     tagHandler.handleContent("click");
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    // The resulting href must not contain an unescaped ]] that would allow
-    // breaking out of the Lua long-bracket string and injecting code.
-    // A proper fix would use a quoting mechanism that prevents ]] from
-    // terminating the string literal.
-    QVERIFY2(!stub.mHrefs[0].contains(qsl("]])os.execute")),
-             qPrintable(qsl("Lua code injection detected in SEND href: %1")
-                            .arg(stub.mHrefs[0])));
+    // The href is now stored as raw data in mLinkFunctionArgs, never as Lua
+    // code. It is passed as an upvalue to a closure, so ]] cannot cause code
+    // injection.
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0],
+             qsl("]])os.execute('payload')send([[x"));
   }
 
   void testSendHrefWithNestedBrackets() {
     // Test that ]] in various positions within the href is handled safely,
     // not just as part of a specific injection payload.
+    // With the closure-based fix, all hrefs are stored as raw data upvalues,
+    // so bracket sequences are irrelevant to security.
     TMxpStubContext ctx;
     TMxpStubClient stub;
 
@@ -371,13 +388,9 @@ private slots:
     tagHandler.handleContent("test1");
     tagHandler.handleTag(ctx, stub, endTag1->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    // After wrapping in send([[...]]), the raw ]] would prematurely close the
-    // long-bracket string. The href must be sanitized so this cannot happen.
-    QVERIFY2(!stub.mHrefs[0].contains(qsl("send([[]]")),
-             qPrintable(
-                 qsl("Unescaped ]] at start of SEND href breaks Lua string: %1")
-                     .arg(stub.mHrefs[0])));
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("]]..evil..[["));
 
     // Case 2: ]] in the middle of href
     auto startTag2 = parseNode(R"(<SEND href="say hello]]world">)");
@@ -389,16 +402,9 @@ private slots:
     tagHandler.handleContent("test2");
     tagHandler.handleTag(ctx, stub, endTag2->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    // Count occurrences of ]] in the href - there should be exactly one,
-    // the legitimate closing ]] at the end of the long-bracket string.
-    // If ]] appears earlier, it breaks the Lua string.
-    int closingBracketCount = stub.mHrefs[0].count(qsl("]]"));
-    QVERIFY2(closingBracketCount == 1,
-             qPrintable(
-                 qsl("SEND href contains %1 occurrences of ]] (expected 1): %2")
-                     .arg(closingBracketCount)
-                     .arg(stub.mHrefs[0])));
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("say hello]]world"));
 
     // Case 3: Multiple ]] sequences
     auto startTag3 = parseNode(R"(<SEND href="a]]))b]]c">)");
@@ -410,19 +416,14 @@ private slots:
     tagHandler.handleContent("test3");
     tagHandler.handleTag(ctx, stub, endTag3->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    closingBracketCount = stub.mHrefs[0].count(qsl("]]"));
-    QVERIFY2(closingBracketCount == 1,
-             qPrintable(
-                 qsl("SEND href contains %1 occurrences of ]] (expected 1): %2")
-                     .arg(closingBracketCount)
-                     .arg(stub.mHrefs[0])));
+    QCOMPARE(stub.mLinkFunctionName, qsl("send"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("a]]))b]]c"));
   }
 
   void testLinkHrefWithLuaBracketInjection() {
-    // Same vulnerability exists in TMxpLinkTagHandler: server-controlled href
-    // is wrapped in openUrl([[...]]) with no sanitization, allowing ]] to
-    // break out of the Lua string and inject arbitrary code.
+    // With the closure-based fix, the href is stored as raw data (never
+    // compiled as Lua code), so ]] in the href cannot cause code injection.
     TMxpStubContext ctx;
     TMxpStubClient stub;
 
@@ -437,20 +438,11 @@ private slots:
     tagHandler.handleContent("click me");
     tagHandler.handleTag(ctx, stub, endTag->asEndTag());
 
-    QCOMPARE(stub.mHrefs.size(), 1);
-    // The resulting href must not allow code injection via unescaped ]]
-    QVERIFY2(!stub.mHrefs[0].contains(qsl("]])os.execute")),
-             qPrintable(qsl("Lua code injection detected in A href: %1")
-                            .arg(stub.mHrefs[0])));
-
-    // Additionally verify that the href has exactly one ]] (the legitimate
-    // closing bracket of the long-bracket string)
-    int closingBracketCount = stub.mHrefs[0].count(qsl("]]"));
-    QVERIFY2(
-        closingBracketCount == 1,
-        qPrintable(qsl("A href contains %1 occurrences of ]] (expected 1): %2")
-                       .arg(closingBracketCount)
-                       .arg(stub.mHrefs[0])));
+    // The href is now stored as raw data in mLinkFunctionArgs, never as Lua
+    // code.
+    QCOMPARE(stub.mLinkFunctionName, qsl("openUrl"));
+    QCOMPARE(stub.mLinkFunctionArgs.size(), 1);
+    QCOMPARE(stub.mLinkFunctionArgs[0], qsl("]])os.execute('x')openUrl([[y"));
   }
 };
 

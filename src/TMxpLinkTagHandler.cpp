@@ -39,13 +39,25 @@ TMxpTagHandlerResult TMxpLinkTagHandler::handleStartTag(TMxpContext& ctx, TMxpCl
 
     const QString hint = tag->hasAttribute(qsl("hint")) ? tag->getAttributeValue(qsl("hint")) : href;
 
-    href = qsl("openUrl([[%1]])").arg(href);
-
-    // Use the version of setLink that supports expire names
-    if (!expireName.isEmpty()) {
-        mLinkId = client.setLink(QStringList(href), QStringList(hint), expireName);
+    if (mIsHrefInContent) {
+        // When &text; is present, the href needs to be replaced with the tag
+        // content later (in handleEndTag). Build a code string so that
+        // replaceInStrings can do in-place replacement on the link store.
+        // This is safe because &text; content comes from the same server.
+        QString hrefCode = qsl("openUrl([[%1]])").arg(href);
+        if (!expireName.isEmpty()) {
+            mLinkId = client.setLink(QStringList(hrefCode), QStringList(hint), expireName);
+        } else {
+            mLinkId = client.setLink(QStringList(hrefCode), QStringList(hint));
+        }
     } else {
-        mLinkId = client.setLink(QStringList(href), QStringList(hint));
+        // Use setLinkFunction to safely bind openUrl and the href as a Lua closure,
+        // preventing code injection via the href value
+        if (!expireName.isEmpty()) {
+            mLinkId = client.setLinkFunction(qsl("openUrl"), QStringList(href), QStringList(hint), expireName);
+        } else {
+            mLinkId = client.setLinkFunction(qsl("openUrl"), QStringList(href), QStringList(hint));
+        }
     }
 
     client.setLinkMode(true);
