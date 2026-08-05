@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2025 by Mudlet Authors                                  *
+ *   Copyright (C) 2026 by Mudlet Developers                               *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -18,24 +18,37 @@
  ***************************************************************************/
 
 /*
- * Test for issue https://github.com/Mudlet/Mudlet/issues/1065
- * Off-by-one error in cTelnet::processSocketData()
+ * Tests for the off-by-one write in cTelnet::processSocketData() -
+ * https://github.com/Mudlet/Mudlet/issues/1065
  *
- * The bug: null terminator was placed at in_buffer[amount + 1] instead of
- * in_buffer[amount], and buffer was accessed before validating amount.
+ * processSocketData() used to terminate its input with
+ * "in_buffer[amount + 1] = '\0'", one byte further along than the data it was
+ * given. The socket path survived it because slot_socketReadyToBeRead() over-
+ * allocates its stack buffer, but the same function is also reached from Lua's
+ * feedTelnet() via cTelnet::loopbackTest(), which hands it a QByteArray sized
+ * exactly to its contents - so the stray NUL landed one byte past the end of a
+ * heap allocation.
  *
- * To test this we must use raw char[] buffers - QByteArray always
- * null-terminates at position size() which masks the off-by-one.
+ * The discriminating test is nulTerminatorLandsAtTheDataEnd(): a sentinel is
+ * planted at [amount + 1] and must still be there afterwards. It fails on the
+ * unfixed code without needing a sanitizer.
+ *
+ * Run with: ctest -R cTelnetBufferTest -V
  */
 
 #include <QtTest/QtTest>
+#include <chrono>
 #include <cstring>
+#include <memory>
 
 #include "MudletInstanceCoordinator.h"
+#include "TMainConsole.h"
 #include "TelnetServerStub.h"
 #include "ctelnet.h"
 #include "dlgConnectionProfiles.h"
 #include "mudlet.h"
+
+using namespace std::chrono_literals;
 
 extern void qInitResources_mudlet();
 extern void qInitResources_qm();
@@ -44,188 +57,201 @@ extern void qInitResources_mudlet_fonts_common();
 extern void qInitResources_mudlet_fonts_posix();
 void initializeQRCResourcesForBufferTest();
 
-class cTelnetBufferTest : public QObject {
-  Q_OBJECT
+class cTelnetBufferTest : public QObject
+{
+    Q_OBJECT
 
 private:
-  TelnetServerStub *mpServer = nullptr;
-  const QString mHostname = "BufferTest-Host";
-  const QString mPort = "4002";
-  const QString mLocalhost = "localhost";
-  Host *mpHost = nullptr;
+    TelnetServerStub* mpServer = nullptr;
+    Host* mpHost = nullptr;
+    const QString mHostname = qsl("BufferTest-Host");
+    QString mPort; // assigned the stub's actual ephemeral port in initTestCase()
+    const QString mLocalhost = qsl("localhost");
 
-  void startProfile(const QString &hostname, const QString &address,
-                    const QString &port) {
-    QTimer::singleShot(0, qApp, [hostname, address, port]() {
-      mudlet::self()->startAutoLogin({});
-      QTest::qWait(100);
-      QTest::mouseClick(mudlet::self()->mpConnectionDialog->new_profile_button,
-                        Qt::LeftButton);
-      QTest::qWait(100);
-      QTest::keyClicks(QApplication::focusWidget(), hostname);
-      QTest::qWait(100);
-      QTest::keyClick(QApplication::focusWidget(), Qt::Key_Tab);
-      QTest::qWait(100);
-      QTest::keyClicks(QApplication::focusWidget(), address);
-      QTest::qWait(100);
-      QTest::keyClick(QApplication::focusWidget(), Qt::Key_Tab);
-      QTest::qWait(100);
-      QTest::keyClicks(QApplication::focusWidget(), port);
-      QTest::qWait(100);
-      QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
-    });
+    // The byte processSocketData() is entitled to overwrite with its NUL, and
+    // the one immediately after it that it must leave alone.
+    static constexpr char scmTerminatorSlot = '\x7b';
+    static constexpr char scmPastTheEnd = '\x7c';
 
-    QSignalSpy spy(mudlet::self(), &mudlet::signal_profileLoaded);
-    if (!spy.wait(1000)) {
-      QFAIL("Profile took too long to load.");
+    // True if any line in the main console buffer contains the given substring
+    bool bufferContains(const QString& text) const
+    {
+        TMainConsole* console = mpHost->mpConsole;
+        for (int i = 0; i <= console->buffer.getLastLineNumber(); ++i) {
+            if (console->buffer.line(i).contains(text)) {
+                return true;
+            }
+        }
+        return false;
     }
-    mpHost = mudlet::self()->getActiveHost();
-    if (!mpHost) {
-      QFAIL("No active host available for test.");
-    }
-
-    QSignalSpy spy2(&(mpHost->mTelnet), &cTelnet::signal_connected);
-    if (!spy2.wait(500)) {
-      QFAIL("Could not connect with the host.");
-    }
-  }
-
-  void deleteProfileDirectory(const QString &profileName) {
-    const QString path =
-        mudlet::getMudletPath(enums::profileHomePath, profileName);
-    QDir dir(path);
-    if (dir.exists()) {
-      dir.removeRecursively();
-    }
-  }
 
 private slots:
-  void initTestCase() { initializeQRCResourcesForBufferTest(); }
+    void initTestCase()
+    {
+        initializeQRCResourcesForBufferTest();
 
-  void init() {
-    mpServer = new TelnetServerStub(qApp);
-    mpServer->start(mLocalhost, mPort.toUShort());
-    mudlet::start();
-    mudlet::self()->setupConfig();
-    mudlet::self()->takeOwnershipOfInstanceCoordinator(
-        std::make_unique<MudletInstanceCoordinator>(
-            "MudletInstanceCoordinator"));
-    mudlet::self()->init();
-    mudlet::self()->setStorePasswordsSecurely(false);
-    deleteProfileDirectory(mHostname);
+        mpServer = new TelnetServerStub(qApp);
+        mpServer->start(mLocalhost, 0); // ephemeral OS-assigned port avoids collisions across concurrent test runs
+        mPort = QString::number(mpServer->serverPort());
+        mudlet::start();
+        mudlet::self()->setupConfig();
+        mudlet::self()->takeOwnershipOfInstanceCoordinator(std::make_unique<MudletInstanceCoordinator>("MudletInstanceCoordinator"));
+        mudlet::self()->init();
+        mudlet::self()->setStorePasswordsSecurely(false);
 
-    startProfile(mHostname, mLocalhost, mPort);
-  }
+        const QString path = mudlet::getMudletPath(enums::profileHomePath, mHostname);
+        QDir(path).removeRecursively();
 
-  // Uses a raw char[] buffer where position [amount] contains a garbage
-  // byte. With the bug (null terminator at amount+1), the garbage byte
-  // would be included in the processed output. With the fix (null
-  // terminator at amount), it is correctly excluded.
-  void testOffByOneNullTerminator() {
-    QVERIFY(mpHost != nullptr);
+        QTimer::singleShot(0ms, qApp, [this]() {
+            mudlet::self()->startAutoLogin({});
+            QTest::qWait(100ms);
+            QTest::mouseClick(mudlet::self()->mpConnectionDialog->new_profile_button, Qt::LeftButton);
+            QTest::qWait(100ms);
+            QTest::keyClicks(QApplication::focusWidget(), mHostname);
+            QTest::qWait(100ms);
+            QTest::keyClick(QApplication::focusWidget(), Qt::Key_Tab);
+            QTest::qWait(100ms);
+            QTest::keyClicks(QApplication::focusWidget(), mLocalhost);
+            QTest::qWait(100ms);
+            QTest::keyClick(QApplication::focusWidget(), Qt::Key_Tab);
+            QTest::qWait(100ms);
+            QTest::keyClicks(QApplication::focusWidget(), mPort);
+            QTest::qWait(100ms);
+            QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        });
 
-    // Wait for any welcome data to be processed
-    QTest::qWait(200);
+        QSignalSpy spy(mudlet::self(), &mudlet::signal_profileLoaded);
+        if (!spy.wait(1000)) {
+            QFAIL("Profile took too long to load.");
+        }
+        mpHost = mudlet::self()->getActiveHost();
+        if (!mpHost) {
+            QFAIL("No active host available for the test.");
+        }
 
-    char buffer[64];
-    std::memset(buffer, 0, sizeof(buffer));
-
-    // Set up: 4 bytes of valid data, then a garbage byte at position 4
-    // Bug: null terminator at buffer[5], so "Test!" (5 chars) is processed
-    // Fix: null terminator at buffer[4], so "Test" (4 chars) is processed
-    std::memcpy(buffer, "Test", 4);
-    buffer[4] = '!';
-    buffer[5] = '\0';
-
-    mpHost->mTelnet.processSocketData(buffer, 4, true);
-    QTest::qWait(100);
-
-    QString displayed = mpHost->mpConsole->getCurrentLine("");
-    QVERIFY2(!displayed.contains('!'),
-             qPrintable(QString("Garbage '!' found in output - off-by-one bug "
-                                "present. Got: '%1'")
-                            .arg(displayed)));
-    QVERIFY2(
-        displayed.contains("Test"),
-        qPrintable(
-            QString("Expected 'Test' in output but got: '%1'").arg(displayed)));
-  }
-
-  // Same test at multiple sizes to catch edge cases at various boundaries
-  void testOffByOneAtVariousSizes() {
-    QVERIFY(mpHost != nullptr);
-
-    QTest::qWait(200);
-
-    const QVector<int> testSizes = {1, 2, 4, 8, 15, 16, 31, 32, 33, 63, 64};
-
-    for (int size : testSizes) {
-      char buffer[128];
-      std::memset(buffer, 0, sizeof(buffer));
-
-      // Fill with 'A's for the valid portion, put garbage right after
-      std::memset(buffer, 'A', size);
-      buffer[size] = '!';
-      buffer[size + 1] = '\0';
-
-      mpHost->mTelnet.processSocketData(buffer, size, true);
-      QTest::qWait(50);
-
-      QString displayed = mpHost->mpConsole->getCurrentLine("");
-      QVERIFY2(
-          !displayed.contains('!'),
-          qPrintable(
-              QString("Size %1: Garbage '!' found - off-by-one bug. Got: '%2'")
-                  .arg(size)
-                  .arg(displayed)));
+        QSignalSpy spy2(&(mpHost->mTelnet), &cTelnet::signal_connected);
+        if (!spy2.wait(500)) {
+            QFAIL("Could not connect with the host.");
+        }
     }
-  }
 
-  // Empty data should be handled gracefully (amount == 0)
-  void testEmptyDataHandling() {
-    QVERIFY(mpHost != nullptr);
+    void init()
+    {
+        QVERIFY(mpHost);
+        QVERIFY(mpHost->mpConsole);
+        mpHost->mpConsole->buffer.clear();
+    }
 
-    QTest::qWait(200);
+    // The regression test for #1065. processSocketData() is handed `payloadSize`
+    // bytes inside a buffer that has two spare bytes after them. It may write
+    // its NUL over the first spare byte; the second must come back untouched.
+    void nulTerminatorLandsAtTheDataEnd()
+    {
+        constexpr int payloadSize = 8;
+        QByteArray backing(payloadSize + 2, '\0');
+        std::memset(backing.data(), 'A', payloadSize);
+        backing[payloadSize] = scmTerminatorSlot;
+        backing[payloadSize + 1] = scmPastTheEnd;
 
-    // Establish baseline
-    QByteArray baselineData = "Baseline\r\n";
-    mpHost->mTelnet.loopbackTest(baselineData);
-    QTest::qWait(50);
+        mpHost->mTelnet.processSocketData(backing.data(), payloadSize, true);
 
-    QString beforeEmpty = mpHost->mpConsole->getCurrentLine("");
+        QCOMPARE(backing.at(payloadSize), '\0');
+        QVERIFY2(backing.at(payloadSize + 1) == scmPastTheEnd,
+                 "processSocketData() wrote its NUL terminator one byte past the data it was given "
+                 "- the off-by-one of issue #1065 is back.");
+    }
 
-    // Empty data should not corrupt console state
-    QByteArray emptyData;
-    mpHost->mTelnet.loopbackTest(emptyData);
-    QTest::qWait(50);
+    // The same off-by-one across the sizes a read can plausibly return, so a
+    // future rewrite cannot reintroduce it for only some lengths.
+    void nulTerminatorLandsAtTheDataEndAtEverySize()
+    {
+        for (const int payloadSize : {1, 2, 4, 8, 15, 16, 31, 32, 33, 63, 64, 1024}) {
+            QByteArray backing(payloadSize + 2, '\0');
+            std::memset(backing.data(), 'A', payloadSize);
+            backing[payloadSize] = scmTerminatorSlot;
+            backing[payloadSize + 1] = scmPastTheEnd;
 
-    QString afterEmpty = mpHost->mpConsole->getCurrentLine("");
-    QCOMPARE(afterEmpty, beforeEmpty);
-  }
+            mpHost->mTelnet.processSocketData(backing.data(), payloadSize, true);
 
-  void cleanup() {
-    mpHost = nullptr;
-    delete mpServer;
-    mpServer = nullptr;
-    deleteProfileDirectory(mHostname);
-    delete mudlet::self();
-  }
+            QVERIFY2(backing.at(payloadSize + 1) == scmPastTheEnd, qPrintable(qsl("processSocketData() wrote past the end of a %1 byte payload.").arg(payloadSize)));
+        }
+    }
 
-  void cleanupTestCase() {}
+    // The heap shape that Lua's feedTelnet() actually produces: an allocation
+    // sized exactly to the data plus its terminator. Writing at [size + 1] runs
+    // off the end of it, which AddressSanitizer reports as a heap-buffer-overflow.
+    void exactlySizedHeapAllocationIsNotOverrun()
+    {
+        const QByteArray payload = QByteArrayLiteral("heap probe\r\n");
+        const auto size = static_cast<int>(payload.size());
+        auto buffer = std::make_unique<char[]>(size + 1); // +1 for the terminator, exactly as QByteArray allocates
+        std::memcpy(buffer.get(), payload.constData(), size);
+        buffer[size] = scmTerminatorSlot;
+
+        mpHost->mTelnet.processSocketData(buffer.get(), size, true);
+
+        QCOMPARE(buffer[size], '\0');
+    }
+
+    // The production route from Lua: feedTelnet() -> loopbackTest() ->
+    // processSocketData(), with a QByteArray squeezed down to its contents so
+    // there is no slack to absorb a stray write.
+    void feedTelnetPathDisplaysItsDataIntact()
+    {
+        QByteArray payload = QByteArrayLiteral("BUFFER_TEST_MARKER\r\n");
+        payload.squeeze();
+
+        mpHost->mTelnet.loopbackTest(payload);
+        QVERIFY2(QTest::qWaitFor(
+                         [this]() {
+                             return bufferContains(qsl("BUFFER_TEST_MARKER"));
+                         },
+                         QDeadlineTimer(5s)),
+                 "Text fed through loopbackTest() did not reach the console.");
+    }
+
+    // A closed or errored socket reports -1 and an empty read reports 0. Neither
+    // may touch the caller's buffer, which for amount == 0 can legitimately have
+    // no writable byte at all.
+    void emptyAndErroredReadsLeaveTheBufferAlone()
+    {
+        QByteArray backing(2, '\0');
+        backing[0] = scmTerminatorSlot;
+        backing[1] = scmPastTheEnd;
+
+        mpHost->mTelnet.processSocketData(backing.data(), 0, true);
+        QCOMPARE(backing.at(0), scmTerminatorSlot);
+        QCOMPARE(backing.at(1), scmPastTheEnd);
+
+        mpHost->mTelnet.processSocketData(backing.data(), -1, true);
+        QCOMPARE(backing.at(0), scmTerminatorSlot);
+        QCOMPARE(backing.at(1), scmPastTheEnd);
+    }
+
+    void cleanupTestCase()
+    {
+        mpHost = nullptr;
+        delete mpServer;
+        mpServer = nullptr;
+        const QString path = mudlet::getMudletPath(enums::profileHomePath, mHostname);
+        QDir(path).removeRecursively();
+        delete mudlet::self();
+    }
 };
 
-void initializeQRCResourcesForBufferTest() {
+void initializeQRCResourcesForBufferTest()
+{
 #ifdef INCLUDE_VARIABLE_SPLASH_SCREEN
-  qInitResources_additional_splash_screens();
+    qInitResources_additional_splash_screens();
 #endif
 #ifdef INCLUDE_FONTS
-  qInitResources_mudlet_fonts_common();
+    qInitResources_mudlet_fonts_common();
 #if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
-  qInitResources_mudlet_fonts_posix();
+    qInitResources_mudlet_fonts_posix();
 #endif
 #endif
-  qInitResources_mudlet();
-  qInitResources_qm();
+    qInitResources_mudlet();
+    qInitResources_qm();
 }
 
 #include "cTelnetBufferTest.moc"
