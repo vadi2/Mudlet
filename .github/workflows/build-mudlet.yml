@@ -27,7 +27,9 @@ jobs:
     if: ${{ (github.repository_owner == 'Mudlet' || github.repository_owner == 'vadi2') }}
     env:
       LUA_VERSION: '5.1.5'
-      CCACHE_MAXSIZE: 500M
+      # Headroom for a build's restored and freshly compiled entries together; the
+      # saved cache is trimmed to one build's working set, well under this
+      CCACHE_MAXSIZE: 2G
       CCACHE_COMPRESSLEVEL: ${{ ((github.ref_name == 'development' || github.repository_owner == 'vadi2') && github.event_name != 'schedule' && github.event.inputs.scheduled != 'true') && '19' || '1' }}
     strategy:
       fail-fast: false
@@ -385,6 +387,7 @@ jobs:
       run: |
         ccache --recompress 19
         ccache --show-compression
+        echo "CCACHE_BUILD_START=$(date +%s)" >> "$GITHUB_ENV"
 
     - name: (diag) mark ccache build start
       shell: bash
@@ -408,6 +411,13 @@ jobs:
         SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         MUDLET_SANITIZERS: ${{ github.event_name == 'pull_request' && 'address' || '' }}
         SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+    # A hit refreshes the entry's timestamp, so anything older than this build is
+    # something it no longer compiles. Skipped after a failed build, which stops
+    # early and would leave most of the working set looking stale.
+    - name: Trim the ccache to what this build used
+      if: success() && env.CCACHE_BUILD_START
+      run: ccache --evict-older-than "$(( $(date +%s) - CCACHE_BUILD_START + 60 ))s"
 
     - name: Save ccache
       if: >-
@@ -795,3 +805,38 @@ jobs:
           echo "Lua tests failed - see the action called 'Run Lua tests' above for detailed output."
           exit 1
         fi
+
+  # Every development build saves its ccache under a new per-commit key and only
+  # the newest is ever restored, so the older ones would sit in the 10GB quota
+  # until GitHub's least-recently-used eviction - which is just as likely to drop
+  # a current entry that only development builds restore. The Windows workflow
+  # saves under the same scheme and is swept here too.
+  prune-superseded-ccache:
+    name: Delete superseded ccache entries
+    needs: compile-mudlet
+    if: always() && (github.repository_owner == 'vadi2' || (github.repository_owner == 'Mudlet' && github.ref == 'refs/heads/development'))
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+    - name: Delete all but the newest ccache entry per build
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CACHE_REF: ${{ github.ref }}
+      run: |
+        # jq -s rather than gh's --slurp: --paginate applies --jq per page, and
+        # the grouping has to see every page at once
+        gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/caches?per_page=100&ref=${CACHE_REF}&key=ccache-" \
+          --jq '.actions_caches[]' \
+          | jq -rs '
+              map(select(.key | test("^ccache-.+-sha-[0-9a-f]{40}$")))
+              | group_by(.key | sub("-sha-[0-9a-f]{40}$"; ""))
+              | map(sort_by(.created_at) | .[:-1][])
+              | .[] | "\(.id) \(.key)"' \
+          | while read -r id key; do
+              echo "deleting ${key}"
+              # a 404 means it is already gone, which is the wanted end state
+              response="$(gh api --method DELETE "repos/${GITHUB_REPOSITORY}/actions/caches/${id}" 2>&1)" \
+                || [[ "${response}" == *"HTTP 404"* ]] \
+                || echo "::warning::could not delete ${key}: ${response}"
+            done

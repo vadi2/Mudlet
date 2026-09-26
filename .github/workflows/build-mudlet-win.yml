@@ -33,7 +33,9 @@ jobs:
     env:
       SIGNPATH_SIGNING_ENABLED: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
       SIGNPATH_POLICY_SLUG: ${{ startsWith(github.ref, 'refs/tags/') && 'release-signing' || 'test-signing' }}
-      CCACHE_MAXSIZE: 500M
+      # Headroom for a build's restored and freshly compiled entries together; the
+      # saved cache is trimmed to one build's working set, well under this
+      CCACHE_MAXSIZE: 2G
       CCACHE_COMPRESSLEVEL: ${{ ((github.ref_name == 'development' || github.repository_owner == 'vadi2') && github.event_name != 'schedule' && github.event.inputs.scheduled != 'true') && '19' || '1' }}
     strategy:
       fail-fast: false
@@ -95,6 +97,7 @@ jobs:
       run: |
         ccache --recompress 19
         ccache --show-compression
+        echo "CCACHE_BUILD_START=$(date +%s)" >> "$GITHUB_ENV"
 
     - name: (diag) mark ccache build start
       shell: msys2 {0}
@@ -115,6 +118,16 @@ jobs:
         SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         WITH_SENTRY: "ON"
       run: $GITHUB_WORKSPACE/CI/build-mudlet-for-windows.sh
+
+    # A hit refreshes the entry's timestamp, so anything older than this build is
+    # something it no longer compiles. Skipped after a failed build, which stops
+    # early and would leave most of the working set looking stale.
+    - name: Trim the ccache to what this build used
+      if: success() && env.CCACHE_BUILD_START
+      shell: msys2 {0}
+      env:
+        CCACHE_DIR: ${{runner.workspace}}/ccache
+      run: ccache --evict-older-than "$(( $(date +%s) - CCACHE_BUILD_START + 60 ))s"
 
     - name: check ccache stats post build
       shell: msys2 {0}
