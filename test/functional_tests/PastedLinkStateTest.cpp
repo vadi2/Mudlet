@@ -37,7 +37,7 @@
 #include <QtTest/QtTest>
 #include <chrono>
 
-#include "MudletPaths.h"
+#include "MudletApp.h"
 #include "PortableModeTestHelper.h"
 #include "ProfileTestHelper.h"
 #include "Host.h"
@@ -96,7 +96,7 @@ private slots:
         QSignalSpy connectionSpy(&(host->mTelnet), &cTelnet::signal_connected);
         QVERIFY2(connectionSpy.wait(2000), "could not connect with the host");
 
-        mpHost = mudlet::self()->getHostManager().getHost(mHostname);
+        mpHost = HostManager::self()->getHost(mHostname);
         QVERIFY(mpHost);
         QVERIFY(mpHost->mpConsole);
     }
@@ -427,7 +427,7 @@ private:
 
     void deleteProfileDirectory(const QString& profileName)
     {
-        QDir dir(MudletPaths::getMudletPath(enums::profileHomePath, profileName));
+        QDir dir(MudletApp::getMudletPath(enums::profileHomePath, profileName));
         if (dir.exists()) {
             dir.removeRecursively();
         }

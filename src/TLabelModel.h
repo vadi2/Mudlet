@@ -27,31 +27,21 @@
 
 class Host;
 
-// The per-label data model: the slice of a label's state that needs no widget.
-// Holding it apart is what lets the core (Host) hold a handle to a named label
-// without holding a QLabel, which is the point of the Widgets-free core (#8681).
-//
-// A label is view-owned, so its model is owned by its TLabel (reached through
-// TLabel::model()); the widget exposes same-named members as references aliasing
-// the model, so widget-side code reads and writes the model directly. The core's
-// window registry indexes these models by name and does NOT own them - see
-// TWindowRegistry.
+// A label's widget-free state, so the Widgets-free core can hold a named label without a QLabel.
+// Owned by its TLabel, whose same-named reference members alias it; TWindowRegistry indexes
+// these by name but does NOT own them.
 struct TLabelModel
 {
     // Defined out of line: mpHost is a QPointer, which needs Host complete.
     TLabelModel(Host* pHost, const QString& name);
-    // Frees the callback registry indexes, so a label that is destroyed without
-    // its callbacks having been replaced does not leak them.
+    // Frees the callbacks' Lua registry indexes.
     ~TLabelModel();
 
-    // A copy would leave two models claiming the same Lua registry indexes, and
-    // free them twice. Deleting the copy operations suppresses the implicit move
-    // ones too.
+    // A copy would free the same Lua registry indexes twice. This also suppresses the implicit moves.
     TLabelModel(const TLabelModel&) = delete;
     TLabelModel& operator=(const TLabelModel&) = delete;
 
-    // Each releases the index it is replacing, so a callback set twice does not
-    // strand the first function in the Lua registry.
+    // Each releases the Lua registry index it replaces.
     void setClick(const int func);
     void setDoubleClick(const int func);
     void setRelease(const int func);
@@ -78,6 +68,13 @@ struct TLabelModel
     // What setBackgroundColor() was last given; a label restyled with its own
     // background-color stylesheet paints something else.
     QColor mBackgroundColor;
+    // The tint and the transforms of an SVG background are properties of the
+    // label that outlive any particular image, so they belong with the rest of
+    // its widget-free state; the renderer that draws them stays with the widget.
+    QColor mSvgTintColor;
+    double mSvgRotation = 0.0;
+    double mSvgShearX = 0.0;
+    double mSvgShearY = 0.0;
 
 private:
     void releaseFunc(const int existingFunction, const int newFunction);

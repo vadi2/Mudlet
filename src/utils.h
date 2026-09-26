@@ -29,6 +29,8 @@
 #include <cstdint>
 #include <cstring>
 
+class QDir;
+
 #define qsl(s) QStringLiteral(s)
 
 // user-defined literals to represent kilobytes and megabytes
@@ -121,6 +123,9 @@ public:
         return localNow.toString(Qt::ISODate);
 #endif
     }
+
+    // Creates any folders the archive needs through tmpDir. Runs on a worker thread, so must not touch the UI.
+    static bool unzip(const QString& archivePath, const QString& destination, const QDir& tmpDir);
 };
 
 #endif // MUDLET_UTILS_H

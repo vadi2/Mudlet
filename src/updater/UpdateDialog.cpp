@@ -131,9 +131,8 @@ UpdateDialog::UpdateDialog(Feed* feed, Type type, QSettings* settings, QWidget* 
         break;
     }
 
-    // Mudlet keeps this dialog for the whole session and checks for updates
-    // twice a day, so it stays connected to hear every one of those checks. A
-    // changelog dialog is a transient the user closes, and reports one load
+    // The session-long dialog stays connected for every twice-daily check; a changelog dialog is
+    // transient and reports one load
     const bool transient = (mType == ManualChangelog);
     if (!transient) {
         connect(mFeed, &Feed::ready, this, &UpdateDialog::handleFeedReady);
@@ -437,7 +436,8 @@ void UpdateDialog::resetUi()
                   << mUi->checkAutoDownload << mUi->buttonCancel << mUi->buttonCancelLoading << mUi->buttonConfirm << mUi->buttonInstall;
     for (auto* widget : hiddenWidgets) {
         widget->hide();
-        widget->disconnect();
+        // Not a wildcard disconnect(): that also severs Qt's style sheet destroyed() hook
+        widget->disconnect(this);
     }
     // Re-establish the changelog link handler broken by disconnect() above
     connect(mUi->labelChangelog, &QTextBrowser::anchorClicked, this, &UpdateDialog::onLinkActivated);

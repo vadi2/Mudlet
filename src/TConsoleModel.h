@@ -72,10 +72,17 @@ struct TConsoleModel
     void toggleLogging(bool isMessageEnabled);
     void reportFailedLogStart(const QString& path, const QString& reason);
 
-    // The count is the distance between the two arguments, not the difference
-    // between an inclusive pair, so lines(n, n) is empty rather than one line.
-    // Not const because TBuffer::line() hands out a mutable QString&.
+    // Half-open: lines(n, n) is empty. Not const because TBuffer::line() returns a mutable QString&.
     QStringList lines(int from, int to);
+
+    // Colorizer triggers: select a run of the current line, paint it, restore the format. Needs no view;
+    // the painting calls return whether the buffer changed, the view's cue to repaint. They write
+    // mFormatCurrent and the selected run, not mFgColor/mBgColor below (the profile's colours).
+    void deselect();
+    bool selectSection(int from, int to);
+    void resetFormat();
+    bool setSelectionFgColor(const QColor& newColor);
+    bool setSelectionBgColor(const QColor& newColor);
 
     // No 'm' prefix on purpose: TConsole::buffer aliases this one by reference and has to keep its name for the rest of the codebase, so the two match.
     TBuffer buffer;
@@ -94,10 +101,14 @@ struct TConsoleModel
     QString mCurrentLine;
     int mEngineCursor = -1;
     QPoint mUserCursor;
+    // The run selectSection() marks. No 'm' prefix, like buffer above: the widget's members alias these.
+    QPoint P_begin;
+    QPoint P_end;
+    // The format text is written into the buffer with.
+    TChar mFormatCurrent;
     bool mIsPromptLine = false;
-    // 1 = up, 2 = down, 0 is not valid: the state of the toolbar button pressed
-    // most recently (a plain button sets it back to 1), read back by
-    // getButtonState() with no arguments
+    // Last pressed toolbar button's state for getButtonState(): 1 = up, 2 = down (0 invalid); a plain button
+    // resets it to 1.
     int mButtonState = 1;
 
     // The OSC 8 hyperlink managers. Concealing and revealing rewrite this
@@ -120,8 +131,7 @@ struct TConsoleModel
     QString mLogFileName;
     QTextStream mLogStream;
     bool mLogToLogFile = false;
-    // The path a failed start could not write and why, for a caller with no
-    // console to read the report off.
+    // Path and reason of a failed start, for a caller with no console to read the report off.
     QString mLogStartFailure;
 };
 

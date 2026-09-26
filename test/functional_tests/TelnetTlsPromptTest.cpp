@@ -25,9 +25,10 @@
 #include <chrono>
 #include <memory>
 
-#include "MudletPaths.h"
+#include "MudletApp.h"
 #include "PortableModeTestHelper.h"
 #include "ProfileTestHelper.h"
+#include "HostManager.h"
 #include "MudletInstanceCoordinator.h"
 #include "TMainConsole.h"
 #include "TelnetServerStub.h"
@@ -112,7 +113,7 @@ private slots:
         mPort = QString::number(mpServer->serverPort());
         mudlet::start();
         mudlet::self()->setupConfig();
-        QCOMPARE(MudletPaths::getMudletPath(enums::mainPath), qsl("%1/mudlet").arg(mConfigDir.path()));
+        QCOMPARE(MudletApp::getMudletPath(enums::mainPath), qsl("%1/mudlet").arg(mConfigDir.path()));
         mudlet::self()->takeOwnershipOfInstanceCoordinator(std::make_unique<MudletInstanceCoordinator>("MudletInstanceCoordinator"));
         mudlet::self()->init();
         mudlet::self()->setStorePasswordsSecurely(false);
@@ -466,7 +467,7 @@ private slots:
         // the warning claimed above is therefore already in by the time this
         // returns.
         QTRY_VERIFY2_WITH_TIMEOUT(mTlsPromptAnswered, "The frontend never put the TLS upgrade question up for the user to answer.", 5000);
-        QVERIFY2(!mudlet::self()->getHostManager().getHost(mHostname), "The profile survived the teardown, so this is not the case being tested.");
+        QVERIFY2(!HostManager::self()->getHost(mHostname), "The profile survived the teardown, so this is not the case being tested.");
 #endif
     }
 
@@ -666,8 +667,8 @@ private slots:
         mpPackageBodyDrip = nullptr;
         delete mpPackageServer;
         mpPackageServer = nullptr;
-        deleteProfileDirectory(mHostname);
         delete mudlet::self();
+        deleteProfileDirectory(mHostname);
     }
 
     // Utility function to manually start a profile like a user would do via the
@@ -688,14 +689,7 @@ private slots:
     // Utility function
     void deleteProfileDirectory(const QString& profileName)
     {
-        const QString path = MudletPaths::getMudletPath(enums::profileHomePath, profileName);
-        QDir dir(path);
-
-        if (!dir.exists()) {
-            qInfo() << "Profile directory does not exist:" << path;
-            return;
-        }
-        dir.removeRecursively();
+        TestProfile::removeProfileDirectory(profileName);
     }
 
 private:
@@ -768,10 +762,10 @@ private:
                 // ~Host() runs here and now rather than being posted - which is
                 // what leaves the frontend's QPointer null when exec() returns.
                 // forceClose() first, or the teardown asks whether to save.
-                if (Host* pHost = mudlet::self()->getHostManager().getHost(mHostname)) {
+                if (Host* pHost = HostManager::self()->getHost(mHostname)) {
                     pHost->forceClose();
                 }
-                mudlet::self()->getHostManager().deleteHost(mHostname);
+                HostManager::self()->deleteHost(mHostname);
             }
             mTlsPromptAnswered = true;
             button->click();
