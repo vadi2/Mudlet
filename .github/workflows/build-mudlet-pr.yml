@@ -70,14 +70,6 @@ jobs:
             # Enable AddressSanitizer for PTB and testing builds, but not release
             # builds (tagged Mudlet-*) - ASAN adds significant runtime overhead
             enable_asan: 'true'
-          # No tests: none branch on host architecture, so the arm64 job covers them on a faster pool.
-          - os: macos-15-intel
-            buildname: 'macos (x86_64)'
-            compiler: clang_64
-            qt: '6.11.1'
-            ccache_id: macos-x64
-            deploy: 'deploy'
-            build_tests: 'false'
           - os: macos-15
             buildname: 'macos (arm64) / c++, lua tests'
             compiler: clang_64
@@ -715,3 +707,12 @@ jobs:
           echo "Lua tests failed - see the action called 'Run Lua tests' above for detailed output."
           exit 1
         fi
+
+    - name: PROBE test arrangements
+      if: ${{ !cancelled() && matrix.run_tests == 'true' }}
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" = "macOS" ]; then
+          python3 -c 'import psutil' 2>/dev/null || python3 -m pip install --quiet --break-system-packages psutil || true
+        fi
+        bash ${{github.workspace}}/CI/probe-tests.sh
