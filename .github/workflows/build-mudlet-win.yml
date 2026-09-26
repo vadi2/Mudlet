@@ -96,6 +96,12 @@ jobs:
         ccache --recompress 19
         ccache --show-compression
 
+    - name: (diag) mark ccache build start
+      shell: msys2 {0}
+      run: |
+        touch "$(cygpath -u "${RUNNER_TEMP}")/ccache-build-start"
+        echo "CCACHE_STATSLOG=$(cygpath -m "${RUNNER_TEMP}")/ccache-stats.log" >> "$GITHUB_ENV"
+
     - name: (Windows) Build
       shell: msys2 {0}
       env:
@@ -117,6 +123,25 @@ jobs:
       run: |
         ccache --show-stats -v
         ccache --show-compression
+
+    - name: (diag) ccache working set
+      if: always()
+      shell: msys2 {0}
+      run: |
+        d="$(cygpath -u "${RUNNER_WORKSPACE}")/ccache"; t="$(cygpath -u "${RUNNER_TEMP}")"; m="$t/ccache-build-start"; l="$t/ccache-stats.log"
+        echo "DIAG cache now: $(find "$d" -type f | wc -l) files, $(find "$d" -type f -print0 | xargs -0 cat | wc -c) bytes"
+        echo "DIAG used by this build: $(find "$d" -type f -newer "$m" | wc -l) files, $(find "$d" -type f -newer "$m" -print0 | xargs -0 cat | wc -c) bytes"
+        awk '/^# /{f=substr($0,3)} /^cache_miss/{print f}' "$l" | tr -d '\r' > "$t/ccache-misses.txt"
+        echo "DIAG misses: $(wc -l < "$t/ccache-misses.txt") of $(grep -c '^# ' "$l") logged"
+        sed -E 's#^.*[/\\](src|test|3rdparty|build-CLANG64)[/\\]#\1/#' "$t/ccache-misses.txt" | tr '\\' / | awk -F/ '{print $1"/"$2}' | sort | uniq -c | sort -rn | head -30
+
+    - name: (diag) upload ccache stats log
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: ccache-diag-${{matrix.ccache_id}}
+        path: ${{runner.temp}}/ccache-stats.log
+        retention-days: 7
 
     - name: (Windows) Run QTest
       shell: msys2 {0}
