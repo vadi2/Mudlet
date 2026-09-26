@@ -158,3 +158,4 @@ The preferred order of [merging PRs](https://help.github.com/articles/about-pull
 PRs auto-opened by [mudlet-machine-account](https://github.com/mudlet-machine-account) with new translation strings can be approved and merged right away by anyone on the core team.
 
 The idea is to use Crowdin as a single source of truth for translation - if there's an issue with a translation, let's discuss it in Crowdin.
+
