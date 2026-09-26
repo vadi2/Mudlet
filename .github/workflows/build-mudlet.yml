@@ -27,9 +27,7 @@ jobs:
     if: ${{ (github.repository_owner == 'Mudlet' || github.repository_owner == 'vadi2') }}
     env:
       LUA_VERSION: '5.1.5'
-      # Headroom for a build's restored and freshly compiled entries together; the
-      # saved cache is trimmed to one build's working set, well under this
-      CCACHE_MAXSIZE: 2G
+      CCACHE_MAXSIZE: 500M
       CCACHE_COMPRESSLEVEL: ${{ ((github.ref_name == 'development' || github.repository_owner == 'vadi2') && github.event_name != 'schedule' && github.event.inputs.scheduled != 'true') && '19' || '1' }}
     strategy:
       fail-fast: false
