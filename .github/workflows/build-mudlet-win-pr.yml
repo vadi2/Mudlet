@@ -211,6 +211,30 @@ jobs:
           exit 1
         fi
 
+    - name: PROBE test arrangements
+      if: ${{ !cancelled() }}
+      shell: msys2 {0}
+      env:
+        TESTS_DIRECTORY_WIN: ${{github.workspace}}/src/mudlet-lua/tests
+      run: |
+        LUA_PATH=$(luarocks --lua-version 5.1 path --lr-path)
+        export LUA_PATH
+        LUA_CPATH=$(luarocks --lua-version 5.1 path --lr-cpath)
+        export LUA_CPATH
+        temp_dir="$(cygpath -m "${RUNNER_TEMP}")"
+        port_file="${temp_dir}/probe-http-port"
+        rm -f "${port_file}"
+        python_bin=python3
+        command -v "${python_bin}" > /dev/null 2>&1 || python_bin=python
+        MUDLET_TEST_HTTP_PORT_FILE="${port_file}" "${python_bin}" "$GITHUB_WORKSPACE/CI/http-fixture-server.py" > "${temp_dir}/probe-http.log" 2>&1 &
+        fixture_pid=$!
+        disown "${fixture_pid}" 2>/dev/null || true
+        trap 'kill -9 "${fixture_pid}" > /dev/null 2>&1 || true' EXIT
+        for _ in $(seq 1 100); do [ -s "${port_file}" ] && break; sleep 0.1; done
+        MUDLET_TEST_HTTP_PORT="$(cat "${port_file}")"
+        export MUDLET_TEST_HTTP_PORT
+        bash $GITHUB_WORKSPACE/CI/probe-tests.sh
+
     - name: (Windows) Package
       shell: msys2 {0}
       run: $GITHUB_WORKSPACE/CI/package-mudlet-for-windows.sh
