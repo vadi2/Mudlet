@@ -1,8 +1,8 @@
 # DUPLICATE WORKFLOW: This file is paired with build-mudlet-win-pr.yml
 # Changes here likely need to be mirrored there as well, apart from the
-# ccache save step below: only builds of development write
+# ccache trim and save steps below: only builds of development write
 # this shared cache, every other build restores read-only, so
-# build-mudlet-win-pr.yml has no equivalent save step at all.
+# build-mudlet-win-pr.yml has no equivalent steps at all.
 name: 🔨 Build Mudlet (windows)
 on:
   push:
