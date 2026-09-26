@@ -1,0 +1,36 @@
+# THROWAWAY probe - never for upstream
+name: winsetup probe
+on:
+  push:
+    branches: [ci-winsetup-probe]
+jobs:
+  probe:
+    name: winsetup ${{matrix.variant}} ${{matrix.rep}}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, parallel16]
+        rep: [1, 2]
+    steps:
+    - uses: actions/checkout@v7
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: CLANG64
+        update: true
+    - name: show pacman.conf
+      shell: msys2 {0}
+      run: grep -nE 'ParallelDownloads|CheckSpace|XferCommand|DisableDownloadTimeout' /etc/pacman.conf || true
+    - name: tweak
+      if: matrix.variant == 'parallel16'
+      shell: msys2 {0}
+      run: |
+        sed -i -E 's/^#?ParallelDownloads.*/ParallelDownloads = 16/' /etc/pacman.conf
+        grep -q '^ParallelDownloads' /etc/pacman.conf || sed -i '/^\[options\]/a ParallelDownloads = 16' /etc/pacman.conf
+        grep -n ParallelDownloads /etc/pacman.conf
+    - name: setup sdk
+      shell: msys2 {0}
+      run: |
+        s=$(date +%s)
+        $GITHUB_WORKSPACE/CI/setup-windows-sdk.sh 2>&1 | while IFS= read -r l; do printf '%s %s\n' "$(( $(date +%s) - s ))" "$l"; done | grep -E 'Retrieving packages|Processing package changes|post-transaction|Checking, and installing|luarocks installation completed|Total Download|Total Installed'
+        echo "TOTAL $(( $(date +%s) - s ))s"
