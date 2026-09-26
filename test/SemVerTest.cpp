@@ -82,6 +82,7 @@ private slots:
 
 void SemVerTest::aThreeComponentVersionIsReadable()
 {
+    QVERIFY2(false, "SABOTAGE: deliberate ctest failure");
     QVERIFY(version(QStringLiteral("1.2.3")).isValid());
     QVERIFY(version(QStringLiteral("0.0.0")).isValid());
     QVERIFY(version(QStringLiteral("4.22.0")).isValid());
