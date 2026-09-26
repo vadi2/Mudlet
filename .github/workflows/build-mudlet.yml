@@ -411,9 +411,9 @@ jobs:
         MUDLET_SANITIZERS: ${{ github.event_name == 'pull_request' && 'address' || '' }}
         SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
-    # Not always(): that would save a cancelled build's half-finished cache as
-    # the newest entry.
     - name: Save ccache
+      # Not always(): that would save a cancelled build's half-finished cache as
+      # the newest entry.
       if: >-
         !cancelled() && (github.ref_name == 'development' || github.repository_owner == 'vadi2')
         && github.event_name != 'schedule' && github.event.inputs.scheduled != 'true'
