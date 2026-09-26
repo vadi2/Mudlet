@@ -252,9 +252,13 @@ static void applyHighDpiRoundingPolicyFromConfig(int argc, char* argv[])
 }
 #endif // !defined(Q_OS_MACOS)
 
+int* volatile gSabotageLeakProbe = nullptr;
+
 int main(int argc, char* argv[])
 {
     initializeQRCResources();
+    gSabotageLeakProbe = new int[64];
+    gSabotageLeakProbe = nullptr;
 
 #ifdef Q_OS_WINDOWS
     // Handle Squirrel installer commands - must exit quickly for install/update/uninstall
