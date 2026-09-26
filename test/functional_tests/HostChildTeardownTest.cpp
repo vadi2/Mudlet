@@ -38,7 +38,7 @@
 #include <QJsonObject>
 #include <QPlainTextEdit>
 
-#include "MudletPaths.h"
+#include "MudletApp.h"
 #include "PortableModeTestHelper.h"
 #include "ProfileTestHelper.h"
 #include "ActionUnit.h"
@@ -71,7 +71,7 @@ private:
 
     void deleteProfileDirectory(const QString& profileName)
     {
-        QDir dir(MudletPaths::getMudletPath(enums::profileHomePath, profileName));
+        QDir dir(MudletApp::getMudletPath(enums::profileHomePath, profileName));
         if (dir.exists()) {
             dir.removeRecursively();
         }
@@ -160,7 +160,7 @@ private:
 
     QString noteContentOnDisk(const QString& profileName) const
     {
-        QFile file(MudletPaths::getMudletPath(enums::profileDataItemPath, profileName, qsl("notes.json")));
+        QFile file(MudletApp::getMudletPath(enums::profileDataItemPath, profileName, qsl("notes.json")));
         if (!file.open(QIODevice::ReadOnly)) {
             return QString();
         }
@@ -202,7 +202,7 @@ private slots:
         mPort = QString::number(mpServer->serverPort());
         mudlet::start();
         mudlet::self()->setupConfig();
-        QCOMPARE(MudletPaths::getMudletPath(enums::mainPath), qsl("%1/mudlet").arg(mConfigDir.path()));
+        QCOMPARE(MudletApp::getMudletPath(enums::mainPath), qsl("%1/mudlet").arg(mConfigDir.path()));
         mudlet::self()->takeOwnershipOfInstanceCoordinator(std::make_unique<MudletInstanceCoordinator>(qsl("MudletInstanceCoordinator")));
         mudlet::self()->init();
         mudlet::self()->setStorePasswordsSecurely(false);
@@ -214,8 +214,8 @@ private slots:
     void cleanup()
     {
         for (const QString& profileName : {qsl("HostChildTeardown-NoCloseChildren"), qsl("HostChildTeardown-CloseChildren")}) {
-            if (mudlet::self()->getHostManager().getHost(profileName)) {
-                mudlet::self()->getHostManager().deleteHost(profileName);
+            if (HostManager::self()->getHost(profileName)) {
+                HostManager::self()->deleteHost(profileName);
             }
             deleteProfileDirectory(profileName);
         }
@@ -228,7 +228,7 @@ private slots:
 
         // Null when initTestCase skipped or failed ahead of mudlet::start()
         if (mudlet::self()) {
-            const QString leftOpenProfilePath = MudletPaths::getMudletPath(enums::profileHomePath, mProfileLeftOpenAtTheEnd);
+            const QString leftOpenProfilePath = MudletApp::getMudletPath(enums::profileHomePath, mProfileLeftOpenAtTheEnd);
 
             // The third ordering: a profile still loaded when the main window goes,
             // so the Host is destroyed with no close of any kind asked for.
@@ -266,7 +266,7 @@ private slots:
 
         const QPointer<Host> hostGuard(pHost);
         pHost = nullptr;
-        mudlet::self()->getHostManager().deleteHost(profileName);
+        HostManager::self()->deleteHost(profileName);
         QVERIFY2(hostGuard.isNull(), "The Host outlived deleteHost(), so ~Host() never ran");
 
         const QStringList leftBehind = windowsLeftBehind(windows);
@@ -297,7 +297,7 @@ private slots:
         // not give one either, which is what leaves the deferred deletes pending
         const QPointer<Host> hostGuard(pHost);
         pHost = nullptr;
-        mudlet::self()->getHostManager().deleteHost(profileName);
+        HostManager::self()->deleteHost(profileName);
         QVERIFY2(hostGuard.isNull(), "The Host outlived deleteHost(), so ~Host() never ran");
 
         // checked before the event loop gets a turn, so that the deletes

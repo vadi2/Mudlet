@@ -136,6 +136,94 @@ describe("Tests ISO 8859-1 decoding", function()
   end)
 end)
 
+describe("Tests UTF-8 decoding of malformed sequences", function()
+
+  -- Each form below is complete: every byte after its lead is a continuation
+  -- byte, so it is refused for its lead byte or its value, not for being cut
+  -- short. What must not happen is a character being let through, or the
+  -- refusal spilling onto the ASCII byte after it. How many replacement marks a
+  -- refused form earns is left open: decoders differ on it - Mudlet gives each
+  -- form one, where the WHATWG decoder gives one per byte for a lead byte UTF-8
+  -- no longer has. The caller selects UTF-8, and only once per case, as busted
+  -- keeps just the last finally() a case registers.
+  --
+  -- A sequence cut short by a byte that is not a continuation byte is not one
+  -- of these: Mudlet takes the cutting byte into the replacement mark too, so a
+  -- line ending, an escape or an ASCII character after a truncated sequence is
+  -- lost - see PR #11068, which fixes that.
+  local function assertRefused(data, what)
+    -- Under any decoder but UTF-8 these bytes would be refused, or mangled,
+    -- for other reasons:
+    assert.equals("é", decoded(bytes(0xC3, 0xA9)), "the precondition failed - UTF-8 is not the decoder in use")
+    local payload = decoded(data .. "Z")
+    local rest, marks = payload:gsub(replacement, "")
+    assert.is_true(marks > 0 and rest == "Z", what .. " decoded to " .. payload)
+  end
+
+  it("still decodes the well-formed sequences of every length", function()
+    using("UTF-8")
+
+    assert.equals("é日😀Z", decoded(bytes(0xC3, 0xA9, 0xE6, 0x97, 0xA5, 0xF0, 0x9F, 0x98, 0x80) .. "Z"))
+  end)
+
+  it("still decodes the smallest code point of every length", function()
+    using("UTF-8")
+
+    -- the first value each length may carry, just past the overlong forms below
+    assert.same({0x80, 0x800, 0x10000, 0x5A}, codePoints(decoded(bytes(0xC2, 0x80, 0xE0, 0xA0, 0x80, 0xF0, 0x90, 0x80, 0x80) .. "Z")))
+  end)
+
+  it("refuses an overlong encoding of an ASCII character", function()
+    using("UTF-8")
+
+    -- each of these spells '/' in more bytes than it needs, the classic way of
+    -- smuggling a character past a check made on the bytes
+    assertRefused(bytes(0xC0, 0xAF), "the two byte overlong form")
+    assertRefused(bytes(0xE0, 0x80, 0xAF), "the three byte overlong form")
+    assertRefused(bytes(0xF0, 0x80, 0x80, 0xAF), "the four byte overlong form")
+  end)
+
+  it("refuses a UTF-16 surrogate", function()
+    using("UTF-8")
+
+    assertRefused(bytes(0xED, 0xA0, 0x80), "a high surrogate")
+    assertRefused(bytes(0xED, 0xBF, 0xBF), "a low surrogate")
+  end)
+
+  it("accepts the code points either side of the surrogates", function()
+    using("UTF-8")
+
+    assert.same({0xD7FF, 0xE000, 0x5A}, codePoints(decoded(bytes(0xED, 0x9F, 0xBF, 0xEE, 0x80, 0x80) .. "Z")))
+  end)
+
+  it("refuses a code point past U+10FFFF", function()
+    using("UTF-8")
+
+    assertRefused(bytes(0xF4, 0x90, 0x80, 0x80), "U+110000")
+    assertRefused(bytes(0xF5, 0x80, 0x80, 0x80), "a lead byte that can only start such a code point")
+  end)
+
+  it("accepts U+10FFFF itself", function()
+    using("UTF-8")
+
+    assert.same({0x10FFFF, 0x5A}, codePoints(decoded(bytes(0xF4, 0x8F, 0xBF, 0xBF) .. "Z")))
+  end)
+
+  it("refuses the five and six byte forms UTF-8 no longer has", function()
+    using("UTF-8")
+
+    assertRefused(bytes(0xF8, 0x88, 0x80, 0x80, 0x80), "a five byte form")
+    assertRefused(bytes(0xFC, 0x84, 0x80, 0x80, 0x80, 0x80), "a six byte form")
+  end)
+
+  it("keeps a byte order mark as the character it encodes", function()
+    using("UTF-8")
+
+    -- inside a line it is a zero width no-break space, not a mark to drop
+    assert.same({0x41, 0xFEFF, 0x5A}, codePoints(decoded("A" .. bytes(0xEF, 0xBB, 0xBF) .. "Z")))
+  end)
+end)
+
 describe("Tests GBK decoding", function()
 
   it("decodes each of the areas the encoding is divided into", function()
@@ -448,6 +536,35 @@ describe("Tests a character whose bytes are split by the posting timeout", funct
     return table.concat(payload), #payload, payload
   end
 
+  -- Feeds "CSI 31 m RED" parted at the point its arguments name and checks the
+  -- colour reached the screen, rather than only that the sequence stopped
+  -- printing as text. Which colour ANSI 31 is depends on the profile's palette,
+  -- so the same sequence arriving whole says what to expect - and a line with no
+  -- sequence at all says what a lost colour looks like, without which a
+  -- regression that stopped SGR 31 applying anywhere would leave both
+  -- deliveries default-coloured and both comparisons content. A mark is the
+  -- number of the empty line the next feed fills, so each one is taken just
+  -- before the feed it belongs to.
+  local function expectRedSurvivesSplit(...)
+    local plainMark = getLastLineNumber("main")
+    feed("plain:RED\n")
+    beQuiet()
+
+    local splitMark = getLastLineNumber("main")
+    local text, lines, perLine = splitAcrossTimeout(...)
+    assert.equals("RED:end", text)
+    assert.equals(2, lines)
+    assert.same({"", "RED:end"}, perLine)
+
+    local splitColour = redForegroundFrom(splitMark)
+    assert.is_not_nil(splitColour, "no coloured text to read a colour from")
+    local wholeMark = getLastLineNumber("main")
+    feed("whole:\27[31mRED\27[m\n")
+    beQuiet()
+    assert.same(redForegroundFrom(wholeMark), splitColour)
+    assert.are_not.same(redForegroundFrom(plainMark), splitColour)
+  end
+
   it("breaks an ASCII line at the flush marker", function()
     if timerUnavailable() then return end
     using("UTF-8")
@@ -556,20 +673,87 @@ describe("Tests a character whose bytes are split by the posting timeout", funct
     -- character: held with the half of "CSI 31 m" that had arrived, it would
     -- never match a parameter byte when the rest turned up, so the colour would
     -- be dropped and the "1m" that completes it printed as text
-    local splitMark = getLastLineNumber("main")
-    local text, lines, perLine = splitAcrossTimeout("\27[3", "1mRED\27[m")
-    assert.equals("RED:end", text)
-    assert.equals(2, lines)
-    assert.same({"", "RED:end"}, perLine)
+    expectRedSurvivesSplit("\27[3", "1mRED\27[m")
+  end)
 
-    -- and the colour the game asked for was applied, rather than the sequence
-    -- merely being swallowed. Which colour ANSI 31 is depends on the profile's
-    -- palette, so the same sequence arriving whole says what to expect:
-    local wholeMark = getLastLineNumber("main")
-    feed("whole:\27[31mRED\27[m\n")
+  it("keeps an ANSI colour sequence the marker lands right after its escape", function()
+    if timerUnavailable() then return end
+    using("UTF-8")
+
+    -- The narrowest place the marker can part a sequence: the escape has
+    -- arrived and nothing else has. Read as the byte after the escape it names
+    -- no sequence, so the escape used to be taken for a stray one and thrown
+    -- away, leaving the whole of "[31m" to print as text once it turned up
+    -- - see issue #10874
+    expectRedSurvivesSplit("\27", "[31mRED\27[m")
+  end)
+
+  it("keeps a character set designation the marker lands inside", function()
+    if timerUnavailable() then return end
+    using("UTF-8")
+
+    -- ESC ( B names a character set and shows nothing, but its final byte waits
+    -- on a second latch (mGotEscCharset) rather than the one the case above
+    -- exercises: with the marker taken for that byte the designation was
+    -- abandoned and the "B" printed as text - see issue #10874
+    local text, lines, perLine = splitAcrossTimeout("\27(", "B")
+    assert.equals(":end", text)
+    assert.equals(2, lines)
+    assert.same({"", ":end"}, perLine)
+  end)
+
+  it("keeps an operating system command the marker lands right after its escape", function()
+    if timerUnavailable() then return end
+    using("UTF-8")
+
+    -- The same split where the escape turns out to open an OSC rather than a
+    -- colour sequence - the branch Mudlet reads hyperlinks on: with the escape
+    -- gone the payload used to be put on the line as text
+    local text, lines, perLine = splitAcrossTimeout("\27", "]0;title\27\\")
+    assert.equals(":end", text)
+    assert.equals(2, lines)
+    assert.same({"", ":end"}, perLine)
+  end)
+
+  it("spends a held character set designation on the byte after the pause", function()
+    if timerUnavailable() then return end
+    using("UTF-8")
+
+    -- What holding the latch costs, which is the same as what an ordinary
+    -- packet boundary costs: a designation the game never completes takes the
+    -- next byte it sends, however long the quiet spell was. A held escape on
+    -- its own does not - "H" names no sequence, so it stays text. The two
+    -- latches part company here, which makes this the easiest place for a
+    -- later tidy-up to go wrong
+    local eaten = splitAcrossTimeout("\27(", "Hello")
+    assert.equals("ello:end", eaten)
+    local kept = splitAcrossTimeout("\27", "Hello")
+    assert.equals("Hello:end", kept)
+  end)
+
+  it("keeps the held escape when locally fed text arrives during the pause", function()
+    if timerUnavailable() then return end
+    using("UTF-8")
+
+    -- Holding the latch opens a window nothing could land in before: the game
+    -- is part way through a sequence and quiet, so anything the profile itself
+    -- prints meanwhile meets that parser. Local text runs through it on a copy
+    -- of the sequence state of its own (TBuffer::swapParserSequenceState()) and
+    -- has to leave the game's alone
+    local mark = getLastLineNumber("main")
+    feed("split:\27")
     beQuiet()
-    assert.same(redForegroundFrom(wholeMark), redForegroundFrom(splitMark))
-    assert.is_not_nil(redForegroundFrom(splitMark), "no coloured text to read a colour from")
+    feedTriggers("interleaved\n")
+    feed("[31mRED\27[m:end\n")
+    beQuiet()
+
+    local seen = {}
+    for _, line in ipairs(getLines("main", mark, getLastLineNumber("main") + 1)) do
+      if line ~= "" then
+        seen[#seen + 1] = line
+      end
+    end
+    assert.same({"split:", "interleaved", "RED:end"}, seen)
   end)
 
   it("takes a carriage return in locally fed text as data, not as a marker", function()

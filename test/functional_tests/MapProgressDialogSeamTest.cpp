@@ -42,7 +42,7 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 
-#include "MudletPaths.h"
+#include "MudletApp.h"
 #include "PortableModeTestHelper.h"
 #include "Host.h"
 #include "HostManager.h"
@@ -86,7 +86,7 @@ private:
 
     void deleteProfileDirectory(const QString& profileName)
     {
-        const QString path = MudletPaths::getMudletPath(enums::profileHomePath, profileName);
+        const QString path = MudletApp::getMudletPath(enums::profileHomePath, profileName);
         QDir dir(path);
         if (dir.exists()) {
             dir.removeRecursively();
@@ -113,7 +113,7 @@ private slots:
 
         mudlet::start();
         mudlet::self()->setupConfig();
-        QCOMPARE(MudletPaths::getMudletPath(enums::mainPath), qsl("%1/mudlet").arg(mConfigDir.path()));
+        QCOMPARE(MudletApp::getMudletPath(enums::mainPath), qsl("%1/mudlet").arg(mConfigDir.path()));
         mudlet::self()->takeOwnershipOfInstanceCoordinator(std::make_unique<MudletInstanceCoordinator>("MudletInstanceCoordinator"));
         mudlet::self()->init();
         mudlet::self()->setStorePasswordsSecurely(false);
@@ -122,12 +122,12 @@ private slots:
 
         QVERIFY(mSaveDir.isValid());
 
-        auto& hostManager = mudlet::self()->getHostManager();
-        QVERIFY2(hostManager.addHost(mSourceName, qsl("23"), QString(), QString()), "failed to create the source Host");
-        mpSource = hostManager.getHost(mSourceName);
+        auto* hostManager = HostManager::self();
+        QVERIFY2(hostManager->addHost(mSourceName, qsl("23"), QString(), QString()), "failed to create the source Host");
+        mpSource = hostManager->getHost(mSourceName);
         QVERIFY(mpSource);
-        QVERIFY2(hostManager.addHost(mTargetName, qsl("23"), QString(), QString()), "failed to create the target Host");
-        mpTarget = hostManager.getHost(mTargetName);
+        QVERIFY2(hostManager->addHost(mTargetName, qsl("23"), QString(), QString()), "failed to create the target Host");
+        mpTarget = hostManager->getHost(mTargetName);
         QVERIFY(mpTarget);
 
         buildSmallMap(mpSource);

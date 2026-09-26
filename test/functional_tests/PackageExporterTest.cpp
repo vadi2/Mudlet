@@ -38,7 +38,7 @@
 
 #include "Host.h"
 #include "MudletInstanceCoordinator.h"
-#include "MudletPaths.h"
+#include "MudletApp.h"
 #include "PortableModeTestHelper.h"
 #include "ProfileTestHelper.h"
 #include "TAction.h"
@@ -51,6 +51,7 @@
 #include "ctelnet.h"
 #include "dlgPackageExporter.h"
 #include "mudlet.h"
+#include "utils.h"
 
 #include "GroupedTest.h"
 
@@ -76,7 +77,7 @@ private:
 
     void deleteProfileDirectory(const QString& profileName)
     {
-        QDir dir(MudletPaths::getMudletPath(enums::profileHomePath, profileName));
+        QDir dir(MudletApp::getMudletPath(enums::profileHomePath, profileName));
         if (dir.exists()) {
             dir.removeRecursively();
         }
@@ -160,9 +161,9 @@ private:
         return settled;
     }
 
-    // mudlet::unzip() joins its destination onto each archive entry without a
+    // utils::unzip() joins its destination onto each archive entry without a
     // separator, so the trailing slash is load-bearing
-    bool unpackInto(const QString& packageFile, const QTemporaryDir& destination) const { return mudlet::unzip(packageFile, qsl("%1/").arg(destination.path()), QDir(destination.path())); }
+    bool unpackInto(const QString& packageFile, const QTemporaryDir& destination) const { return utils::unzip(packageFile, qsl("%1/").arg(destination.path()), QDir(destination.path())); }
 
 private slots:
     void initTestCase()
@@ -182,7 +183,7 @@ private slots:
         QVERIFY2(mpServer->isListening(), qPrintable(qsl("TelnetServerStub failed to start: %1").arg(mpServer->errorString())));
         mudlet::start();
         mudlet::self()->setupConfig();
-        QCOMPARE(MudletPaths::getMudletPath(enums::mainPath), qsl("%1/mudlet").arg(mConfigDir.path()));
+        QCOMPARE(MudletApp::getMudletPath(enums::mainPath), qsl("%1/mudlet").arg(mConfigDir.path()));
         mudlet::self()->takeOwnershipOfInstanceCoordinator(std::make_unique<MudletInstanceCoordinator>("MudletInstanceCoordinator"));
         mudlet::self()->init();
         mudlet::self()->setStorePasswordsSecurely(false);
@@ -196,7 +197,7 @@ private slots:
         // getActualPath() falls back to this setting when the user has not
         // browsed for a location, which is the only way a test can steer where
         // a package lands without a file dialog
-        mudlet::getQSettings()->setValue(qsl("lastFileDialogLocation"), mExportDir.path());
+        MudletApp::getQSettings()->setValue(qsl("lastFileDialogLocation"), mExportDir.path());
 
         auto* pTrigger = new TTrigger(nullptr, mpHost);
         pTrigger->setRegexCodeList({qsl("^exported$")}, {REGEX_PERL});
@@ -411,7 +412,7 @@ private slots:
         QVERIFY2(waitForExportToSettle(exporter), "the module export never finished");
         QVERIFY2(!reportedFailure(exporter), qPrintable(qsl("the module export reported a failure: %1").arg(infoText(exporter))));
 
-        const QString moduleFile = qsl("%1/%2.mpackage").arg(MudletPaths::getMudletPath(enums::profileHomePath, mProfileName), moduleName);
+        const QString moduleFile = qsl("%1/%2.mpackage").arg(MudletApp::getMudletPath(enums::profileHomePath, mProfileName), moduleName);
         QVERIFY2(QFileInfo::exists(moduleFile), "module mode did not write the package into the profile directory");
         QVERIFY2(mpHost->mInstalledModules.contains(moduleName), "module mode exported the file but never installed it");
 

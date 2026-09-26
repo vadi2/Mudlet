@@ -39,9 +39,10 @@
 #include <QToolButton>
 #include <QtTest/QtTest>
 
-#include "MudletPaths.h"
+#include "MudletApp.h"
 #include "ProfileTestHelper.h"
 #include "Host.h"
+#include "HostManager.h"
 #include "MudletInstanceCoordinator.h"
 #include "TDetachedWindow.h"
 #include "TLuaInterpreter.h"
@@ -108,7 +109,7 @@ private slots:
         mPort = QString::number(mpServer->serverPort());
         mudlet::start();
         mudlet::self()->setupConfig();
-        QCOMPARE(MudletPaths::getMudletPath(enums::mainPath), qsl("%1/mudlet").arg(mConfigDir.path()));
+        QCOMPARE(MudletApp::getMudletPath(enums::mainPath), qsl("%1/mudlet").arg(mConfigDir.path()));
         mudlet::self()->takeOwnershipOfInstanceCoordinator(std::make_unique<MudletInstanceCoordinator>("MudletInstanceCoordinator"));
         mudlet::self()->init();
         mudlet::self()->setStorePasswordsSecurely(false);
@@ -144,7 +145,7 @@ private slots:
     // place before the detach builds that window's toolbar
     void init()
     {
-        Host* pHost = mudlet::self()->getHostManager().getHost(mSecondHostname);
+        Host* pHost = HostManager::self()->getHost(mSecondHostname);
         QVERIFY(pHost);
         pHost->setDiscordGameName(mGameName);
         pHost->setDiscordInviteURL(mInviteUrl);
@@ -182,7 +183,7 @@ private slots:
         QToolButton* pButton = discordButton();
         QVERIFY(pButton);
 
-        Host* pHost = mudlet::self()->getHostManager().getHost(mSecondHostname);
+        Host* pHost = HostManager::self()->getHost(mSecondHostname);
         QVERIFY(pHost);
         pHost->setDiscordInviteURL(QString());
         mudlet::self()->updateDiscordNamedIcon();
@@ -214,7 +215,7 @@ private slots:
         QToolButton* pButton = discordButton();
         QVERIFY(pButton);
 
-        Host* pHost = mudlet::self()->getHostManager().getHost(mSecondHostname);
+        Host* pHost = HostManager::self()->getHost(mSecondHostname);
         QVERIFY(pHost);
         pHost->processDiscordGMCP(qsl("External.Discord.Status"), qsl(R"({"game":"Avalon"})"));
 
@@ -228,7 +229,7 @@ private slots:
         QToolButton* pButton = discordButton();
         QVERIFY(pButton);
 
-        Host* pHost = mudlet::self()->getHostManager().getHost(mSecondHostname);
+        Host* pHost = HostManager::self()->getHost(mSecondHostname);
         QVERIFY(pHost);
 
         QVERIFY(pHost->getLuaInterpreter()->compileAndExecuteScript(qsl("setDiscordGameUrl('https://discord.gg/lusternia', 'Lusternia')")));
@@ -310,7 +311,7 @@ private:
 
     void deleteProfileDirectory(const QString& profileName)
     {
-        QDir dir(MudletPaths::getMudletPath(enums::profileHomePath, profileName));
+        QDir dir(MudletApp::getMudletPath(enums::profileHomePath, profileName));
         if (dir.exists()) {
             dir.removeRecursively();
         }

@@ -22,7 +22,8 @@
 #include "TConsoleModel.h"
 
 #include "Host.h"
-#include "MudletPaths.h"
+#include "MudletApp.h"
+#include "TDebug.h"
 #include "mudlet.h"
 
 #include <QCoreApplication>
@@ -48,6 +49,63 @@ QStringList TConsoleModel::lines(int from, int to)
     return ret;
 }
 
+void TConsoleModel::deselect()
+{
+    P_begin = QPoint();
+    P_end = QPoint();
+}
+
+bool TConsoleModel::selectSection(int from, int to)
+{
+    if (TDebug::wants(TDebug::Category::Selection)) {
+        TDebug(Qt::darkMagenta, Qt::black, TDebug::Category::Selection) << "selectSection(" << from << "," << to << "): line under current user cursor: " << buffer.line(mUserCursor.y()) << "\n"
+                >> mpHost;
+    }
+    if (from < 0) {
+        return false;
+    }
+    // a negative length would put the selection's end before its start
+    if (to < 0) {
+        return false;
+    }
+    if (mUserCursor.y() >= static_cast<int>(buffer.buffer.size())) {
+        return false;
+    }
+    const int s = buffer.buffer[mUserCursor.y()].size();
+    // Not `from + to > s`: that overflows for a large `to`, and a wrapped negative sum passes the check.
+    if (from > s || to > s - from) {
+        return false;
+    }
+    P_begin = QPoint(from, mUserCursor.y());
+    P_end = QPoint(from + to, mUserCursor.y());
+
+    if (TDebug::wants(TDebug::Category::Selection)) {
+        TDebug(Qt::darkMagenta, Qt::black, TDebug::Category::Selection) << "P_begin(" << P_begin.x() << "/" << P_begin.y() << "), P_end(" << P_end.x() << "/" << P_end.y() << ") selectedText:\n\""
+                                                                        << buffer.line(mUserCursor.y()).mid(P_begin.x(), P_end.x() - P_begin.x()) << "\"\n"
+                >> mpHost;
+    }
+    return true;
+}
+
+void TConsoleModel::resetFormat()
+{
+    deselect();
+    mFormatCurrent.setColors(mFgColor, mBgColor);
+    mFormatCurrent.setAllDisplayAttributes(TChar::None);
+}
+
+bool TConsoleModel::setSelectionBgColor(const QColor& newColor)
+{
+    mFormatCurrent.setBackground(newColor);
+    return buffer.applyBgColor(P_begin, P_end, newColor);
+}
+
+bool TConsoleModel::setSelectionFgColor(const QColor& newColor)
+{
+    mFormatCurrent.setForeground(newColor);
+    return buffer.applyFgColor(P_begin, P_end, newColor);
+}
+
 // Two gotchas in here:
 //
 // - the strings destined for the log file itself are translated against the
@@ -59,11 +117,8 @@ QStringList TConsoleModel::lines(int from, int to)
 //   the main console, because Host::getDisplayFont() hands back that widget's
 //   own QFont - and unlike the widget call it still answers with no widget.
 namespace {
-// The sentinel's only job is to say that logging was on when the profile last
-// closed: Host reads its bare existence on the next load and clicks the log
-// button. One left behind by a start that never began makes that failure
-// repeat on every launch, and what blocks the sentinel can be a directory,
-// which QFile::remove() will not take.
+// The sentinel's existence makes Host resume logging on the next load, so a stale one repeats a failed
+// start on every launch. It may be a directory, which QFile::remove() won't take.
 void removeAutologSentinel(const QString& path)
 {
     const QFileInfo sentinel(path);
@@ -78,9 +133,8 @@ void removeAutologSentinel(const QString& path)
 }
 } // namespace
 
-// A clicked checkable button has already flipped itself, so a start that goes
-// nowhere still has to report the state it left behind - and say why, since
-// the autolog resume on profile load has no button to watch.
+// A clicked checkable button has already flipped itself, so a failed start must still report the state,
+// and why, since the autolog resume on profile load has no button to watch.
 void TConsoleModel::reportFailedLogStart(const QString& path, const QString& reason)
 {
     mLogStartFailure = qsl("%1: %2").arg(path, reason);
@@ -100,7 +154,7 @@ void TConsoleModel::toggleLogging(bool isMessageEnabled)
         return;
     }
 
-    const auto loggingPath = MudletPaths::getMudletPath(enums::profileDataItemPath, mpHost->getName(), qsl("autolog"));
+    const auto loggingPath = MudletApp::getMudletPath(enums::profileDataItemPath, mpHost->getName(), qsl("autolog"));
     QFile file(loggingPath);
     const QDateTime logDateTime = QDateTime::currentDateTime();
     if (!mLogToLogFile) {
@@ -117,7 +171,7 @@ void TConsoleModel::toggleLogging(bool isMessageEnabled)
         QString logFileName;
         // If no log directory is set, default to Mudlet's replay and log files path
         if (mpHost->mLogDir == nullptr || mpHost->mLogDir.isEmpty()) {
-            directoryLogFile = MudletPaths::getMudletPath(enums::profileReplayAndLogFilesPath, mpHost->getName());
+            directoryLogFile = MudletApp::getMudletPath(enums::profileReplayAndLogFilesPath, mpHost->getName());
         } else {
             directoryLogFile = mpHost->mLogDir;
         }
@@ -209,7 +263,7 @@ void TConsoleModel::toggleLogging(bool isMessageEnabled)
             logStream << "  <meta http-equiv='content-type' content='text/html; charset=utf-8'>";
             // put the charset as early as possible as the parser MUST restart when it
             // switches away from the ASCII default
-            logStream << "  <meta name='generator' content='" << QCoreApplication::translate("TMainConsole", "Mudlet MUD Client version: %1%2").arg(APP_VERSION, mudlet::self()->mAppBuild) << "'>\n";
+            logStream << "  <meta name='generator' content='" << QCoreApplication::translate("TMainConsole", "Mudlet MUD Client version: %1%2").arg(APP_VERSION, MudletApp::buildSuffix()) << "'>\n";
             // Nice to identify what made the file!
             logStream << "  <title>" << QCoreApplication::translate("TMainConsole", "Mudlet, log from %1 profile").arg(mpHost->getName()) << "</title>\n";
             // Web-page title

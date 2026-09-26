@@ -52,9 +52,7 @@ bool SelectionRectangleHandler::matches(const T2DMap::MapInteractionContext& con
         if (context.isSizingLabel) {
             return true;
         }
-        // A label that has been picked up follows the mouse, so the selection
-        // rectangle stands aside for it - the order the single mouse move
-        // handler used to run these two in.
+        // A picked-up label follows the mouse, so the selection rectangle yields to it.
         return context.isMultiSelectionActive && !context.isLabelHighlighted;
     case QEvent::MouseButtonRelease:
         return context.button == Qt::LeftButton && (context.isMultiSelectionActive || context.isSizingLabel);
@@ -93,7 +91,7 @@ bool SelectionRectangleHandler::handleMousePress(T2DMap::MapInteractionContext& 
 
     mMapWidget.mPopupMenu = false;
     mMapWidget.mMultiSelection = !mMapWidget.mMapViewOnly;
-    mMapWidget.mMultiRect = QRect(context.widgetPosition, context.widgetPosition);
+    mMapWidget.mMultiRect = QRectF(context.widgetPosition, context.widgetPosition);
 
     if (!mMapWidget.mpMap->mpRoomDB->getRoom(mMapWidget.mRoomID)) {
         return true;
@@ -161,7 +159,8 @@ bool SelectionRectangleHandler::handleMouseMove(T2DMap::MapInteractionContext& c
     }
 
     if (mMapWidget.mNewMoveAction) {
-        mMapWidget.mMultiRect = QRect(context.widgetPosition, context.widgetPosition);
+        // Not QRect: QRect(p, p) is a pixel wide, and that pixel would stay on the dragged box's far edge.
+        mMapWidget.mMultiRect = QRectF(context.widgetPosition, context.widgetPosition);
         mMapWidget.mNewMoveAction = false;
     } else {
         mMapWidget.mMultiRect.setBottomLeft(context.widgetPosition);
@@ -267,8 +266,10 @@ bool SelectionRectangleHandler::handleMouseRelease(T2DMap::MapInteractionContext
 
     if (mMapWidget.mSizeLabel) {
         mMapWidget.mSizeLabel = false;
-        const QRectF labelRect = mMapWidget.mMultiRect;
-        mMapWidget.createLabel(labelRect);
+        const QRectF labelRect = mMapWidget.mMultiRect.normalized();
+        if (!labelRect.isEmpty()) {
+            mMapWidget.createLabel(labelRect);
+        }
     }
 
     mMapWidget.mMultiRect = QRect(0, 0, 0, 0);

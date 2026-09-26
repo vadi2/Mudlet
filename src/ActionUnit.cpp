@@ -34,11 +34,9 @@
 #include "utils.h"
 
 #include <QDebug>
-#include <QDockWidget>
 #include <QMapIterator>
 #include <QPoint>
 #include <QSet>
-#include <QWidget>
 
 #include <functional>
 
@@ -110,8 +108,7 @@ void ActionUnit::doCleanup()
         return;
     }
 
-    // Called once per unit for every line of game text, and next to never has
-    // anything queued, so skip setting up the flush below.
+    // Runs per unit on every line of game text and next to never has work queued.
     if (!hasPendingDeletes()) {
         return;
     }
@@ -246,7 +243,7 @@ void ActionUnit::reParentAction(int childID, int oldParentID, int newParentID, i
     pChild->setDataChanged();
 
     if ((!pOldParent) && (pNewParent)) {
-        // The bars are the console's widgets; a profile with no view has none to take down
+        // A profile with no view has no console, so no bars to take down
         TMainConsole* pConsole = mpHost->mpConsole;
         if (!pConsole) {
             return;
@@ -624,7 +621,7 @@ void ActionUnit::constructToolbar(TAction* pAction, TToolBar* pToolBar)
     }
 
     if (pAction->mLocation == 4) {
-        pAction->expandToolbar(pToolBar);
+        pToolBar->addActionButtons(pAction);
         pToolBar->setTitleBarWidget(nullptr);
     }
 
@@ -637,7 +634,6 @@ void ActionUnit::constructToolbar(TAction* pAction, TToolBar* pToolBar)
     }
 
     pToolBar->setTitleBarWidget(nullptr);
-    pToolBar->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
     if (pAction->mLocation == 4) {
         if (pAction->mToolbarLastDockArea == Qt::NoDockWidgetArea) {
             qWarning().nospace().noquote() << "ActionUnit::constructToolbar(TAction*, TToolBar*) WARNING - no last dockarea was set for the TAction (\"" << pAction->getName()
@@ -702,7 +698,7 @@ void ActionUnit::constructToolbar(TAction* pA, TEasyButtonBar* pTB)
         return;
     }
 
-    pA->expandToolbar(pTB);
+    pTB->addActionButtons(pA);
     pTB->finalize();
     if (pA->mOrientation == 0) {
         pTB->setHorizontalOrientation();
@@ -718,8 +714,7 @@ void ActionUnit::constructToolbar(TAction* pA, TEasyButtonBar* pTB)
 
 void ActionUnit::updateAllToolbars()
 {
-    // The bars are the console's widgets, so a profile with no view has nothing
-    // to build; the regenerate paths below reach the console only through here
+    // A profile with no view has no console; the regenerate functions below rely on this check
     if (!mpHost->mpConsole) {
         return;
     }
