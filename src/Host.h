@@ -159,6 +159,7 @@ inline QDebug& operator<<(QDebug& debug, const stopWatch& stopwatch)
 }
 #endif // QT_NO_DEBUG_STREAM
 
+// DIAG: header touch to measure a realistic rebuild
 class Host : public QObject
 {
     Q_OBJECT
