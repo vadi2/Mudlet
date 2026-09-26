@@ -1,4 +1,5 @@
 describe("Alias processing", function()
+    it("SABOTAGE: deliberate spec failure", function() assert.is_true(false) end)
 
     -- TAlias's match-all loop is unconditional, and it steps one byte after an
     -- empty match, so on a command holding a multi-byte character it can land
