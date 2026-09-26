@@ -452,111 +452,6 @@ jobs:
         RUNNER_OS: ${{runner.os}}
         DEPLOY: ${{matrix.deploy}}
 
-    - name: (Linux) Run C++ tests
-      if: runner.os == 'Linux' && matrix.run_tests == 'true'
-      working-directory: '${{runner.workspace}}/b/ninja'
-      run: ctest --output-on-failure -j $(nproc)
-      env:
-        QT_QPA_PLATFORM: offscreen
-        # This runner has Qt's FFmpeg backend and can decode, so TMediaLoopTest must
-        # demonstrate every media behaviour rather than skip any of them. Without a floor
-        # somewhere, a lost codec or a changed default backend would turn the whole file
-        # green-by-skip on every platform and say nothing about it.
-        MUDLET_MEDIA_TESTS_REQUIRE_PLAYBACK: 1
-
-    - name: (macOS) Run C++ tests
-      if: runner.os == 'macOS' && matrix.run_tests == 'true'
-      working-directory: '${{runner.workspace}}/b/ninja'
-      run: ctest --output-on-failure -j $(sysctl -n hw.ncpu)
-
-    # Skipped after the full ctest run, which covers these, and with BUILD_TESTING=OFF (bare ctest exits 8)
-    - name: Run QTest
-      if: matrix.run_tests != 'true' && matrix.build_tests != 'false'
-      run: ctest --test-dir ${{runner.workspace}}/b/ninja -L functional --output-on-failure -j $(nproc)
-
-    - name: add ssh-agent for release uploads
-      if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.deploy == 'deploy' && startsWith(github.ref, 'refs/tags/Mudlet-')
-      uses: webfactory/ssh-agent@v0.10.0
-      with:
-        ssh-private-key: ${{secrets.UPLOAD_PRIVATEKEY}}
-
-    - name: package Mudlet
-      if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.deploy == 'deploy'
-      run: |
-        export ARCH=$(uname -m)
-        echo "ARCH=$ARCH" >> $GITHUB_ENV
-        if [ "$RUNNER_OS" = "macOS" ] && [ "$ARCH" = "arm64" ]; then
-          # dblsqd only supports 'arm' as an architecture and not 'arm64'
-          export ARCH_DBLSQD=arm
-          echo "ARCH_DBLSQD=arm" >> $GITHUB_ENV
-        else
-          export ARCH_DBLSQD=$ARCH
-          echo "ARCH_DBLSQD=$ARCH" >> $GITHUB_ENV
-        fi
-        ${{github.workspace}}/CI/after_success.sh
-      env:
-        BUILD_FOLDER: ${{runner.workspace}}/b/ninja
-        RUNNER_OS: ${{runner.os}}
-        X_WP_DOWNLOAD_TOKEN: ${{secrets.X_WP_DOWNLOAD_TOKEN}}
-        DEPLOY: ${{matrix.deploy}}
-        DEPLOY_PATH: ${{secrets.DEPLOY_PATH}}
-        DBLSQD_USER: ${{secrets.DBLSQD_USER}}
-        DBLSQD_PASS: ${{secrets.DBLSQD_PASS}}
-        DEPLOY_KEY_PASS: ${{secrets.DEPLOY_KEY_PASS}}
-        MACOS_SIGNING_PASS: ${{secrets.MACOS_SIGNING_PASS}}
-        APPLE_USERNAME: ${{secrets.APPLE_USERNAME}}
-        APPLE_PASSWORD: ${{secrets.APPLE_PASSWORD}}
-        APPLE_TEAM_ID: ${{secrets.APPLE_TEAM_ID}}
-        WITH_SENTRY: "ON"
-        GITHUB_FORCE_BUILD: ${{ github.event.inputs.scheduled == 'true' }}
-        # needed so CI/*.after_success.sh can query existing releases to skip duplicate PTBs
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Upload packaged Mudlet
-      uses: actions/upload-artifact@v7
-      if: env.UPLOAD_FILENAME
-      with:
-        name: ${{env.UPLOAD_FILENAME}}
-        path: ${{env.FOLDER_TO_UPLOAD}}
-
-    - name: Submit to make.mudlet.org
-      if: env.UPLOAD_FILENAME
-      # --fail-with-body: gha_queue.php reports refusals (e.g. a duplicate artifact name after a
-      # job re-run) as a 4xx with the reason in the body, which plain curl would exit 0 on
-      run: curl --fail-with-body --retry 5 -X POST "https://make.mudlet.org/snapshots/gha_queue.php?artifact_name=${{env.UPLOAD_FILENAME}}&unzip=1"
-      shell: bash
-
-    - name: Upload release asset for GitHub Release
-      uses: actions/upload-artifact@v7
-      if: env.RELEASE_ASSET_PATH
-      with:
-        name: release-asset-${{ runner.os }}-${{ runner.arch }}
-        path: |
-          ${{ env.RELEASE_ASSET_PATH }}
-          ${{ env.RELEASE_ASSET_SHA256_PATH }}
-        retention-days: 3
-
-    - name: Export release metadata
-      if: env.RELEASE_ASSET_PATH
-      shell: bash
-      run: |
-        jq -n \
-          --arg version "${VERSION}" \
-          --arg build_suffix "${MUDLET_VERSION_BUILD}" \
-          --arg commit "${BUILD_COMMIT}" \
-          --arg ref "${{ github.ref }}" \
-          --arg event "${{ github.event_name }}" \
-          '{version: $version, build_suffix: $build_suffix, commit: $commit, ref: $ref, event: $event}' \
-          > release-metadata.json
-
-    - name: Upload release metadata
-      uses: actions/upload-artifact@v7
-      if: env.RELEASE_ASSET_PATH
-      with:
-        name: release-metadata-${{ runner.os }}-${{ runner.arch }}
-        path: release-metadata.json
-        retention-days: 3
-
     # we need to be in the right place for LuaGlobals.lua to load
     - name: (Linux) Prep binary for running tests
       if: matrix.run_tests == 'true' && runner.os =='Linux'
@@ -564,15 +459,9 @@ jobs:
 
     - name: (macOS) Prep binary for running tests
       if: matrix.run_tests == 'true' && runner.os == 'macOS'
+      # Copied before packaging moves the bundle out of the build tree
       run: |
-        if [ -d "${{runner.workspace}}/b/ninja/${{env.UPLOAD_FILENAME}}.app" ]; then
-          cp -r ${{runner.workspace}}/b/ninja/${{env.UPLOAD_FILENAME}}.app ~/Desktop/Mudlet.app
-        elif [ -d "${{runner.workspace}}/b/ninja/Mudlet PTB.app" ]; then
-          cp -r "${{runner.workspace}}/b/ninja/Mudlet PTB.app" ~/Desktop/Mudlet.app
-        else
-          cp -r ${{runner.workspace}}/b/ninja/src/mudlet.app ~/Desktop/Mudlet.app
-        fi
-        cd ~/Desktop
+        cp -r ${{runner.workspace}}/b/ninja/src/mudlet.app ~/Desktop/Mudlet.app
         sudo codesign --remove-signature ~/Desktop/Mudlet.app
 
     - name: (Linux/macOS) Start fixture HTTP server for Lua tests
@@ -675,13 +564,15 @@ jobs:
         echo "MUDLET_TEST_MMCP_DIR=${peer_dir}" >> "${GITHUB_ENV}"
         echo "MMCP peer fixture ready on 127.0.0.1:$(cat "${peer_dir}/port")"
 
-    - name: (Linux) Run Lua tests
+    - name: (Linux) Start Lua tests
+      id: lua-start-linux
       if: matrix.run_tests == 'true' && runner.os == 'Linux'
-      # This leg drives the real discord-rpc library, whose reconnects happen in
-      # wall-clock time, so the suite needs a budget of its own: the run itself
-      # takes ~75s, and the rest is headroom for a slow runner stretching those.
-      timeout-minutes: 6
-      run: xvfb-run --auto-servernum ${{github.workspace}}/src/mudlet --profile "Mudlet self-test" --mirror --offline
+      # In the background, alongside the C++ tests and packaging; "Finish Lua tests"
+      # waits for it and fails the job if it failed
+      run: |
+        date +%s > "${{runner.temp}}/lua-tests.started"
+        nohup bash -c 'xvfb-run --auto-servernum "$1" --profile "Mudlet self-test" --mirror --offline > "$2" 2>&1; echo $? > "$3.tmp"; mv "$3.tmp" "$3"' _ \
+          "${{github.workspace}}/src/mudlet" "${{runner.temp}}/lua-tests.log" "${{runner.temp}}/lua-tests.status" > /dev/null 2>&1 &
       env:
         AUTORUN_BUSTED_TESTS: 'true'
         MUDLET_TEST_MODE: 1
@@ -725,12 +616,13 @@ jobs:
         # that from CI.
         LSAN_OPTIONS: ${{ matrix.enable_asan == 'true' && format('suppressions={0}/asan-suppressions.txt:exitcode=1:log_threads=1', github.workspace) || '' }}
 
-    - name: (macOS) Run Lua tests
+    - name: (macOS) Start Lua tests
+      id: lua-start-macos
       if: matrix.run_tests == 'true' && runner.os == 'macOS'
-      # ~100s on a healthy Intel runner and measured at 172s on a slow one, so a
-      # tighter limit fails on runner speed rather than on anything the suite did
-      timeout-minutes: 6
-      run: ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline
+      run: |
+        date +%s > "${{runner.temp}}/lua-tests.started"
+        nohup bash -c '"$1" --profile "Mudlet self-test" --mirror --offline > "$2" 2>&1; echo $? > "$3.tmp"; mv "$3.tmp" "$3"' _ \
+          ~/Desktop/Mudlet.app/Contents/MacOS/mudlet "${{runner.temp}}/lua-tests.log" "${{runner.temp}}/lua-tests.status" > /dev/null 2>&1 &
       env:
         AUTORUN_BUSTED_TESTS: 'true'
         MUDLET_TEST_MODE: 1
@@ -743,6 +635,133 @@ jobs:
         TESTS_DIRECTORY: ${{github.workspace}}/src/mudlet-lua/tests
         QUIT_MUDLET_AFTER_TESTS: 'true'
         ASAN_OPTIONS: detect_leaks=0
+
+    - name: (Linux) Run C++ tests
+      if: runner.os == 'Linux' && matrix.run_tests == 'true'
+      working-directory: '${{runner.workspace}}/b/ninja'
+      run: ctest --output-on-failure -j $(nproc)
+      env:
+        QT_QPA_PLATFORM: offscreen
+        # This runner has Qt's FFmpeg backend and can decode, so TMediaLoopTest must
+        # demonstrate every media behaviour rather than skip any of them. Without a floor
+        # somewhere, a lost codec or a changed default backend would turn the whole file
+        # green-by-skip on every platform and say nothing about it.
+        MUDLET_MEDIA_TESTS_REQUIRE_PLAYBACK: 1
+
+    - name: (macOS) Run C++ tests
+      if: runner.os == 'macOS' && matrix.run_tests == 'true'
+      working-directory: '${{runner.workspace}}/b/ninja'
+      # Twice the cores: most of these tests wait on timers rather than the CPU, and
+      # -j3 left a third of it idle (292s at -j3, 178s at -j6)
+      run: ctest --output-on-failure -j $(( $(sysctl -n hw.ncpu) * 2 ))
+
+    # Skipped after the full ctest run, which covers these, and with BUILD_TESTING=OFF (bare ctest exits 8)
+    - name: Run QTest
+      if: matrix.run_tests != 'true' && matrix.build_tests != 'false'
+      run: ctest --test-dir ${{runner.workspace}}/b/ninja -L functional --output-on-failure -j $(nproc)
+
+    - name: add ssh-agent for release uploads
+      if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.deploy == 'deploy' && startsWith(github.ref, 'refs/tags/Mudlet-')
+      uses: webfactory/ssh-agent@v0.10.0
+      with:
+        ssh-private-key: ${{secrets.UPLOAD_PRIVATEKEY}}
+
+    - name: package Mudlet
+      if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.deploy == 'deploy'
+      run: |
+        export ARCH=$(uname -m)
+        echo "ARCH=$ARCH" >> $GITHUB_ENV
+        if [ "$RUNNER_OS" = "macOS" ] && [ "$ARCH" = "arm64" ]; then
+          # dblsqd only supports 'arm' as an architecture and not 'arm64'
+          export ARCH_DBLSQD=arm
+          echo "ARCH_DBLSQD=arm" >> $GITHUB_ENV
+        else
+          export ARCH_DBLSQD=$ARCH
+          echo "ARCH_DBLSQD=$ARCH" >> $GITHUB_ENV
+        fi
+        ${{github.workspace}}/CI/after_success.sh
+      env:
+        BUILD_FOLDER: ${{runner.workspace}}/b/ninja
+        RUNNER_OS: ${{runner.os}}
+        X_WP_DOWNLOAD_TOKEN: ${{secrets.X_WP_DOWNLOAD_TOKEN}}
+        DEPLOY: ${{matrix.deploy}}
+        DEPLOY_PATH: ${{secrets.DEPLOY_PATH}}
+        DBLSQD_USER: ${{secrets.DBLSQD_USER}}
+        DBLSQD_PASS: ${{secrets.DBLSQD_PASS}}
+        DEPLOY_KEY_PASS: ${{secrets.DEPLOY_KEY_PASS}}
+        MACOS_SIGNING_PASS: ${{secrets.MACOS_SIGNING_PASS}}
+        APPLE_USERNAME: ${{secrets.APPLE_USERNAME}}
+        APPLE_PASSWORD: ${{secrets.APPLE_PASSWORD}}
+        APPLE_TEAM_ID: ${{secrets.APPLE_TEAM_ID}}
+        WITH_SENTRY: "ON"
+        GITHUB_FORCE_BUILD: ${{ github.event.inputs.scheduled == 'true' }}
+        # needed so CI/*.after_success.sh can query existing releases to skip duplicate PTBs
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload packaged Mudlet
+      uses: actions/upload-artifact@v7
+      if: env.UPLOAD_FILENAME
+      with:
+        name: ${{env.UPLOAD_FILENAME}}
+        path: ${{env.FOLDER_TO_UPLOAD}}
+
+    - name: Submit to make.mudlet.org
+      if: env.UPLOAD_FILENAME
+      # --fail-with-body: gha_queue.php reports refusals (e.g. a duplicate artifact name after a
+      # job re-run) as a 4xx with the reason in the body, which plain curl would exit 0 on
+      run: curl --fail-with-body --retry 5 -X POST "https://make.mudlet.org/snapshots/gha_queue.php?artifact_name=${{env.UPLOAD_FILENAME}}&unzip=1"
+      shell: bash
+
+    - name: Upload release asset for GitHub Release
+      uses: actions/upload-artifact@v7
+      if: env.RELEASE_ASSET_PATH
+      with:
+        name: release-asset-${{ runner.os }}-${{ runner.arch }}
+        path: |
+          ${{ env.RELEASE_ASSET_PATH }}
+          ${{ env.RELEASE_ASSET_SHA256_PATH }}
+        retention-days: 3
+
+    - name: Export release metadata
+      if: env.RELEASE_ASSET_PATH
+      shell: bash
+      run: |
+        jq -n \
+          --arg version "${VERSION}" \
+          --arg build_suffix "${MUDLET_VERSION_BUILD}" \
+          --arg commit "${BUILD_COMMIT}" \
+          --arg ref "${{ github.ref }}" \
+          --arg event "${{ github.event_name }}" \
+          '{version: $version, build_suffix: $build_suffix, commit: $commit, ref: $ref, event: $event}' \
+          > release-metadata.json
+
+    - name: Upload release metadata
+      uses: actions/upload-artifact@v7
+      if: env.RELEASE_ASSET_PATH
+      with:
+        name: release-metadata-${{ runner.os }}-${{ runner.arch }}
+        path: release-metadata.json
+        retention-days: 3
+
+    - name: (Linux/macOS) Finish Lua tests
+      if: ${{ !cancelled() && (steps.lua-start-linux.outcome == 'success' || steps.lua-start-macos.outcome == 'success') }}
+      shell: bash
+      env:
+        # Counted from the start of the run, which shares the runner with the C++
+        # tests: ~4m40s alone on the Linux leg and ~6m30s beside them
+        LUA_TESTS_TIMEOUT: 600
+      run: |
+        status_file="${{runner.temp}}/lua-tests.status"
+        deadline=$(( $(cat "${{runner.temp}}/lua-tests.started") + LUA_TESTS_TIMEOUT ))
+        while [ ! -s "${status_file}" ] && [ "$(date +%s)" -lt "${deadline}" ]; do
+          sleep 2
+        done
+        cat "${{runner.temp}}/lua-tests.log"
+        if [ ! -s "${status_file}" ]; then
+          echo "::error::The Lua tests did not finish within ${LUA_TESTS_TIMEOUT}s of starting"
+          exit 1
+        fi
+        exit "$(cat "${status_file}")"
 
     - name: (Linux) Show the captured Discord frames on failure
       if: failure() && matrix.run_tests == 'true' && runner.os == 'Linux'
