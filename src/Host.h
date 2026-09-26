@@ -1373,3 +1373,4 @@ private:
 Q_DECLARE_OPERATORS_FOR_FLAGS(Host::DiscordOptionFlags)
 
 #endif // MUDLET_HOST_H
+// CI A/B header-change probe
