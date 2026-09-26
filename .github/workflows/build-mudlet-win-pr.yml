@@ -187,9 +187,7 @@ jobs:
           $GITHUB_WORKSPACE/build-$MSYSTEM/release/mudlet.exe --profile "Mudlet self-test" --offline > "${lua_log}" 2>&1 &
         lua_pid=$!
 
-        # Twice the cores: most of these tests wait on timers rather than the CPU, and
-        # -j4 left half of it idle (174s at -j4, 112s at -j8)
-        ctest --test-dir $GITHUB_WORKSPACE/build-$MSYSTEM/test --output-on-failure -j $(( $(nproc) * 2 )) && ctest_status=0 || ctest_status=$?
+        ctest --test-dir $GITHUB_WORKSPACE/build-$MSYSTEM/test --output-on-failure -j $(nproc) && ctest_status=0 || ctest_status=$?
 
         while kill -0 "${lua_pid}" 2>/dev/null && [ "$(date +%s)" -lt $(( lua_started + LUA_TESTS_TIMEOUT )) ]; do
           sleep 2
