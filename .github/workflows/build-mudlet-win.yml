@@ -187,6 +187,11 @@ jobs:
           echo "::error::The Lua tests did not finish within ${LUA_TESTS_TIMEOUT}s of starting"
         elif [ "${lua_status}" != 0 ]; then
           echo "::error::Mudlet exited with ${lua_status} running the Lua tests"
+        elif ! grep -qE '^[0-9]+ successes? / [0-9]+ failures? / [0-9]+ errors? / [0-9]+ pending' "${lua_log}"; then
+          # Mudlet quits cleanly and marks nothing failed when it cannot find
+          # busted or the specs, so a run without busted's totals line ran nothing
+          echo "::error::The Lua tests never ran - there is no busted summary in their output"
+          lua_status=no-tests
         fi
         [ "${ctest_status}" = 0 ] && [ "${lua_status}" = 0 ]
 

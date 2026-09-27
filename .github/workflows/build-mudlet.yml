@@ -457,13 +457,6 @@ jobs:
       if: matrix.run_tests == 'true' && runner.os =='Linux'
       run: cp ${{runner.workspace}}/b/ninja/src/mudlet ${{github.workspace}}/src
 
-    - name: (macOS) Prep binary for running tests
-      if: matrix.run_tests == 'true' && runner.os == 'macOS'
-      # Copied before packaging moves the bundle out of the build tree
-      run: |
-        cp -r ${{runner.workspace}}/b/ninja/src/mudlet.app ~/Desktop/Mudlet.app
-        sudo codesign --remove-signature ~/Desktop/Mudlet.app
-
     - name: (Linux/macOS) Start fixture HTTP server for Lua tests
       if: matrix.run_tests == 'true'
       shell: bash
@@ -616,26 +609,6 @@ jobs:
         # that from CI.
         LSAN_OPTIONS: ${{ matrix.enable_asan == 'true' && format('suppressions={0}/asan-suppressions.txt:exitcode=1:log_threads=1', github.workspace) || '' }}
 
-    - name: (macOS) Start Lua tests
-      id: lua-start-macos
-      if: matrix.run_tests == 'true' && runner.os == 'macOS'
-      run: |
-        date +%s > "${{runner.temp}}/lua-tests.started"
-        nohup bash -c '"$1" --profile "Mudlet self-test" --mirror --offline > "$2" 2>&1; echo $? > "$3.tmp"; mv "$3.tmp" "$3"' _ \
-          ~/Desktop/Mudlet.app/Contents/MacOS/mudlet "${{runner.temp}}/lua-tests.log" "${{runner.temp}}/lua-tests.status" > /dev/null 2>&1 &
-      env:
-        AUTORUN_BUSTED_TESTS: 'true'
-        MUDLET_TEST_MODE: 1
-        MUDLET_TEST_REQUIRE_TTS_MOCK: 1
-        MUDLET_TEST_REQUIRE_HTTP_FIXTURE: 1
-        MUDLET_TEST_REQUIRE_MMCP_PEER: 1
-        MUDLET_TEST_REQUIRE_TELNET_FIXTURE: 1
-        # No MUDLET_TEST_REQUIRE_MEDIA: Qt Multimedia starts no player on the
-        # macOS runners, so the media effect specs pend here by design.
-        TESTS_DIRECTORY: ${{github.workspace}}/src/mudlet-lua/tests
-        QUIT_MUDLET_AFTER_TESTS: 'true'
-        ASAN_OPTIONS: detect_leaks=0
-
     - name: (Linux) Run C++ tests
       if: runner.os == 'Linux' && matrix.run_tests == 'true'
       working-directory: '${{runner.workspace}}/b/ninja'
@@ -648,8 +621,9 @@ jobs:
         # green-by-skip on every platform and say nothing about it.
         MUDLET_MEDIA_TESTS_REQUIRE_PLAYBACK: 1
 
-    - name: (macOS) Run C++ tests
-      if: runner.os == 'macOS' && matrix.run_tests == 'true'
+    - name: (macOS) Run C++ tests before publishing
+      # Tags and PTBs publish from inside packaging, so there it waits for these
+      if: runner.os == 'macOS' && matrix.run_tests == 'true' && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'schedule' || github.event.inputs.scheduled == 'true')
       working-directory: '${{runner.workspace}}/b/ninja'
       # Twice the cores: most of these tests wait on timers rather than the CPU, and
       # -j3 left a third of it idle (292s at -j3, 178s at -j6)
@@ -659,6 +633,12 @@ jobs:
     - name: Run QTest
       if: matrix.run_tests != 'true' && matrix.build_tests != 'false'
       run: ctest --test-dir ${{runner.workspace}}/b/ninja -L functional --output-on-failure -j $(nproc)
+
+    - name: (macOS) Keep the built app for the C++ tests
+      # Packaging moves src/mudlet.app into the bundle it ships, and the C++ tests
+      # that run after it still launch and read the one the build made
+      if: runner.os == 'macOS' && matrix.run_tests == 'true' && matrix.deploy == 'deploy' && !(startsWith(github.ref, 'refs/tags/') || github.event_name == 'schedule' || github.event.inputs.scheduled == 'true')
+      run: cp -Rp ${{runner.workspace}}/b/ninja/src/mudlet.app "${{runner.temp}}/mudlet-built.app"
 
     - name: add ssh-agent for release uploads
       if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.deploy == 'deploy' && startsWith(github.ref, 'refs/tags/Mudlet-')
@@ -697,6 +677,55 @@ jobs:
         GITHUB_FORCE_BUILD: ${{ github.event.inputs.scheduled == 'true' }}
         # needed so CI/*.after_success.sh can query existing releases to skip duplicate PTBs
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: (macOS) Put the built app back for the C++ tests
+      if: runner.os == 'macOS' && matrix.run_tests == 'true' && matrix.deploy == 'deploy' && !(startsWith(github.ref, 'refs/tags/') || github.event_name == 'schedule' || github.event.inputs.scheduled == 'true')
+      run: |
+        if [ ! -d "${{runner.workspace}}/b/ninja/src/mudlet.app" ]; then
+          mv "${{runner.temp}}/mudlet-built.app" "${{runner.workspace}}/b/ninja/src/mudlet.app"
+        fi
+
+    - name: (macOS) Prep binary for running tests
+      if: matrix.run_tests == 'true' && runner.os == 'macOS'
+      # The packaged bundle when there is one, so the suite also covers what
+      # packaging bundled into it
+      run: |
+        if [ -d "${{runner.workspace}}/b/ninja/${{env.UPLOAD_FILENAME}}.app" ]; then
+          cp -r ${{runner.workspace}}/b/ninja/${{env.UPLOAD_FILENAME}}.app ~/Desktop/Mudlet.app
+        elif [ -d "${{runner.workspace}}/b/ninja/Mudlet PTB.app" ]; then
+          cp -r "${{runner.workspace}}/b/ninja/Mudlet PTB.app" ~/Desktop/Mudlet.app
+        else
+          cp -r ${{runner.workspace}}/b/ninja/src/mudlet.app ~/Desktop/Mudlet.app
+        fi
+        cd ~/Desktop
+        sudo codesign --remove-signature ~/Desktop/Mudlet.app
+
+    - name: (macOS) Start Lua tests
+      id: lua-start-macos
+      if: matrix.run_tests == 'true' && runner.os == 'macOS'
+      run: |
+        date +%s > "${{runner.temp}}/lua-tests.started"
+        nohup bash -c '"$1" --profile "Mudlet self-test" --mirror --offline > "$2" 2>&1; echo $? > "$3.tmp"; mv "$3.tmp" "$3"' _ \
+          ~/Desktop/Mudlet.app/Contents/MacOS/mudlet "${{runner.temp}}/lua-tests.log" "${{runner.temp}}/lua-tests.status" > /dev/null 2>&1 &
+      env:
+        AUTORUN_BUSTED_TESTS: 'true'
+        MUDLET_TEST_MODE: 1
+        MUDLET_TEST_REQUIRE_TTS_MOCK: 1
+        MUDLET_TEST_REQUIRE_HTTP_FIXTURE: 1
+        MUDLET_TEST_REQUIRE_MMCP_PEER: 1
+        MUDLET_TEST_REQUIRE_TELNET_FIXTURE: 1
+        # No MUDLET_TEST_REQUIRE_MEDIA: Qt Multimedia starts no player on the
+        # macOS runners, so the media effect specs pend here by design.
+        TESTS_DIRECTORY: ${{github.workspace}}/src/mudlet-lua/tests
+        QUIT_MUDLET_AFTER_TESTS: 'true'
+        ASAN_OPTIONS: detect_leaks=0
+
+    - name: (macOS) Run C++ tests
+      if: runner.os == 'macOS' && matrix.run_tests == 'true' && !(startsWith(github.ref, 'refs/tags/') || github.event_name == 'schedule' || github.event.inputs.scheduled == 'true')
+      working-directory: '${{runner.workspace}}/b/ninja'
+      # Twice the cores: most of these tests wait on timers rather than the CPU, and
+      # -j3 left a third of it idle (292s at -j3, 178s at -j6)
+      run: ctest --output-on-failure -j $(( $(sysctl -n hw.ncpu) * 2 ))
 
     - name: Upload packaged Mudlet
       uses: actions/upload-artifact@v7
@@ -759,6 +788,12 @@ jobs:
         cat "${{runner.temp}}/lua-tests.log"
         if [ ! -s "${status_file}" ]; then
           echo "::error::The Lua tests did not finish within ${LUA_TESTS_TIMEOUT}s of starting"
+          exit 1
+        fi
+        # Mudlet quits cleanly and marks nothing failed when it cannot find busted
+        # or the specs, so a run without busted's totals line ran no tests at all
+        if ! grep -qE '^[0-9]+ successes? / [0-9]+ failures? / [0-9]+ errors? / [0-9]+ pending' "${{runner.temp}}/lua-tests.log"; then
+          echo "::error::The Lua tests never ran - there is no busted summary in their output"
           exit 1
         fi
         exit "$(cat "${status_file}")"
