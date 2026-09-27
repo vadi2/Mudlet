@@ -571,7 +571,6 @@ jobs:
         # against this job by LeakSanitizer with no Mudlet frames in the stack),
         # and no spec needs a session bus.
         DBUS_SESSION_BUS_ADDRESS: 'disabled:'
-        TESTS_DIRECTORY: ${{github.workspace}}/src/mudlet-lua/tests
         QUIT_MUDLET_AFTER_TESTS: 'true'
         # intercept_tls_get_addr=0 keeps gcc-10's sanitizer runtime from
         # recording a bogus dynamic-TLS range for LeakSanitizer's tracer to crash
@@ -683,7 +682,6 @@ jobs:
         MUDLET_TEST_REQUIRE_TELNET_FIXTURE: 1
         # No MUDLET_TEST_REQUIRE_MEDIA: Qt Multimedia starts no player on the
         # macOS runners, so the media effect specs pend here by design.
-        TESTS_DIRECTORY: ${{github.workspace}}/src/mudlet-lua/tests
         QUIT_MUDLET_AFTER_TESTS: 'true'
         ASAN_OPTIONS: detect_leaks=0
 
