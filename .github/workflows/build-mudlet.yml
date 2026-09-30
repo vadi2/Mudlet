@@ -25,11 +25,11 @@ jobs:
   compile-mudlet:
     name: ${{matrix.buildname}}
     runs-on: ${{matrix.os}}
-    if: ${{ github.repository_owner == 'Mudlet' }}
+    if: ${{ (github.repository_owner == 'Mudlet' || github.repository_owner == 'vadi2') }}
     env:
       LUA_VERSION: '5.1.5'
       CCACHE_MAXSIZE: ${{ matrix.ccache_maxsize || '500M' }}
-      CCACHE_COMPRESSLEVEL: ${{ (github.ref_name == 'development' && github.event_name != 'schedule' && github.event.inputs.scheduled != 'true') && '19' || '1' }}
+      CCACHE_COMPRESSLEVEL: ${{ ((github.ref_name == 'development' || github.repository_owner == 'vadi2') && github.event_name != 'schedule' && github.event.inputs.scheduled != 'true') && '19' || '1' }}
     strategy:
       fail-fast: false
       matrix:
@@ -204,7 +204,7 @@ jobs:
       if: runner.os == 'Linux'
 
     - name: Save Lua build cache
-      if: github.ref_name == 'development' && steps.cache-lua.outputs.cache-hit != 'true'
+      if: (github.ref_name == 'development' || github.repository_owner == 'vadi2') && steps.cache-lua.outputs.cache-hit != 'true'
       uses: actions/cache/save@v6
       with:
         path: .lua
@@ -307,7 +307,7 @@ jobs:
 
     - name: (Linux) Save xcb-util-cursor 0.1.5 cache
       if: >-
-        runner.os == 'Linux' && github.ref_name == 'development'
+        runner.os == 'Linux' && (github.ref_name == 'development' || github.repository_owner == 'vadi2')
         && steps.cache-xcb-cursor.outputs.cache-hit != 'true'
       uses: actions/cache/save@v6
       with:
@@ -388,7 +388,7 @@ jobs:
 
     - name: recompress the restored ccache
       if: >-
-        github.ref_name == 'development'
+        (github.ref_name == 'development' || github.repository_owner == 'vadi2')
         && github.event_name != 'schedule' && github.event.inputs.scheduled != 'true'
       run: |
         ccache --recompress 19
@@ -422,7 +422,7 @@ jobs:
 
     - name: Save ccache
       if: >-
-        always() && github.ref_name == 'development'
+        always() && (github.ref_name == 'development' || github.repository_owner == 'vadi2')
         && github.event_name != 'schedule' && github.event.inputs.scheduled != 'true'
       uses: actions/cache/save@v6
       with:
