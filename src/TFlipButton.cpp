@@ -28,7 +28,6 @@
 #include "TEasyButtonBar.h"
 #include "TToolBar.h"
 
-#include <QMenu>
 #include <QStyleOptionButton>
 #include <QStylePainter>
 
