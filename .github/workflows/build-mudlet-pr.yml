@@ -441,17 +441,6 @@ jobs:
         # green-by-skip on every platform and say nothing about it.
         MUDLET_MEDIA_TESTS_REQUIRE_PLAYBACK: 1
 
-    - name: (macOS) Run C++ tests
-      if: runner.os == 'macOS' && matrix.run_tests == 'true'
-      working-directory: '${{runner.workspace}}/b/ninja'
-      run: |
-        iostat -w 5 > "$RUNNER_TEMP/iostat-ctest.log" 2>&1 &
-        sampler=$!
-        ctest --output-on-failure -j ${CTEST_JOBS:-$(sysctl -n hw.ncpu)}
-        kill $sampler || true
-        echo "--- iostat during ctest (cpu us sy id at the end of each row) ---"
-        cat "$RUNNER_TEMP/iostat-ctest.log"
-
     # Skipped after the full ctest run, which covers these, and with BUILD_TESTING=OFF (bare ctest exits 8)
     - name: Run QTest
       if: matrix.run_tests != 'true' && matrix.build_tests != 'false'
@@ -680,28 +669,34 @@ jobs:
 
     - name: (macOS) Run Lua tests
       if: matrix.run_tests == 'true' && runner.os == 'macOS'
-      # ~100s on a healthy Intel runner and measured at 172s on a slow one, so a
-      # tighter limit fails on runner speed rather than on anything the suite did
-      timeout-minutes: 6
+      timeout-minutes: 15
+      shell: bash
       run: |
-        iostat -w 5 > "$RUNNER_TEMP/iostat-lua.log" 2>&1 &
+        iostat -w 5 > "$RUNNER_TEMP/iostat-both.log" 2>&1 &
         sampler=$!
-        ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline
+        (
+          env AUTORUN_BUSTED_TESTS=true MUDLET_TEST_MODE=1 MUDLET_TEST_REQUIRE_TTS_MOCK=1 \
+            MUDLET_TEST_REQUIRE_HTTP_FIXTURE=1 MUDLET_TEST_REQUIRE_MMCP_PEER=1 MUDLET_TEST_REQUIRE_TELNET_FIXTURE=1 \
+            TESTS_DIRECTORY="${{github.workspace}}/src/mudlet-lua/tests" QUIT_MUDLET_AFTER_TESTS=true ASAN_OPTIONS=detect_leaks=0 \
+            ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline > "$RUNNER_TEMP/lua.log" 2>&1
+          echo $? > "$RUNNER_TEMP/lua.exit"
+          echo "Lua tests finished at $(date -u +%T)" >> "$RUNNER_TEMP/lua.log"
+        ) &
+        luapid=$!
+        echo "started Lua tests at $(date -u +%T)"
+        set +e
+        (cd "${{runner.workspace}}/b/ninja" && ctest --output-on-failure -j ${CTEST_JOBS})
+        ctest_rc=$?
+        echo "ctest finished at $(date -u +%T) rc=$ctest_rc"
+        wait $luapid
         kill $sampler || true
-        echo "--- iostat during Lua tests ---"
-        cat "$RUNNER_TEMP/iostat-lua.log"
-      env:
-        AUTORUN_BUSTED_TESTS: 'true'
-        MUDLET_TEST_MODE: 1
-        MUDLET_TEST_REQUIRE_TTS_MOCK: 1
-        MUDLET_TEST_REQUIRE_HTTP_FIXTURE: 1
-        MUDLET_TEST_REQUIRE_MMCP_PEER: 1
-        MUDLET_TEST_REQUIRE_TELNET_FIXTURE: 1
-        # No MUDLET_TEST_REQUIRE_MEDIA: Qt Multimedia starts no player on the
-        # macOS runners, so the media effect specs pend here by design.
-        TESTS_DIRECTORY: ${{github.workspace}}/src/mudlet-lua/tests
-        QUIT_MUDLET_AFTER_TESTS: 'true'
-        ASAN_OPTIONS: detect_leaks=0
+        echo "--- Lua tests output ---"
+        cat "$RUNNER_TEMP/lua.log"
+        echo "--- iostat during both ---"
+        cat "$RUNNER_TEMP/iostat-both.log"
+        lua_rc=$(cat "$RUNNER_TEMP/lua.exit")
+        echo "ctest rc=$ctest_rc lua rc=$lua_rc"
+        [ "$ctest_rc" = 0 ] && [ "$lua_rc" = 0 ]
 
     - name: (Linux) Show the captured Discord frames on failure
       if: failure() && matrix.run_tests == 'true' && runner.os == 'Linux'
