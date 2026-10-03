@@ -69,4 +69,5 @@ python3 build.py            # writes SwedishTranslator.mpackage next to this fil
 If you select text, click elsewhere to clear the selection and then right-click → **Translate**,
 the previously selected text is translated. Mudlet passes the last selection's coordinates to the
 menu action even after the highlight is gone, and a script has no way to tell, so select the text
-again right before translating it.
+again right before translating it. Reported upstream as
+[Mudlet/Mudlet#11401](https://github.com/Mudlet/Mudlet/issues/11401).
