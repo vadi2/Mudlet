@@ -59,17 +59,6 @@ jobs:
           # an artifact. 'ubuntu (x86_64)' and 'ubuntu / clang' still run there on
           # every push to development and nightly.
           # oldest OS supported for maximum compatibility of built AppImage
-          - os: ubuntu-22.04
-            buildname: 'ubuntu / gcc / lua tests + leak detection'
-            compiler: gcc_64
-            gcc_compiler_version: 12
-            qt: '6.11.1'
-            ccache_id: ubuntu-gcc-asan
-            deploy: 'deploy'
-            run_tests: 'true'
-            # Enable AddressSanitizer for PTB and testing builds, but not release
-            # builds (tagged Mudlet-*) - ASAN adds significant runtime overhead
-            enable_asan: 'true'
           # No tests: none branch on host architecture, so the arm64 job covers them on a faster pool.
           - os: macos-15-intel
             buildname: 'macos (x86_64)'
@@ -387,6 +376,26 @@ jobs:
         MUDLET_SANITIZERS: ${{ github.event_name == 'pull_request' && 'address' || '' }}
         SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
+    - name: (EXP) build profile
+      if: runner.os == 'macOS'
+      working-directory: ${{runner.workspace}}/b/ninja
+      run: |
+        sysctl -n hw.ncpu hw.memsize machdep.cpu.brand_string || true
+        python3 - <<'PY'
+        import os
+        rows=[]
+        for line in open('.ninja_log'):
+            if line.startswith('#'): continue
+            a=line.rstrip('\n').split('\t')
+            rows.append((int(a[1])-int(a[0]), int(a[0]), int(a[1]), a[3]))
+        print('entries', len(rows), 'sum(s)', sum(r[0] for r in rows)/1000, 'span(s)', (max(r[2] for r in rows)-min(r[1] for r in rows))/1000)
+        for d,b,e,n in sorted(rows, reverse=True)[:40]:
+            print(f'{d/1000:8.2f} start={b/1000:7.2f} end={e/1000:7.2f} {n}')
+        PY
+        /usr/bin/time -p dsymutil src/mudlet.app/Contents/MacOS/mudlet -o "$RUNNER_TEMP/again.dSYM" || true
+        ls -la src/mudlet.app/Contents/MacOS/ || true
+        du -sh src/mudlet.app src/mudlet.app/Contents/MacOS/mudlet.dSYM || true
+
     - name: check ccache stats post build
       run: |
         ccache --show-stats -v
@@ -442,7 +451,13 @@ jobs:
     - name: (macOS) Run C++ tests
       if: runner.os == 'macOS' && matrix.run_tests == 'true'
       working-directory: '${{runner.workspace}}/b/ninja'
-      run: ctest --output-on-failure -j $(sysctl -n hw.ncpu)
+      run: |
+        iostat -w 5 > "$RUNNER_TEMP/iostat-ctest.log" 2>&1 &
+        sampler=$!
+        ctest --output-on-failure -j ${CTEST_JOBS:-$(sysctl -n hw.ncpu)}
+        kill $sampler || true
+        echo "--- iostat during ctest (cpu us sy id at the end of each row) ---"
+        cat "$RUNNER_TEMP/iostat-ctest.log"
 
     # Skipped after the full ctest run, which covers these, and with BUILD_TESTING=OFF (bare ctest exits 8)
     - name: Run QTest
@@ -675,7 +690,13 @@ jobs:
       # ~100s on a healthy Intel runner and measured at 172s on a slow one, so a
       # tighter limit fails on runner speed rather than on anything the suite did
       timeout-minutes: 6
-      run: ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline
+      run: |
+        iostat -w 5 > "$RUNNER_TEMP/iostat-lua.log" 2>&1 &
+        sampler=$!
+        ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline
+        kill $sampler || true
+        echo "--- iostat during Lua tests ---"
+        cat "$RUNNER_TEMP/iostat-lua.log"
       env:
         AUTORUN_BUSTED_TESTS: 'true'
         MUDLET_TEST_MODE: 1

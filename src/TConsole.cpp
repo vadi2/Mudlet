@@ -3501,3 +3501,4 @@ void TConsole::restoreCommandSearchSettings()
 
     commandSplitter->restoreState(pQSettings->value("commandSearchSplitterState").toByteArray());
 }
+// A/B experiment marker, as a typical pull request touches one source file
