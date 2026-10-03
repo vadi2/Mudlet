@@ -91,7 +91,7 @@ function ST.showWords()
   for _, key in ipairs(keys) do
     width = math.max(width, ST.width(key))
   end
-  ST.msg(string.format("your word list (%d words; ● = how well you know it):", #keys), "gold")
+  ST.msg(string.format("your word list (%d %s; ● = how well you know it):", #keys, #keys == 1 and "word" or "words"), "gold")
   for _, key in ipairs(keys) do
     local word = ST.state.vocab[key]
     ST.out("main", {
