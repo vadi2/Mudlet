@@ -48,6 +48,7 @@ jobs:
       LUA_VERSION: '5.1.5'
       CCACHE_MAXSIZE: 2G
       CCACHE_COMPRESSLEVEL: 1
+      CTEST_JOBS: 6
     strategy:
       fail-fast: false
       matrix:
@@ -59,14 +60,6 @@ jobs:
           # an artifact. 'ubuntu (x86_64)' and 'ubuntu / clang' still run there on
           # every push to development and nightly.
           # oldest OS supported for maximum compatibility of built AppImage
-          # No tests: none branch on host architecture, so the arm64 job covers them on a faster pool.
-          - os: macos-15-intel
-            buildname: 'macos (x86_64)'
-            compiler: clang_64
-            qt: '6.11.1'
-            ccache_id: macos-x64
-            deploy: 'deploy'
-            build_tests: 'false'
           - os: macos-15
             buildname: 'macos (arm64) / c++, lua tests'
             compiler: clang_64
