@@ -60,12 +60,28 @@ jobs:
           # every push to development and nightly.
           # oldest OS supported for maximum compatibility of built AppImage
           - os: macos-15-intel
+            buildname: 'intel-A'
+            compiler: clang_64
+            qt: '6.11.1'
+            ccache_id: macos-x64
+            deploy: 'deploy'
+            build_tests: 'false'
+            force_dsym: 'true'
+          - os: macos-15-intel
             buildname: 'intel-N'
             compiler: clang_64
             qt: '6.11.1'
             ccache_id: macos-x64
             deploy: 'deploy'
             build_tests: 'false'
+          - os: macos-15
+            buildname: 'arm-A'
+            compiler: clang_64
+            qt: '6.11.1'
+            ccache_id: macos-arm64
+            deploy: 'deploy'
+            run_tests: 'true'
+            force_dsym: 'true'
           - os: macos-15
             buildname: 'arm-B'
             compiler: clang_64
@@ -74,6 +90,15 @@ jobs:
             deploy: 'deploy'
             run_tests: 'true'
             ctest_jobs: '6'
+          - os: macos-15
+            buildname: 'arm-C'
+            compiler: clang_64
+            qt: '6.11.1'
+            ccache_id: macos-arm64
+            deploy: 'deploy'
+            run_tests: 'true'
+            ctest_jobs: '6'
+            concurrent: 'true'
 
     steps:
     - name: Checkout Mudlet source code
