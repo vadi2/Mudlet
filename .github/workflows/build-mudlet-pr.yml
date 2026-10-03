@@ -433,6 +433,13 @@ jobs:
         RUNNER_OS: ${{runner.os}}
         DEPLOY: ${{matrix.deploy}}
 
+    - name: (VAL fork only) Save Lua rocks cache
+      if: runner.os == 'macOS' && steps.cache-luarocks.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.luarocks
+        key: ${{ steps.rocks.outputs.key }}
+
     - name: (Linux) Run C++ tests
       if: runner.os == 'Linux' && matrix.run_tests == 'true'
       working-directory: '${{runner.workspace}}/b/ninja'
