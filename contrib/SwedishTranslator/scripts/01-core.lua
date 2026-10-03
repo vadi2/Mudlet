@@ -102,12 +102,18 @@ function ST.load()
   local path = ST.dataFile()
   local loaded, err = readStateFile(path)
   if not loaded and not err and io.exists(path .. ".bak") then
-    -- Mudlet stopped between the two renames in ST.save; the backup is the latest save.
-    loaded, err = readStateFile(path .. ".bak")
-    if err then
-      ST.warn("your saved data could not be read (" .. err .. "); starting with an empty word list")
-      ST.finish("main")
+    -- Either Mudlet stopped between the two renames in ST.save, or the file was
+    -- deleted by hand; either way the backup is the latest save there is.
+    local backupErr
+    loaded, backupErr = readStateFile(path .. ".bak")
+    if backupErr then
+      local aside = path .. ".bak.unreadable-" .. os.date("%Y%m%d-%H%M%S")
+      os.rename(path .. ".bak", aside)
+      ST.warn(string.format("your saved data could not be read (%s). It was kept as %s; starting with an empty word list.", backupErr, aside))
+    else
+      ST.msg("restored your data from " .. path .. ".bak (delete that file too, or use sv:clear, to start over)")
     end
+    ST.finish("main")
   elseif err then
     -- Keep the unreadable file rather than letting the next save overwrite it,
     -- and fall back to the copy of the previous save.
@@ -234,6 +240,13 @@ function ST.truncate(s, width)
     return s
   end
   return utf8.sub(s, 1, width - 1) .. "…"
+end
+
+-- Plain finds: a pattern class like "[åäö]" would match single bytes of any
+-- multi-byte character (é, ü, ♥, ...), not these letters.
+function ST.hasSwedishLetter(s)
+  s = ST.lower(s)
+  return s:find("å", 1, true) or s:find("ä", 1, true) or s:find("ö", 1, true) or false
 end
 
 function ST.urlencode(s)

@@ -286,10 +286,11 @@ local function pickTranslation(data, source)
   table.sort(candidates, function(a, b) return a.score > b.score end)
   -- Text identical to the Swedish is usually the input handed back untranslated,
   -- but a single word can be its own translation (names, and cognates such as
-  -- "bank" or "radio"), so only multi-word text has to come back changed.
-  local singleWord = not ST.trim(source):find("%s")
+  -- "bank" or "radio") - unless it has å, ä or ö, which no English word has.
+  local trimmed = ST.trim(source)
+  local mayStaySame = not trimmed:find("%s") and not ST.hasSwedishLetter(trimmed)
   for _, candidate in ipairs(candidates) do
-    if plausible(candidate.text, source) and (singleWord or bare(candidate.text) ~= bare(source)) then
+    if plausible(candidate.text, source) and (mayStaySame or bare(candidate.text) ~= bare(source)) then
       return candidate.text
     end
   end

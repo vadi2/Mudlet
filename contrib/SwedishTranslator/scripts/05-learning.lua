@@ -190,10 +190,7 @@ function ST.looksSwedish(line)
   for _, token in ipairs(ST.tokenize(line)) do
     if token.key then
       words = words + 1
-      -- Plain finds: a pattern class like "[åäö]" would match single bytes of
-      -- any multi-byte character (é, ü, ♥, ...), not these letters.
-      local key = token.key
-      if MARKERS[key] or key:find("å", 1, true) or key:find("ä", 1, true) or key:find("ö", 1, true) then
+      if MARKERS[token.key] or ST.hasSwedishLetter(token.key) then
         score = score + 1
       end
     end
