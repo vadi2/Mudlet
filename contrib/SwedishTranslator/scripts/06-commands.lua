@@ -1,6 +1,7 @@
 -- Command-line interface and start-up.
 --   sv <swedish text>      translate it
 --   sv:<command> [args]    everything else - see sv:help
+-- A bare "sv" is left for the game, where it usually means "go southwest".
 SwedishTranslator = SwedishTranslator or {}
 local ST = SwedishTranslator
 
@@ -26,10 +27,11 @@ function ST.help()
   ST.msg("Swedish → English translator " .. ST.version, "gold")
   local lines = {
     { "sv <swedish text>", "translate text (or select text, right-click → Translate)" },
+    { "sv:help", "this list (a bare 'sv' is sent to the game, e.g. to go southwest)" },
     { "sv:views", "show the visualizations and switch them on/off" },
     { "sv:view <name> [on|off]", "toggle one view: " .. table.concat(ST.viewOrder, ", ") },
     { "sv:only <name> [name...]", "use exactly these views" },
-    { "sv:demo", "see every view side by side, to choose your favorites" },
+    { "sv:demo", "try every view in turn, to choose your favorites" },
     { "sv:auto [on|off]", "auto-translate Swedish lines coming from the game" },
     { "sv:save <word>", "add a word to your word list" },
     { "sv:words", "show your word list" },
@@ -171,6 +173,7 @@ commands.auto = function(args)
     enabled = not ST.state.auto
   end
   ST.state.auto = enabled
+  ST.applyAutoTrigger()
   ST.scheduleSave()
   ST.msg(enabled and "auto-translate ON: Swedish lines from the game will be translated" or "auto-translate off")
 end
@@ -220,19 +223,14 @@ end
 function ST.onCommand(line)
   local command, args = line:match("^sv:(%S*)%s*(.-)%s*$")
   if command then
-    local handler = commands[command:lower()]
+    local handler = command == "" and commands.help or commands[command:lower()]
     if handler then
       handler(args)
     else
       ST.warn(string.format("unknown command 'sv:%s' - see sv:help", command))
     end
   else
-    local text = line:match("^sv%s+(.-)%s*$")
-    if text and text ~= "" then
-      ST.process(text, "command")
-    else
-      ST.help()
-    end
+    ST.process(line:match("^sv%s+(.-)%s*$"), "command")
   end
   ST.finish("main")
 end
@@ -244,6 +242,7 @@ if not ST.state then
   ST.load()
 end
 ST.registerMouseEvent()
+ST.applyAutoTrigger()
 
 registerNamedEventHandler(ST.handlerUser, "selection", ST.mouseEvent, function(...) ST.onSelection(...) end)
 registerNamedEventHandler(ST.handlerUser, "exit", "sysExitEvent", function() ST.save() end)

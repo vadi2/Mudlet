@@ -81,7 +81,7 @@ function views.hover(entry)
       if english then
         hint = string.format("%s = %s\n(click to save it to your word list)", token.word, english)
       else
-        hint = token.word .. ": no translation found"
+        hint = token.word .. ": not translated yet (click to look it up and save it)"
       end
       ST.link("main", token.text, function()
         ST.saveWord(token.key, english)
@@ -118,8 +118,8 @@ function ST.getPanel()
     ST.panel:setStyleSheet("QDockWidget { min-width: 380px; }")
     ST.panel:setFontSize(11)
     ST.panel:enableAutoWrap()
-    -- The window can outlive this script (e.g. across a package reinstall), so
-    -- start it over, picking up the recent history again.
+    -- Mudlet keeps the window when the Lua state is rebuilt (e.g. after a
+    -- profile's scripts are reset), so start it over from the saved history.
     ST.panel:clear()
     ST.out(PANEL, { { "gold", "Svenska → English\n" }, { "dim_gray", "Your translations collect here.\n" } })
     local history = ST.state.history
@@ -212,9 +212,10 @@ local function needsHeader(viewSet)
   return viewSet.inline or viewSet.reveal
 end
 
--- Requests finish in whatever order the network returns them, but results are
--- shown strictly in the order they were asked for, so a run of auto-translated
--- game lines reads top to bottom like the lines themselves.
+-- Requests finish in whatever order the network returns them, but auto-translated
+-- lines are shown strictly in the order they arrived, so a run of them reads top
+-- to bottom like the game text itself. Anything the player asked for directly
+-- skips this queue and appears as soon as it is ready.
 ST.outputQueue = ST.outputQueue or {}
 
 local function flushOutput()
@@ -228,30 +229,49 @@ local function flushOutput()
   end
 end
 
+local AUTO_ERROR_QUIET_SECONDS = 60
+
+-- A failing service would otherwise print the same error under every Swedish
+-- line from the game; say it once, then stay quiet for a while.
+local function reportAutoFailure(reason)
+  if reason:find("^skipped") or (ST.autoQuietUntil and os.time() < ST.autoQuietUntil) then
+    return
+  end
+  ST.autoQuietUntil = os.time() + AUTO_ERROR_QUIET_SECONDS
+  ST.warn("auto-translate: " .. reason .. " (repeats of this are hidden for a minute)")
+end
+
 -- Translates `text` and shows it in every view in `opts.views` (default: the
 -- views switched on). `source` is "command", "selection", "auto" or "demo";
 -- for "auto" the Swedish line is already on screen so it is not repeated.
--- `opts.done` is called once everything has been shown.
+-- `opts.done(success)` is called once everything has been shown.
 function ST.process(text, source, opts)
   opts = opts or {}
   local viewSet = opts.views or ST.state.views
+  local auto = source == "auto"
   if not anyEnabled(viewSet) then
-    if source ~= "auto" then
+    if not auto then
       ST.warn("every view is switched off - turn one on with sv:views")
+    end
+    if opts.done then
+      opts.done(false)
     end
     return
   end
   local entry = { sv = ST.trim(text), source = source, tokens = ST.tokenize(text), glosses = {} }
-  local pending = needsGlosses(viewSet) and 2 or 1
-  local failed = nil
+  local glossing = needsGlosses(viewSet)
+  local pending = glossing and 2 or 1
+  local failed, glossFailure = nil, nil
 
   local function render()
     if failed then
-      if source ~= "auto" or not failed:find("^skipped") then
+      if auto then
+        reportAutoFailure(failed)
+      else
         ST.warn("translation failed: " .. failed)
       end
     else
-      if source ~= "auto" and needsHeader(viewSet) then
+      if not auto and needsHeader(viewSet) then
         ST.out("main", { { "dim_gray", "\n  sv› " }, { "light_goldenrod", entry.sv } })
       end
       for _, name in ipairs(ST.viewOrder) do
@@ -262,6 +282,10 @@ function ST.process(text, source, opts)
           end
         end
       end
+      if glossFailure and not auto then
+        ST.out("main", { { "dim_gray", string.format("\n  (%d %s could not be glossed: %s)", glossFailure.count,
+          glossFailure.count == 1 and "word" or "words", tostring(glossFailure.reason)) } })
+      end
       ST.addHistory(entry.sv, entry.en)
     end
     ST.finish("main")
@@ -270,17 +294,26 @@ function ST.process(text, source, opts)
     end
   end
 
-  local slot = {}
-  ST.outputQueue[#ST.outputQueue + 1] = slot
+  local slot = nil
+  if auto then
+    slot = {}
+    ST.outputQueue[#ST.outputQueue + 1] = slot
+  end
   local function step()
     pending = pending - 1
     if pending == 0 then
-      slot.render = render
-      flushOutput()
+      if slot then
+        slot.render = render
+        flushOutput()
+      else
+        render()
+      end
     end
   end
 
-  local requestOpts = { auto = source == "auto" }
+  -- Auto-translate glosses words only from the dictionary and cache: one request
+  -- per unknown word for every game line would soon exhaust the free quota.
+  local requestOpts = { auto = auto, offline = auto }
   ST.translate(entry.sv, function(ok, result)
     if ok then
       entry.en = result
@@ -289,10 +322,17 @@ function ST.process(text, source, opts)
     end
     step()
   end, requestOpts)
-  if needsGlosses(viewSet) then
-    ST.lookupWords(entry.tokens, function(glosses)
-      entry.glosses = glosses
+  if glossing then
+    if failed then
+      -- The sentence was rejected outright (e.g. too long): looking up its
+      -- words would only spend requests on output that is never shown.
       step()
-    end, requestOpts)
+    else
+      ST.lookupWords(entry.tokens, function(glosses, failure)
+        entry.glosses = glosses
+        glossFailure = failure
+        step()
+      end, requestOpts)
+    end
   end
 end

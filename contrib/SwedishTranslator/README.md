@@ -13,6 +13,7 @@ or run `lua installPackage("/path/to/SwedishTranslator.mpackage")`. Then type `s
 | Command | What it does |
 | --- | --- |
 | `sv <swedish text>` | translate text |
+| `sv:help` | list every command (a bare `sv` goes to the game, where it usually means southwest) |
 | select text, right-click → **Translate Swedish → English** | translate anything already on screen |
 | `sv:demo` | one sample sentence per visualization, to compare them |
 | `sv:views` | list the visualizations; click to switch each on or off |
@@ -27,24 +28,33 @@ or run `lua installPackage("/path/to/SwedishTranslator.mpackage")`. Then type `s
 
 Any combination can be on at once; `inline` and `gloss` are on by default.
 
-- **inline** - the English printed under the Swedish. With auto-translate, cached lines get their
-  translation directly beneath them.
+- **inline** - the English printed under the Swedish. With auto-translate, a line whose
+  translation is already cached gets it directly beneath; otherwise translations follow the game
+  text a moment later, in the same order as the lines they belong to.
 - **gloss** - an interlinear, word-by-word gloss: each Swedish word above its English meaning.
 - **hover** - every Swedish word becomes a link; hover for its meaning, click to save it to your word list.
 - **reveal** - the English is hidden behind a link, so you translate in your head first.
 - **panel** - a dockable side window keeping a running Swedish/English history.
-- **subtitle** - a movie-style card over the bottom of the main window that fades after a few seconds.
+- **subtitle** - a movie-style card over the bottom of the main window; it disappears after 5-15
+  seconds, depending on length, or when clicked.
 
 ## How it works
 
 Sentences are translated by the free [MyMemory](https://mymemory.translated.net) API, which needs no
 account. Word glosses come first from a built-in dictionary of about 570 common words, then from
-MyMemory. Every result is cached, so a phrase is only fetched once, and requests are queued (three
-at a time) so a burst of game text cannot flood the service. Auto-translate only picks lines that
-look Swedish - containing å/ä/ö or common Swedish words - so English text is left alone.
+the cache, then from MyMemory - except for auto-translated lines, which are glossed offline only
+(unknown words show as `?`) so game text cannot eat the daily quota one word at a time. Successful
+translations are cached (up to 3,000 phrases), so repeated text is normally not fetched again.
+Requests run three at a time, with your own requests ahead of auto-translated ones. If MyMemory
+reports its quota or rate limit is reached, the package stops asking for a while instead of
+retrying every line.
+
+Auto-translate uses a heuristic to pick lines that look Swedish - words with å/ä/ö, or common
+Swedish words that are rare in English - so it mostly leaves English text alone.
 
 Settings, the cache, your word list and history are saved in `SwedishTranslator.data.lua` in the
-profile directory, and survive reinstalling the package.
+profile directory, and survive reinstalling the package. The previous save is kept as `.bak`; if the
+file is ever unreadable it is set aside rather than overwritten, and the backup is used instead.
 
 ## Building
 
@@ -53,3 +63,10 @@ The package is generated from the sources in `scripts/` (loaded in file-name ord
 ```bash
 python3 build.py            # writes SwedishTranslator.mpackage next to this file
 ```
+
+## Known limitation
+
+If you select text, click elsewhere to clear the selection and then right-click → **Translate**,
+the previously selected text is translated. Mudlet passes the last selection's coordinates to the
+menu action even after the highlight is gone, and a script has no way to tell, so select the text
+again right before translating it.

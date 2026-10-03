@@ -6,7 +6,7 @@ description = [[# Swedish → English translator
 Translate Swedish while you play, and pick how you want to see it.
 
 * `sv <swedish text>` - translate text, or select text in the game window, right-click and choose **Translate Swedish → English**
-* `sv:demo` - shows every visualization side by side so you can pick favorites
+* `sv:demo` - tries every visualization in turn so you can pick favorites
 * `sv:views` - switch visualizations on and off (any combination):
   * **inline** - translation printed right under the Swedish text
   * **gloss** - word-by-word interlinear gloss, Swedish on top and English below
@@ -16,10 +16,10 @@ Translate Swedish while you play, and pick how you want to see it.
   * **subtitle** - movie-style subtitle card over the main window
 * `sv:auto on` - automatically translate Swedish lines coming from the game
 * `sv:words`, `sv:quiz` - your saved word list and a spaced-repetition flashcard quiz
-* `sv:help` - everything else
+* `sv:help` - everything else (a bare `sv` still goes to the game, e.g. to walk southwest)
 
 Translations come from the free MyMemory service (https://mymemory.translated.net), with an
-offline dictionary of common words and a cache, so each phrase is only fetched once.
+offline dictionary of common words and a cache, so repeated text is normally not fetched again.
 ]]
 version = [[1.0.0]]
 created = "2026-10-03T12:00:00+00:00"

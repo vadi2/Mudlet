@@ -21,7 +21,7 @@ function ST.showHistory(count)
     ST.msg("nothing translated yet - try: sv Hej, hur mår du?")
     return
   end
-  count = math.min(count or 10, #history)
+  count = math.min(math.max(1, math.floor(count or 10)), #history)
   ST.msg(string.format("your last %d translations:", count), "gold")
   for i = #history - count + 1, #history do
     local entry = history[i]
@@ -168,14 +168,16 @@ end
 
 -- Auto-translate ---------------------------------------------------------------
 
--- Short, frequent words that are Swedish but not English, so seeing a couple of
--- them is good evidence a line is Swedish.
+-- Short, frequent Swedish words that are rare in English (and in French or
+-- Spanish), so seeing them is good evidence a line is Swedish. Words that are
+-- common in those languages too - "till", "den", "var", "de", "en", "du" - are
+-- deliberately left out. This is a heuristic: it mostly leaves English alone.
 local MARKERS = {}
 for _, word in ipairs({
-  "och", "är", "att", "det", "jag", "inte", "på", "som", "med", "för", "har", "av", "till",
-  "den", "vi", "ni", "de", "om", "kan", "så", "var", "här", "där", "vad", "hur", "eller",
-  "ett", "en", "du", "han", "hon", "sig", "mig", "dig", "nu", "från", "efter", "också",
-  "bara", "skulle", "finns", "kommer", "går", "hej", "tack", "ja", "nej", "vill", "ska",
+  "och", "är", "att", "det", "jag", "inte", "på", "som", "med", "för", "har", "av",
+  "kan", "så", "här", "där", "vad", "hur", "eller", "ett", "hon", "sig", "mig", "dig",
+  "från", "efter", "också", "bara", "skulle", "finns", "kommer", "går", "hej", "tack",
+  "nej", "vill", "ska", "inga", "något", "någon", "mycket", "nu", "vi", "ni",
 }) do
   MARKERS[word] = true
 end
@@ -188,12 +190,26 @@ function ST.looksSwedish(line)
   for _, token in ipairs(ST.tokenize(line)) do
     if token.key then
       words = words + 1
-      if MARKERS[token.key] or token.key:find("[åäö]") then
+      -- Plain finds: a pattern class like "[åäö]" would match single bytes of
+      -- any multi-byte character (é, ü, ♥, ...), not these letters.
+      local key = token.key
+      if MARKERS[key] or key:find("å", 1, true) or key:find("ä", 1, true) or key:find("ö", 1, true) then
         score = score + 1
       end
     end
   end
   return score >= 2 or (score >= 1 and words <= 2)
+end
+
+ST.autoTrigger = "SwedishTranslator auto-translate"
+
+-- The trigger matches every line, so it is only switched on while auto-translate is.
+function ST.applyAutoTrigger()
+  if ST.state.auto then
+    enableTrigger(ST.autoTrigger)
+  else
+    disableTrigger(ST.autoTrigger)
+  end
 end
 
 function ST.onGameLine(text)

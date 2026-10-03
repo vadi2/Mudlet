@@ -54,7 +54,7 @@ SwedishTranslator.dictionary = {
   ["måste"] = "must", ["får"] = "may / get(s)", ["få"] = "to get / may", ["fick"] = "got / was allowed",
   ["bör"] = "should", ["brukar"] = "usually (do)", ["gör"] = "do(es)", ["göra"] = "to do", ["gjorde"] = "did",
   ["går"] = "go(es) / walk(s)", ["gå"] = "to go / walk", ["gick"] = "went", ["kommer"] = "come(s) / will",
-  ["komma"] = "to come", ["kom"] = "came / come", ["ser"] = "see(s)", ["se"] = "to see", ["såg"] = "saw",
+  ["komma"] = "to come", ["kom"] = "came / come", ["ser"] = "see(s)", ["se"] = "to see", ["ses"] = "meet / be seen", ["såg"] = "saw",
   ["säger"] = "say(s)", ["säga"] = "to say", ["sa"] = "said", ["sade"] = "said", ["tar"] = "take(s)",
   ["ta"] = "to take", ["tog"] = "took", ["ger"] = "give(s)", ["ge"] = "to give", ["gav"] = "gave",
   ["vet"] = "know(s)", ["veta"] = "to know", ["visste"] = "knew", ["tror"] = "believe(s)",

@@ -34,31 +34,108 @@ function ST.dataFile()
   return getMudletHomeDir() .. "/SwedishTranslator.data.lua"
 end
 
+-- Reads a saved state file; returns the table, or nil and the reason it failed.
+local function readStateFile(path)
+  if not io.exists(path) then
+    return nil
+  end
+  local loaded = {}
+  local ok, err = pcall(table.load, path, loaded)
+  if not ok then
+    return nil, tostring(err)
+  end
+  return loaded
+end
+
+-- Copies over only well-formed values, so a hand-edited or partly written file
+-- cannot leave entries behind that would break the code reading them later.
+local function adopt(state, loaded)
+  if type(loaded.views) == "table" then
+    for name in pairs(state.views) do
+      if type(loaded.views[name]) == "boolean" then
+        state.views[name] = loaded.views[name]
+      end
+    end
+  end
+  if type(loaded.auto) == "boolean" then
+    state.auto = loaded.auto
+  end
+  if type(loaded.email) == "string" then
+    state.email = loaded.email
+  end
+  local dropped = 0
+  -- On disk the cache and word list are lists of { key = ..., ... } (see toDisk).
+  for key, entry in pairs(type(loaded.cache) == "table" and loaded.cache or {}) do
+    key = type(entry) == "table" and entry.key or key
+    if type(key) == "string" and type(entry) == "table" and type(entry.en) == "string" then
+      state.cache[key] = { en = entry.en, t = tonumber(entry.t) or 0 }
+    else
+      dropped = dropped + 1
+    end
+  end
+  for key, word in pairs(type(loaded.vocab) == "table" and loaded.vocab or {}) do
+    key = type(word) == "table" and word.key or key
+    if type(key) == "string" and type(word) == "table" and type(word.en) == "string" then
+      state.vocab[key] = {
+        en = word.en,
+        box = math.min(5, math.max(1, math.floor(tonumber(word.box) or 1))),
+        right = tonumber(word.right) or 0,
+        wrong = tonumber(word.wrong) or 0,
+        added = tonumber(word.added) or os.time(),
+      }
+    else
+      dropped = dropped + 1
+    end
+  end
+  for _, entry in ipairs(type(loaded.history) == "table" and loaded.history or {}) do
+    if type(entry) == "table" and type(entry.sv) == "string" and type(entry.en) == "string" then
+      state.history[#state.history + 1] = { sv = entry.sv, en = entry.en, t = tonumber(entry.t) or 0 }
+    else
+      dropped = dropped + 1
+    end
+  end
+  return dropped
+end
+
 function ST.load()
   local state = defaults()
   local path = ST.dataFile()
-  if io.exists(path) then
-    local loaded = {}
-    local ok, err = pcall(table.load, path, loaded)
-    if ok and type(loaded) == "table" then
-      for key, value in pairs(loaded) do
-        if type(value) == type(state[key]) then
-          state[key] = value
-        end
-      end
-      for name, enabled in pairs(defaults().views) do
-        if state.views[name] == nil then
-          state.views[name] = enabled
-        end
-      end
-    else
-      ST.warn("could not read saved data (" .. tostring(err) .. "), starting fresh")
+  local loaded, err = readStateFile(path)
+  if err then
+    -- Keep the unreadable file rather than letting the next save overwrite it,
+    -- and fall back to the copy of the previous save.
+    local aside = path .. ".unreadable-" .. os.date("%Y%m%d-%H%M%S")
+    os.rename(path, aside)
+    loaded = readStateFile(path .. ".bak")
+    ST.warn(string.format("your saved data could not be read (%s). It was kept as %s; %s", err, aside,
+      loaded and "restored the previous save instead." or "starting with an empty word list."))
+    ST.finish("main")
+  end
+  if loaded then
+    local dropped = adopt(state, loaded)
+    if dropped > 0 then
+      ST.warn(string.format("ignored %d damaged entries in your saved data", dropped))
       ST.finish("main")
     end
   end
   ST.state = state
 end
 
+-- table.save silently skips keys named after standard libraries ("os", "io",
+-- "string", ...), and "os" is a Swedish word, so words are values on disk, never keys.
+local function toDisk(state)
+  local disk = { views = state.views, auto = state.auto, email = state.email, history = state.history, cache = {}, vocab = {} }
+  for key, entry in pairs(state.cache) do
+    disk.cache[#disk.cache + 1] = { key = key, en = entry.en, t = entry.t }
+  end
+  for key, word in pairs(state.vocab) do
+    disk.vocab[#disk.vocab + 1] = { key = key, en = word.en, box = word.box, right = word.right, wrong = word.wrong, added = word.added }
+  end
+  return disk
+end
+
+-- Writes to a temporary file first and keeps the previous save as .bak, so a
+-- crash or full disk mid-write never destroys the word list.
 function ST.save()
   if ST.saveTimer then
     killTimer(ST.saveTimer)
@@ -71,7 +148,31 @@ function ST.save()
   while #ST.state.history > MAX_HISTORY do
     table.remove(ST.state.history, 1)
   end
-  table.save(ST.dataFile(), ST.state)
+  local path = ST.dataFile()
+  local temporary = path .. ".tmp"
+  local _, err = table.save(temporary, toDisk(ST.state))
+  if not err and not loadfile(temporary) then
+    err = "the written file is incomplete"
+  end
+  if not err then
+    os.remove(path .. ".bak")
+    os.rename(path, path .. ".bak")
+    local renamed, renameErr = os.rename(temporary, path)
+    if not renamed then
+      err = renameErr
+    end
+  end
+  if err then
+    os.remove(temporary)
+    -- Once per problem, not on every autosave.
+    if ST.lastSaveError ~= err then
+      ST.lastSaveError = err
+      ST.warn(string.format("could not save your data to %s (%s) - changes will be lost when Mudlet closes", path, tostring(err)))
+      ST.finish("main")
+    end
+  else
+    ST.lastSaveError = nil
+  end
 end
 
 -- Coalesce bursts of changes (e.g. auto-translating a screenful of text) into one write.
@@ -105,35 +206,24 @@ function ST.trim(s)
   return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
--- Lowercases ASCII and the Swedish letters, independent of the system locale.
 function ST.lower(s)
-  s = s:lower()
-  return (s:gsub("Å", "å"):gsub("Ä", "ä"):gsub("Ö", "ö"):gsub("É", "é"):gsub("Ü", "ü"))
+  return utf8.lower(s)
 end
 
 -- Number of characters on screen, counting UTF-8 sequences as one.
 function ST.width(s)
-  return select(2, s:gsub("[^\128-\191]", ""))
+  return utf8.len(s) or #s
 end
 
 function ST.pad(s, width)
   return s .. string.rep(" ", width - ST.width(s))
 end
 
--- Cuts at a character boundary rather than in the middle of a multi-byte letter.
 function ST.truncate(s, width)
   if ST.width(s) <= width then
     return s
   end
-  local out, count = {}, 0
-  for char in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-    count = count + 1
-    if count >= width then
-      break
-    end
-    out[#out + 1] = char
-  end
-  return table.concat(out) .. "…"
+  return utf8.sub(s, 1, width - 1) .. "…"
 end
 
 function ST.urlencode(s)
@@ -144,9 +234,17 @@ end
 
 local ENTITIES = { amp = "&", lt = "<", gt = ">", quot = '"', apos = "'", nbsp = " " }
 
+-- Out-of-range numbers (which crowd-sourced replies can contain) are left as typed.
+local function codepoint(n)
+  if n and n <= 0x10FFFF and not (n >= 0xD800 and n <= 0xDFFF) then
+    return utf8.char(n)
+  end
+  return nil
+end
+
 function ST.decodeEntities(s)
-  s = s:gsub("&#[xX](%x+);", function(hex) return utf8.char(tonumber(hex, 16)) end)
-  s = s:gsub("&#(%d+);", function(dec) return utf8.char(tonumber(dec)) end)
+  s = s:gsub("&#[xX](%x+);", function(hex) return codepoint(tonumber(hex, 16)) end)
+  s = s:gsub("&#(%d+);", function(dec) return codepoint(tonumber(dec)) end)
   return (s:gsub("&(%a+);", function(name) return ENTITIES[name] end))
 end
 
