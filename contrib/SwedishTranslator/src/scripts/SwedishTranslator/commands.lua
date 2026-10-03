@@ -1,7 +1,8 @@
 -- Command-line interface and start-up.
---   sv <swedish text>      translate it
---   sv:<command> [args]    everything else - see sv:help
--- A bare "sv" is left for the game, where it usually means "go southwest".
+--   sv <command> [args]    when the first word is one of `commands` below
+--   sv <swedish text>      anything else is translated
+-- A bare "sv" is left for the game, where it usually means "go southwest", which
+-- is why the alias in src/aliases needs at least one word after it.
 SwedishTranslator = SwedishTranslator or {}
 local ST = SwedishTranslator
 
@@ -27,18 +28,19 @@ function ST.help()
   ST.msg("Swedish → English translator " .. ST.version, "gold")
   local lines = {
     { "sv <swedish text>", "translate text (or select text, right-click → Translate)" },
-    { "sv:help", "this list (a bare 'sv' is sent to the game, e.g. to go southwest)" },
-    { "sv:views", "show the visualizations and switch them on/off" },
-    { "sv:view <name> [on|off]", "toggle one view: " .. table.concat(ST.viewOrder, ", ") },
-    { "sv:only <name> [name...]", "use exactly these views" },
-    { "sv:demo", "try every view in turn, to choose your favorites" },
-    { "sv:auto [on|off]", "auto-translate Swedish lines coming from the game" },
-    { "sv:save <word>", "add a word to your word list" },
-    { "sv:words", "show your word list" },
-    { "sv:quiz", "flashcard quiz on your saved words" },
-    { "sv:history [n]", "show your last n translations" },
-    { "sv:email <address|off>", "raise MyMemory's free daily limit from 5k to 50k characters" },
-    { "sv:clear <history|words|cache>", "forget saved data" },
+    { "sv translate <text>", "translate text that starts with one of the command words below" },
+    { "sv help", "this list (a bare 'sv' is sent to the game, e.g. to go southwest)" },
+    { "sv views", "show the visualizations and switch them on/off" },
+    { "sv view <name> [on|off]", "toggle one view: " .. table.concat(ST.viewOrder, ", ") },
+    { "sv only <name> [name...]", "use exactly these views" },
+    { "sv demo", "try every view in turn, to choose your favorites" },
+    { "sv auto [on|off]", "auto-translate Swedish lines coming from the game" },
+    { "sv save <word>", "add a word to your word list" },
+    { "sv words", "show your word list" },
+    { "sv quiz", "flashcard quiz on your saved words" },
+    { "sv history [n]", "show your last n translations" },
+    { "sv email <address|off>", "raise MyMemory's free daily limit from 5k to 50k characters" },
+    { "sv clear <history|words|cache>", "forget saved data" },
   }
   for _, line in ipairs(lines) do
     ST.out("main", { { "light_goldenrod", "\n  " .. ST.pad(line[1], 32) }, { "light_gray", line[2] } })
@@ -87,13 +89,13 @@ end
 
 -- Shows the sample sentences, one view each, so the views can be compared directly.
 function ST.demo()
-  ST.msg("demo: one sample sentence per view. Turn the ones you like on with sv:only <names>", "gold")
+  ST.msg("demo: one sample sentence per view. Turn the ones you like on with sv only <names>", "gold")
   local index = 0
   local function nextView()
     index = index + 1
     local name = ST.viewOrder[index]
     if not name then
-      ST.msg("demo done. Currently on: " .. enabledViewNames() .. "  - change with sv:views", "gold")
+      ST.msg("demo done. Currently on: " .. enabledViewNames() .. "  - change with sv views", "gold")
       ST.finish("main")
       return
     end
@@ -119,6 +121,14 @@ end
 local commands = {}
 
 commands.help = function() ST.help() end
+-- For Swedish text that happens to start with one of these command words.
+commands.translate = function(args)
+  if args == "" then
+    ST.warn("use: sv translate <swedish text>")
+    return
+  end
+  ST.process(args, "command")
+end
 commands.views = function() ST.showViews() end
 commands.demo = function() ST.demo() end
 commands.words = function() ST.showWords() end
@@ -133,7 +143,7 @@ commands.view = function(args)
   name = name:lower()
   local enabled = onOff(state)
   if state ~= "" and enabled == nil then
-    ST.warn("use: sv:view <name> [on|off]")
+    ST.warn("use: sv view <name> [on|off]")
     return
   end
   if enabled == nil then
@@ -154,7 +164,7 @@ commands.only = function(args)
     wanted[name] = true
   end
   if next(wanted) == nil then
-    ST.warn("use: sv:only <name> [name...], e.g. sv:only inline gloss")
+    ST.warn("use: sv only <name> [name...], e.g. sv only inline gloss")
     return
   end
   for _, name in ipairs(ST.viewOrder) do
@@ -166,7 +176,7 @@ end
 commands.auto = function(args)
   local enabled = onOff(args:lower())
   if args ~= "" and enabled == nil then
-    ST.warn("use: sv:auto [on|off]")
+    ST.warn("use: sv auto [on|off]")
     return
   end
   if enabled == nil then
@@ -215,7 +225,7 @@ commands.clear = function(args)
   elseif what == "cache" then
     ST.state.cache = {}
   else
-    ST.warn("use: sv:clear history, sv:clear words or sv:clear cache")
+    ST.warn("use: sv clear history, sv clear words or sv clear cache")
     return
   end
   ST.scheduleSave()
@@ -234,20 +244,16 @@ function ST.onCommand(line)
   for _, space in ipairs(UNICODE_SPACES) do
     line = line:gsub(space, " ")
   end
-  local command, args = line:match("^sv:(%S*)%s*(.-)%s*$")
-  if command then
-    local handler = command == "" and commands.help or commands[command:lower()]
+  local text = line:match("^sv%s+(.-)%s*$")
+  if not text or text == "" then
+    ST.help()
+  else
+    local word, args = text:match("^(%S+)%s*(.-)$")
+    local handler = commands[word:lower()]
     if handler then
       handler(args)
     else
-      ST.warn(string.format("unknown command 'sv:%s' - see sv:help", command))
-    end
-  else
-    local text = line:match("^sv%s+(.-)%s*$")
-    if text and text ~= "" then
       ST.process(text, "command")
-    else
-      ST.help()
     end
   end
   ST.finish("main")
@@ -266,7 +272,7 @@ registerNamedEventHandler(ST.handlerUser, "selection", ST.mouseEvent, function(.
 registerNamedEventHandler(ST.handlerUser, "exit", "sysExitEvent", function() ST.save() end)
 registerNamedEventHandler(ST.handlerUser, "installed", "sysInstall", function(_, name)
   if name == "SwedishTranslator" then
-    ST.msg("installed! Type sv:demo to see every visualization, or sv:help for all commands.", "pale_green")
+    ST.msg("installed! Type sv demo to see every visualization, or sv help for all commands.", "pale_green")
     ST.finish("main")
   end
 end)

@@ -22,7 +22,7 @@ function ST.showHistory(count)
     return
   end
   count = math.min(math.max(1, math.floor(count or 10)), #history)
-  ST.msg(string.format("your last %d translations:", count), "gold")
+  ST.msg(string.format("your last %d %s:", count, count == 1 and "translation" or "translations"), "gold")
   for i = #history - count + 1, #history do
     local entry = history[i]
     ST.out("main", {
@@ -39,7 +39,7 @@ end
 function ST.saveWord(key, english)
   key = ST.lower(ST.trim(key))
   if key == "" then
-    ST.warn("which word? e.g. sv:save hund")
+    ST.warn("which word? e.g. sv save hund")
     return
   end
   if not english then
@@ -83,7 +83,7 @@ end
 function ST.showWords()
   local keys = table.keys(ST.state.vocab)
   if #keys == 0 then
-    ST.msg("your word list is empty - click words in the hover view, or use sv:save <word>")
+    ST.msg("your word list is empty - click words in the hover view, or use sv save <word>")
     return
   end
   table.sort(keys)
@@ -129,7 +129,7 @@ end
 
 function ST.quiz()
   if table.size(ST.state.vocab) == 0 then
-    ST.msg("save a few words first (click them in the hover view, or sv:save <word>), then quiz yourself")
+    ST.msg("save a few words first (click them in the hover view, or sv save <word>), then quiz yourself")
     return
   end
   local key = pickQuizWord(ST.lastQuizWord)
@@ -198,9 +198,10 @@ function ST.looksSwedish(line)
   return score >= 2 or (score >= 1 and words <= 2)
 end
 
+-- The trigger in src/triggers matches every line, so it ships disabled and is
+-- only switched on while auto-translate is; its name must stay the same as here.
 ST.autoTrigger = "SwedishTranslator auto-translate"
 
--- The trigger matches every line, so it is only switched on while auto-translate is.
 function ST.applyAutoTrigger()
   if ST.state.auto then
     enableTrigger(ST.autoTrigger)

@@ -251,7 +251,7 @@ function ST.process(text, source, opts)
   local auto = source == "auto"
   if not anyEnabled(viewSet) then
     if not auto then
-      ST.warn("every view is switched off - turn one on with sv:views")
+      ST.warn("every view is switched off - turn one on with sv views")
     end
     if opts.done then
       opts.done(false)

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "sv command",
+    "isActive": "yes",
+    "regex": "^sv\\s+\\S.*$",
+    "script": "SwedishTranslator.onCommand(matches[1])"
+  }
+]

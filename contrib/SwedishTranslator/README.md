@@ -6,23 +6,24 @@ automatically, and choose how the translation is shown from six visualizations.
 ## Install
 
 In Mudlet, open **Toolbox → Package Manager → Install** and pick `SwedishTranslator.mpackage`,
-or run `lua installPackage("/path/to/SwedishTranslator.mpackage")`. Then type `sv:demo`.
+or run `lua installPackage("/path/to/SwedishTranslator.mpackage")`. Then type `sv demo`.
 
 ## Use
 
 | Command | What it does |
 | --- | --- |
 | `sv <swedish text>` | translate text |
-| `sv:help` | list every command (a bare `sv` goes to the game, where it usually means southwest) |
+| `sv help` | list every command (a bare `sv` goes to the game, where it usually means southwest) |
+| `sv translate <text>` | translate text that starts with a command word, e.g. `sv translate demo` |
 | select text, right-click → **Translate Swedish → English** | translate anything already on screen |
-| `sv:demo` | one sample sentence per visualization, to compare them |
-| `sv:views` | list the visualizations; click to switch each on or off |
-| `sv:view <name> [on\|off]`, `sv:only <name>...` | switch visualizations from the command line |
-| `sv:auto [on\|off]` | translate Swedish lines arriving from the game |
-| `sv:save <word>`, `sv:words`, `sv:quiz` | personal word list and a spaced-repetition quiz |
-| `sv:history [n]` | the last n translations |
-| `sv:email <address\|off>` | raise MyMemory's free limit from 5,000 to 50,000 characters a day |
-| `sv:clear <history\|words\|cache>` | forget saved data |
+| `sv demo` | one sample sentence per visualization, to compare them |
+| `sv views` | list the visualizations; click to switch each on or off |
+| `sv view <name> [on\|off]`, `sv only <name>...` | switch visualizations from the command line |
+| `sv auto [on\|off]` | translate Swedish lines arriving from the game |
+| `sv save <word>`, `sv words`, `sv quiz` | personal word list and a spaced-repetition quiz |
+| `sv history [n]` | the last n translations |
+| `sv email <address\|off>` | raise MyMemory's free limit from 5,000 to 50,000 characters a day |
+| `sv clear <history\|words\|cache>` | forget saved data |
 
 ### Visualizations
 
@@ -58,11 +59,22 @@ file is ever unreadable it is set aside rather than overwritten, and the backup 
 
 ## Building
 
-The package is generated from the sources in `scripts/` (loaded in file-name order):
+The package is built with [muddler](https://github.com/demonnic/muddler) from the sources in `src/`
+(metadata in `mfile`, scripts loaded in the order `src/scripts/SwedishTranslator/scripts.json`
+lists them). With muddler installed, run in this directory:
 
 ```bash
-python3 build.py            # writes SwedishTranslator.mpackage next to this file
+muddle                      # writes build/SwedishTranslator.mpackage
 ```
+
+or without installing anything, through muddler's Docker image:
+
+```bash
+docker run --rm -it -u $(id -u):$(id -g) -v "$PWD":"/$PWD" -w "/$PWD" demonnic/muddler
+```
+
+`SwedishTranslator.mpackage` next to this file is a copy of that build, for installing straight
+from the repository.
 
 ## Known limitation
 

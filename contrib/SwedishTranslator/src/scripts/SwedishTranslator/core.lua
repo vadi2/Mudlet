@@ -3,7 +3,7 @@
 SwedishTranslator = SwedishTranslator or {}
 local ST = SwedishTranslator
 
-ST.version = "1.0.0"
+ST.version = "@VERSION@"
 ST.handlerUser = "SwedishTranslator"
 
 ST.viewOrder = { "inline", "gloss", "hover", "reveal", "panel", "subtitle" }
@@ -111,7 +111,7 @@ function ST.load()
       os.rename(path .. ".bak", aside)
       ST.warn(string.format("your saved data could not be read (%s). It was kept as %s; starting with an empty word list.", backupErr, aside))
     else
-      ST.msg("restored your data from " .. path .. ".bak (delete that file too, or use sv:clear, to start over)")
+      ST.msg("restored your data from " .. path .. ".bak (delete that file too, or use sv clear, to start over)")
     end
     ST.finish("main")
   elseif err then

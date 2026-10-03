@@ -297,7 +297,7 @@ local function pickTranslation(data, source)
   return nil
 end
 
-local QUOTA_MESSAGE = "today's free MyMemory quota is used up - try again later, or raise it with sv:email"
+local QUOTA_MESSAGE = "today's free MyMemory quota is used up - try again later, or raise it with sv email"
 
 local function parseResponse(body, source)
   local ok, data = pcall(yajl.to_value, body)
@@ -354,7 +354,7 @@ end
 local function describeHttpError(message)
   message = tostring(message):gsub("https?://%S+", "the translation service")
   if message:find("Too Many Requests", 1, true) then
-    pauseService(RATE_LIMIT_PAUSE_SECONDS, "MyMemory is rate-limiting requests - wait a minute, or raise the limit with sv:email")
+    pauseService(RATE_LIMIT_PAUSE_SECONDS, "MyMemory is rate-limiting requests - wait a minute, or raise the limit with sv email")
     return ST.pauseReason
   end
   local reply = message:match("server replied: (.+)$")
