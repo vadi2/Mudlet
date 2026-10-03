@@ -48,7 +48,7 @@ jobs:
       LUA_VERSION: '5.1.5'
       CCACHE_MAXSIZE: 2G
       CCACHE_COMPRESSLEVEL: 1
-      CTEST_JOBS: 6
+      CTEST_JOBS: 9
     strategy:
       fail-fast: false
       matrix:
