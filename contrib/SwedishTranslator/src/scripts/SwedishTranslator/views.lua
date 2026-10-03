@@ -68,29 +68,95 @@ function views.gloss(entry)
   end
 end
 
--- Every word is a link: hovering shows its meaning, clicking adds it to the word list.
-function views.hover(entry)
-  ST.out("main", { { "dim_gray", "\n  ⓘ   " } })
+-- Hover: the Swedish text stays exactly as it is - same colors, no underline -
+-- but every word gets a tooltip with its meaning and saves itself when clicked.
+local function wordLink(entry, token)
+  local english = entry.glosses[token.key]
+  local hint
+  if english then
+    hint = string.format("%s = %s\n(click to save it to your word list)", token.word, english)
+  else
+    hint = token.word .. ": not translated yet (click to look it up and save it)"
+  end
+  return function()
+    ST.saveWord(token.key, english)
+    ST.finish("main")
+  end, hint
+end
+
+-- Echoes the Swedish with every word hoverable, in whatever format is current,
+-- so it reads exactly like plain text. Punctuation around a word stays unlinked.
+function ST.echoHoverable(entry)
   for index, token in ipairs(entry.tokens) do
     if index > 1 then
       echo("main", " ")
     end
-    if token.key then
-      local english = entry.glosses[token.key]
-      local hint
-      if english then
-        hint = string.format("%s = %s\n(click to save it to your word list)", token.word, english)
-      else
-        hint = token.word .. ": not translated yet (click to look it up and save it)"
-      end
-      ST.link("main", token.text, function()
-        ST.saveWord(token.key, english)
-      end, hint)
+    local wordAt = token.key and token.text:find(token.word, 1, true)
+    if wordAt then
+      local action, hint = wordLink(entry, token)
+      echo("main", token.text:sub(1, wordAt - 1))
+      echoLink("main", token.word, action, hint, true)
+      echo("main", token.text:sub(wordAt + #token.word))
     else
       echo("main", token.text)
     end
   end
-  ST.out("main", { { "dim_gray", "   ← hover the words" } })
+end
+
+-- The game line an auto-translated entry came from: normally still at the line
+-- number noted when it arrived, but the buffer drops old lines as it fills,
+-- which renumbers the rest, so fall back to the most recent identical line.
+local function findSourceLine(entry)
+  local candidate = entry.lineNumber
+  if candidate then
+    local lines = getLines("main", candidate, candidate + 1)
+    if type(lines) == "table" and lines[1] == entry.line then
+      return candidate
+    end
+  end
+  local last = getLastLineNumber("main")
+  for lineNumber = last, math.max(0, last - 200), -1 do
+    local lines = getLines("main", lineNumber, lineNumber + 1)
+    if type(lines) == "table" and lines[1] == entry.line then
+      return lineNumber
+    end
+  end
+  return nil
+end
+
+-- Turns the words of the original game line into hover links in place.
+local function linkSourceLine(entry)
+  local lineNumber = findSourceLine(entry)
+  if not lineNumber then
+    return
+  end
+  local cursorLine, cursorColumn = getLineNumber("main"), getColumnNumber("main")
+  local line, position = entry.line, 1
+  for _, token in ipairs(entry.tokens) do
+    local start = line:find(token.text, position, true)
+    if not start then
+      break
+    end
+    position = start + #token.text
+    if token.key then
+      local wordStart = start + token.text:find(token.word, 1, true) - 1
+      local column = utf8.len(line:sub(1, wordStart - 1))
+      local action, hint = wordLink(entry, token)
+      moveCursor("main", column, lineNumber)
+      selectSection("main", column, utf8.len(token.word))
+      setLink("main", action, hint)
+    end
+  end
+  deselect("main")
+  moveCursor("main", cursorColumn, cursorLine)
+end
+
+-- Auto-translated lines are linked where they are; for everything else the
+-- render step prints the Swedish once, already hoverable (see ST.process).
+function views.hover(entry)
+  if entry.source == "auto" then
+    linkSourceLine(entry)
+  end
 end
 
 -- Active recall: the learner tries to translate before choosing to look.
@@ -207,9 +273,9 @@ local function anyEnabled(viewSet)
 end
 
 -- inline and reveal only show English, so they need the Swedish printed above
--- them; gloss and hover already show the Swedish themselves.
+-- them, and hover needs it to have something to hover; gloss shows its own.
 local function needsHeader(viewSet)
-  return viewSet.inline or viewSet.reveal
+  return viewSet.inline or viewSet.reveal or viewSet.hover
 end
 
 -- Requests finish in whatever order the network returns them, but auto-translated
@@ -258,7 +324,14 @@ function ST.process(text, source, opts)
     end
     return
   end
-  local entry = { sv = ST.trim(text), source = source, tokens = ST.tokenize(text), glosses = {} }
+  local entry = {
+    sv = ST.trim(text),
+    line = text,
+    lineNumber = opts.lineNumber,
+    source = source,
+    tokens = ST.tokenize(text),
+    glosses = {},
+  }
   local glossing = needsGlosses(viewSet)
   local pending = glossing and 2 or 1
   local failed, glossFailure = nil, nil
@@ -272,7 +345,14 @@ function ST.process(text, source, opts)
       end
     else
       if not auto and needsHeader(viewSet) then
-        ST.out("main", { { "dim_gray", "\n  sv› " }, { "light_goldenrod", entry.sv } })
+        ST.out("main", { { "dim_gray", "\n  sv› " } })
+        fg("main", "light_goldenrod")
+        if viewSet.hover then
+          ST.echoHoverable(entry)
+        else
+          echo("main", entry.sv)
+        end
+        resetFormat("main")
       end
       for _, name in ipairs(ST.viewOrder) do
         if viewSet[name] then

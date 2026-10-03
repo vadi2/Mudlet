@@ -33,7 +33,9 @@ Any combination can be on at once; `inline` and `gloss` are on by default.
   translation is already cached gets it directly beneath; otherwise translations follow the game
   text a moment later, in the same order as the lines they belong to.
 - **gloss** - an interlinear, word-by-word gloss: each Swedish word above its English meaning.
-- **hover** - every Swedish word becomes a link; hover for its meaning, click to save it to your word list.
+- **hover** - hover any Swedish word to see its meaning, click it to save it to your word list. The
+  text itself is left exactly as it was - same colors, no underline. With auto-translate the game's
+  own lines become hoverable.
 - **reveal** - the English is hidden behind a link, so you translate in your head first.
 - **panel** - a dockable side window keeping a running Swedish/English history.
 - **subtitle** - a movie-style card over the bottom of the main window; it disappears after 5-15

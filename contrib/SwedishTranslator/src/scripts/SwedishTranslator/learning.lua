@@ -212,7 +212,7 @@ end
 
 function ST.onGameLine(text)
   if ST.state.auto and ST.looksSwedish(text) then
-    ST.process(text, "auto")
+    ST.process(text, "auto", { lineNumber = getLineNumber("main") })
   end
 end
 
