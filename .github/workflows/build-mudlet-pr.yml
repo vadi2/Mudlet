@@ -1,8 +1,9 @@
 # DUPLICATE WORKFLOW: This file is paired with build-mudlet.yml
 # Changes here likely need to be mirrored there as well, apart from the
-# ccache/Lua/xcb-util-cursor handling: only builds of development
+# ccache/Lua/Lua rocks/xcb-util-cursor handling: only builds of development
 # write these shared caches, so there are no save steps here at all - a pull
-# request never owns an entry of its own.
+# request never owns an entry of its own. The macOS C++ tests also run later
+# here, alongside the Lua tests - see "(macOS) Run C++ and Lua tests".
 name: 🔨 Build Mudlet - PR
 on:
   pull_request:
@@ -59,46 +60,32 @@ jobs:
           # an artifact. 'ubuntu (x86_64)' and 'ubuntu / clang' still run there on
           # every push to development and nightly.
           # oldest OS supported for maximum compatibility of built AppImage
+          - os: ubuntu-22.04
+            buildname: 'ubuntu / gcc / lua tests + leak detection'
+            compiler: gcc_64
+            gcc_compiler_version: 12
+            qt: '6.11.1'
+            ccache_id: ubuntu-gcc-asan
+            deploy: 'deploy'
+            run_tests: 'true'
+            # Enable AddressSanitizer for PTB and testing builds, but not release
+            # builds (tagged Mudlet-*) - ASAN adds significant runtime overhead
+            enable_asan: 'true'
+          # No tests: none branch on host architecture, so the arm64 job covers them on a faster pool.
           - os: macos-15-intel
-            buildname: 'intel-A'
+            buildname: 'macos (x86_64)'
             compiler: clang_64
             qt: '6.11.1'
             ccache_id: macos-x64
             deploy: 'deploy'
             build_tests: 'false'
-            force_dsym: 'true'
-          - os: macos-15-intel
-            buildname: 'intel-N'
-            compiler: clang_64
-            qt: '6.11.1'
-            ccache_id: macos-x64
-            deploy: 'deploy'
-            build_tests: 'false'
           - os: macos-15
-            buildname: 'arm-A'
+            buildname: 'macos (arm64) / c++, lua tests'
             compiler: clang_64
             qt: '6.11.1'
             ccache_id: macos-arm64
             deploy: 'deploy'
             run_tests: 'true'
-            force_dsym: 'true'
-          - os: macos-15
-            buildname: 'arm-B'
-            compiler: clang_64
-            qt: '6.11.1'
-            ccache_id: macos-arm64
-            deploy: 'deploy'
-            run_tests: 'true'
-            ctest_jobs: '6'
-          - os: macos-15
-            buildname: 'arm-C'
-            compiler: clang_64
-            qt: '6.11.1'
-            ccache_id: macos-arm64
-            deploy: 'deploy'
-            run_tests: 'true'
-            ctest_jobs: '6'
-            concurrent: 'true'
 
     steps:
     - name: Checkout Mudlet source code
@@ -145,6 +132,9 @@ jobs:
       if: runner.os == 'macOS'
       uses: leafo/gh-actions-luarocks@v6
 
+    # Keyed on the runner image because the rocks link against its Homebrew libraries.
+    # Every rock is still checked for below, so a key that predates a change to the list
+    # only costs the build of what it lacks.
     - name: (macOS) Identify the runner image
       if: runner.os == 'macOS'
       id: image
@@ -410,19 +400,10 @@ jobs:
         CMAKE_BUILD_TYPE: ${{ startsWith(github.ref, 'refs/tags/Mudlet-') && 'Release' || '' }}
         USE_SANITIZER: ${{ matrix.enable_asan == 'true' && !startsWith(github.ref, 'refs/tags/Mudlet-') && 'Address' || '' }}
         WITH_SENTRY: 'ON'
-        EXP_FORCE_DSYM: ${{ matrix.force_dsym }}
         SENTRY_SEND_DEBUG: ${{ (startsWith(github.ref, 'refs/tags/') || github.event_name == 'schedule' || github.event.inputs.scheduled == 'true') && '1' || '0' }}
         SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         MUDLET_SANITIZERS: ${{ github.event_name == 'pull_request' && 'address' || '' }}
         SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-
-    - name: (EXP) Save ccache
-      if: always()
-      continue-on-error: true
-      uses: actions/cache/save@v6
-      with:
-        path: ${{runner.workspace}}/ccache
-        key: ccache-${{matrix.ccache_id}}-sha-${{ github.sha }}
 
     - name: check ccache stats post build
       run: |
@@ -431,6 +412,7 @@ jobs:
 
     - name: install dependencies for packaging/tests
       run: |
+        # Skips a rock the restored cache already holds - at the pinned version, if one is given
         rock() {
           local version=""
           if [ $# -gt 1 ] && [[ "$2" != *=* ]]; then version="$2"; fi
@@ -470,13 +452,6 @@ jobs:
         RUNNER_OS: ${{runner.os}}
         DEPLOY: ${{matrix.deploy}}
 
-    - name: (EXP) Save Lua rocks cache
-      if: runner.os == 'macOS' && steps.cache-luarocks.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v6
-      with:
-        path: ~/.luarocks
-        key: luarocks-${{ matrix.os }}-${{ runner.arch }}-${{ steps.image.outputs.version }}
-
     - name: (Linux) Run C++ tests
       if: runner.os == 'Linux' && matrix.run_tests == 'true'
       working-directory: '${{runner.workspace}}/b/ninja'
@@ -489,16 +464,13 @@ jobs:
         # green-by-skip on every platform and say nothing about it.
         MUDLET_MEDIA_TESTS_REQUIRE_PLAYBACK: 1
 
-    - name: (macOS) Run C++ tests
-      if: runner.os == 'macOS' && matrix.run_tests == 'true' && matrix.concurrent != 'true'
+    # The macOS C++ tests run alongside the Lua tests further down, which need the
+    # packaged app - and packaging moves src/mudlet.app, which AppStartupTeardownTest
+    # and HeadlessVersionTest launch. A clone costs no disk on APFS.
+    - name: (macOS) Keep the unpackaged app for the C++ tests
+      if: runner.os == 'macOS' && matrix.run_tests == 'true'
       working-directory: '${{runner.workspace}}/b/ninja'
-      run: |
-        iostat -w 5 > "$RUNNER_TEMP/iostat-ctest.log" 2>&1 &
-        sampler=$!
-        ctest --output-on-failure -j ${{ matrix.ctest_jobs || '$(sysctl -n hw.ncpu)' }}
-        kill $sampler || true
-        echo "--- iostat during ctest ---"
-        cat "$RUNNER_TEMP/iostat-ctest.log"
+      run: cp -cR src/mudlet.app "${{runner.temp}}/mudlet-for-ctest.app"
 
     # Skipped after the full ctest run, which covers these, and with BUILD_TESTING=OFF (bare ctest exits 8)
     - name: Run QTest
@@ -510,15 +482,6 @@ jobs:
       uses: webfactory/ssh-agent@v0.10.0
       with:
         ssh-private-key: ${{secrets.UPLOAD_PRIVATEKEY}}
-
-    - name: (EXP) Keep an unpackaged copy of the app for ctest
-      if: matrix.concurrent == 'true'
-      working-directory: '${{runner.workspace}}/b/ninja'
-      run: cp -cR src/mudlet.app "$RUNNER_TEMP/mudlet-for-ctest.app"
-
-    - name: (EXP) packaging timer start
-      if: runner.os == 'macOS'
-      run: date -u +%s > "$RUNNER_TEMP/pkg-start"
 
     - name: package Mudlet
       if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.deploy == 'deploy'
@@ -551,12 +514,6 @@ jobs:
         GITHUB_FORCE_BUILD: ${{ github.event.inputs.scheduled == 'true' }}
         # needed so CI/*.after_success.sh can query existing releases to skip duplicate PTBs
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: (EXP) packaging result
-      if: runner.os == 'macOS'
-      run: |
-        echo "packaging took $(( $(date -u +%s) - $(cat "$RUNNER_TEMP/pkg-start") ))s"
-        ls -la "${{runner.workspace}}/b/ninja/upload" || true
 
     - name: Upload packaged Mudlet
       uses: actions/upload-artifact@v7
@@ -741,39 +698,54 @@ jobs:
         # that from CI.
         LSAN_OPTIONS: ${{ matrix.enable_asan == 'true' && format('suppressions={0}/asan-suppressions.txt:exitcode=1:log_threads=1', github.workspace) || '' }}
 
-    - name: (macOS) Run Lua tests
+    # Unlike build-mudlet.yml, where packaging can publish a PTB or a release and so has
+    # to wait for the C++ tests, nothing here is published before this step. Running both
+    # suites at once took the arm64 job's tests from 387s to 257s.
+    - name: (macOS) Run C++ and Lua tests
       if: matrix.run_tests == 'true' && runner.os == 'macOS'
-      timeout-minutes: 12
-      shell: bash
+      # The Lua suite alone is ~100s on a healthy Intel runner and was measured at 172s on
+      # a slow one, and sharing the runner with ctest stretches it to ~240s
+      timeout-minutes: 10
       run: |
-        lua_env=(AUTORUN_BUSTED_TESTS=true MUDLET_TEST_MODE=1 MUDLET_TEST_REQUIRE_TTS_MOCK=1
-          MUDLET_TEST_REQUIRE_HTTP_FIXTURE=1 MUDLET_TEST_REQUIRE_MMCP_PEER=1 MUDLET_TEST_REQUIRE_TELNET_FIXTURE=1
-          TESTS_DIRECTORY="${{github.workspace}}/src/mudlet-lua/tests" QUIT_MUDLET_AFTER_TESTS=true ASAN_OPTIONS=detect_leaks=0)
-        iostat -w 5 > "$RUNNER_TEMP/iostat-lua.log" 2>&1 &
-        sampler=$!
-        if [ "${{ matrix.concurrent }}" != "true" ]; then
-          env "${lua_env[@]}" ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline
-          kill $sampler || true
-          cat "$RUNNER_TEMP/iostat-lua.log"
-          exit 0
-        fi
+        ( ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline \
+            > "${{runner.temp}}/lua-tests.log" 2>&1
+          echo $? > "${{runner.temp}}/lua-tests.exit" ) &
+        lua_tests=$!
+
         cd "${{runner.workspace}}/b/ninja"
-        [ -d src/mudlet.app ] || mv "$RUNNER_TEMP/mudlet-for-ctest.app" src/mudlet.app
-        ( env "${lua_env[@]}" ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline > "$RUNNER_TEMP/lua.log" 2>&1
-          echo $? > "$RUNNER_TEMP/lua.exit"; echo "Lua tests finished at $(date -u +%T)" >> "$RUNNER_TEMP/lua.log" ) &
-        luapid=$!
-        echo "started at $(date -u +%T)"
-        set +e
-        ctest --output-on-failure -j ${{ matrix.ctest_jobs }}
-        ctest_rc=$?
-        echo "ctest finished at $(date -u +%T) rc=$ctest_rc"
-        wait $luapid
-        kill $sampler || true
-        cat "$RUNNER_TEMP/lua.log"
-        cat "$RUNNER_TEMP/iostat-lua.log"
-        lua_rc=$(cat "$RUNNER_TEMP/lua.exit")
-        echo "ctest rc=$ctest_rc lua rc=$lua_rc"
-        [ "$ctest_rc" = 0 ] && [ "$lua_rc" = 0 ]
+        [ -d src/mudlet.app ] || mv "${{runner.temp}}/mudlet-for-ctest.app" src/mudlet.app
+        # Twice the cores: most of these tests wait on timers and sockets rather than compute.
+        # On the 3-core arm64 runner -j6 took the run from 330s to 213s, and -j9 was slower (245s).
+        # The variables below are the Lua run's, so keep them from the C++ tests.
+        ctest_status=0
+        env -u AUTORUN_BUSTED_TESTS -u TESTS_DIRECTORY -u QUIT_MUDLET_AFTER_TESTS \
+          ctest --output-on-failure -j $(( 2 * $(sysctl -n hw.ncpu) )) || ctest_status=$?
+
+        wait $lua_tests || true
+        echo "::group::Lua tests"
+        cat "${{runner.temp}}/lua-tests.log" && touch "${{runner.temp}}/lua-tests.shown"
+        echo "::endgroup::"
+        lua_status=$(cat "${{runner.temp}}/lua-tests.exit" 2>/dev/null || echo 1)
+        echo "C++ tests exited with ${ctest_status}, Lua tests with ${lua_status}"
+        [ "${ctest_status}" -eq 0 ] && [ "${lua_status}" -eq 0 ]
+      env:
+        AUTORUN_BUSTED_TESTS: 'true'
+        MUDLET_TEST_MODE: 1
+        MUDLET_TEST_REQUIRE_TTS_MOCK: 1
+        MUDLET_TEST_REQUIRE_HTTP_FIXTURE: 1
+        MUDLET_TEST_REQUIRE_MMCP_PEER: 1
+        MUDLET_TEST_REQUIRE_TELNET_FIXTURE: 1
+        # No MUDLET_TEST_REQUIRE_MEDIA: Qt Multimedia starts no player on the
+        # macOS runners, so the media effect specs pend here by design.
+        TESTS_DIRECTORY: ${{github.workspace}}/src/mudlet-lua/tests
+        QUIT_MUDLET_AFTER_TESTS: 'true'
+        ASAN_OPTIONS: detect_leaks=0
+
+    # A timeout kills the step above before it can show what the Lua run printed
+    - name: (macOS) Show the Lua test log on failure
+      if: failure() && matrix.run_tests == 'true' && runner.os == 'macOS'
+      run: |
+        [ -e "${{runner.temp}}/lua-tests.shown" ] || cat "${{runner.temp}}/lua-tests.log" 2>/dev/null || true
 
     - name: (Linux) Show the captured Discord frames on failure
       if: failure() && matrix.run_tests == 'true' && runner.os == 'Linux'
