@@ -108,6 +108,10 @@ def main():
         with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("config.lua", config)
             archive.writestr(f"{NAME}.xml", xml)
+        # mkstemp creates the file owner-only; give it the usual permissions.
+        umask = os.umask(0)
+        os.umask(umask)
+        os.chmod(temporary, 0o666 & ~umask)
         os.replace(temporary, target)
     finally:
         if os.path.exists(temporary):

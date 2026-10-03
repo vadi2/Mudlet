@@ -196,6 +196,8 @@ commands.email = function(args)
     ST.msg("e-mail removed; using MyMemory's anonymous limit")
   elseif args:find("^[^@%s]+@[^@%s]+%.[^@%s]+$") then
     ST.state.email = args
+    -- The larger limit may already cover a paused quota, so try again.
+    ST.resumeService()
     ST.msg("MyMemory requests will include " .. args .. " for the larger free limit")
   else
     ST.warn("that does not look like an e-mail address")
@@ -221,6 +223,9 @@ commands.clear = function(args)
 end
 
 function ST.onCommand(line)
+  -- Mudlet's alias regex treats a no-break space (Option+Space on a Mac) as
+  -- whitespace, but Lua patterns do not.
+  line = line:gsub("\194\160", " ")
   local command, args = line:match("^sv:(%S*)%s*(.-)%s*$")
   if command then
     local handler = command == "" and commands.help or commands[command:lower()]
@@ -230,7 +235,12 @@ function ST.onCommand(line)
       ST.warn(string.format("unknown command 'sv:%s' - see sv:help", command))
     end
   else
-    ST.process(line:match("^sv%s+(.-)%s*$"), "command")
+    local text = line:match("^sv%s+(.-)%s*$")
+    if text and text ~= "" then
+      ST.process(text, "command")
+    else
+      ST.help()
+    end
   end
   ST.finish("main")
 end

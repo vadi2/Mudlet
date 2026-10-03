@@ -52,6 +52,10 @@ local function pauseService(seconds, reason)
   ST.pauseReason = reason
 end
 
+function ST.resumeService()
+  ST.pausedUntil = nil
+end
+
 local function servicePaused()
   return ST.pausedUntil and os.time() < ST.pausedUntil
 end
@@ -135,12 +139,11 @@ function ST.translate(text, callback, opts)
     return
   end
 
-  if servicePaused() then
+  local request = ST.byKey[key]
+  if not request and servicePaused() then
     callback(false, ST.pauseReason)
     return
   end
-
-  local request = ST.byKey[key]
   if request then
     request.callbacks[#request.callbacks + 1] = callback
     if request.auto and not opts.auto then
@@ -253,13 +256,12 @@ end
 -- MyMemory blends machine translation with a crowd-sourced translation memory,
 -- and memory hits are occasionally junk: "hej" -> a whole e-mail template,
 -- markup like <ex id="_1"/>, or the Swedish text itself handed back. Reject
--- those; only a single capitalized word may stay the same, since names do.
+-- the first two outright; see pickTranslation for the third.
 local function plausible(candidate, source)
   return candidate:find("[%a\128-\255]") ~= nil
     and not candidate:find("<%a")
     and not candidate:find("%%s")
     and ST.width(candidate) <= 3 * ST.width(source) + 15
-    and (bare(candidate) ~= bare(source) or (not source:find("%s") and ST.lower(source) ~= source))
 end
 
 -- Picks the best-scoring plausible translation among the top result and the
@@ -282,8 +284,12 @@ local function pickTranslation(data, source)
     end
   end
   table.sort(candidates, function(a, b) return a.score > b.score end)
+  -- Text identical to the Swedish is usually the input handed back untranslated,
+  -- but a single word can be its own translation (names, and cognates such as
+  -- "bank" or "radio"), so only multi-word text has to come back changed.
+  local singleWord = not ST.trim(source):find("%s")
   for _, candidate in ipairs(candidates) do
-    if plausible(candidate.text, source) then
+    if plausible(candidate.text, source) and (singleWord or bare(candidate.text) ~= bare(source)) then
       return candidate.text
     end
   end
@@ -304,13 +310,13 @@ local function parseResponse(body, source)
     pauseService(QUOTA_PAUSE_SECONDS, QUOTA_MESSAGE)
     return false, QUOTA_MESSAGE
   end
-  if status ~= 200 or type(translated) ~= "string" or translated == "" then
-    return false, "the translation service refused: " .. (details ~= "" and details or ("status " .. tostring(data.responseStatus)))
-  end
-  -- MyMemory reports some failures as a 200 whose "translation" is an error message.
-  if translated:find("^MYMEMORY WARNING") then
+  -- MyMemory reports some failures as a "translation" that is an error message.
+  if type(translated) == "string" and translated:find("^MYMEMORY WARNING") then
     pauseService(QUOTA_PAUSE_SECONDS, QUOTA_MESSAGE)
     return false, QUOTA_MESSAGE
+  end
+  if status ~= 200 or type(translated) ~= "string" or translated == "" then
+    return false, "the translation service refused: " .. (details ~= "" and details or ("status " .. tostring(data.responseStatus)))
   end
   if translated:find("^QUERY LENGTH LIMIT") or translated:find("^INVALID ") then
     return false, "the translation service refused: " .. translated
@@ -345,8 +351,8 @@ end
 -- Qt's error text embeds the whole request URL - the text being translated, and
 -- the user's e-mail when one is set - so describe the failure without it.
 local function describeHttpError(message)
-  message = tostring(message)
-  if message:find("Too Many Requests") or message:find("429") then
+  message = tostring(message):gsub("https?://%S+", "the translation service")
+  if message:find("Too Many Requests", 1, true) then
     pauseService(RATE_LIMIT_PAUSE_SECONDS, "MyMemory is rate-limiting requests - wait a minute, or raise the limit with sv:email")
     return ST.pauseReason
   end
@@ -354,7 +360,7 @@ local function describeHttpError(message)
   if reply and reply ~= "" then
     return "the translation service replied: " .. reply
   end
-  return "network error: " .. (message:gsub("https?://%S+", "the translation service"))
+  return "network error: " .. message
 end
 
 function ST.onHttpError(_, message, url)

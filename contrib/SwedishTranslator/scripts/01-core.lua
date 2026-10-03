@@ -101,7 +101,14 @@ function ST.load()
   local state = defaults()
   local path = ST.dataFile()
   local loaded, err = readStateFile(path)
-  if err then
+  if not loaded and not err and io.exists(path .. ".bak") then
+    -- Mudlet stopped between the two renames in ST.save; the backup is the latest save.
+    loaded, err = readStateFile(path .. ".bak")
+    if err then
+      ST.warn("your saved data could not be read (" .. err .. "); starting with an empty word list")
+      ST.finish("main")
+    end
+  elseif err then
     -- Keep the unreadable file rather than letting the next save overwrite it,
     -- and fall back to the copy of the previous save.
     local aside = path .. ".unreadable-" .. os.date("%Y%m%d-%H%M%S")
@@ -155,8 +162,11 @@ function ST.save()
     err = "the written file is incomplete"
   end
   if not err then
-    os.remove(path .. ".bak")
-    os.rename(path, path .. ".bak")
+    -- Rotate only when there is a save to keep; otherwise the .bak is the only copy.
+    if io.exists(path) then
+      os.remove(path .. ".bak")
+      os.rename(path, path .. ".bak")
+    end
     local renamed, renameErr = os.rename(temporary, path)
     if not renamed then
       err = renameErr
