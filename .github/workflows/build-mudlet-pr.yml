@@ -59,6 +59,67 @@ jobs:
           # an artifact. 'ubuntu (x86_64)' and 'ubuntu / clang' still run there on
           # every push to development and nightly.
           # oldest OS supported for maximum compatibility of built AppImage
+          - os: macos-15-intel
+            buildname: 'intel-N'
+            compiler: clang_64
+            qt: '6.11.1'
+            ccache_id: macos-x64
+            deploy: 'deploy'
+            build_tests: 'false'
+          - os: macos-15
+            buildname: 'arm-B'
+            compiler: clang_64
+            qt: '6.11.1'
+            ccache_id: macos-arm64
+            deploy: 'deploy'
+            run_tests: 'true'
+            ctest_jobs: '6'
+
+    steps:
+    - name: Check whether anything affecting the build changed
+      id: filter
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Only genuinely inert paths are listed - CI, CMake and packaging scripts
+        # all affect the build. Anything unexpected falls through to building.
+        files=$(gh api --paginate \
+          "/repos/${{github.repository}}/pulls/${{github.event.pull_request.number}}/files" \
+          -q '.[].filename')
+        echo "Changed files:"
+        printf '%s\n' "$files"
+
+        if printf '%s\n' "$files" | grep -qvE '(^docs/|^\.github/ISSUE_TEMPLATE/|\.md$)'; then
+          echo "build=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "build=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::Documentation-only change - skipping the build matrix"
+        fi
+
+  compile-mudlet:
+    name: ${{matrix.buildname}}
+    runs-on: ${{matrix.os}}
+    needs: changes
+    if: ${{ (github.repository_owner == 'Mudlet' || github.repository_owner == 'vadi2') && needs.changes.outputs.build == 'true' }}
+    concurrency:
+      group: ${{github.workflow}}-${{matrix.buildname}}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    env:
+      BUILD_TASK: 'PR'
+      LUA_VERSION: '5.1.5'
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPRESSLEVEL: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Note: using / in the "buildname" has significance - replacing the
+          # ',' in some of the following with a '/' seemed to cause extra
+          # spurious steps in the build and broke things! - SlySven
+          # Smaller than build-mudlet.yml's on purpose - only builds that produce
+          # an artifact. 'ubuntu (x86_64)' and 'ubuntu / clang' still run there on
+          # every push to development and nightly.
+          # oldest OS supported for maximum compatibility of built AppImage
           - os: ubuntu-22.04
             buildname: 'ubuntu / gcc / lua tests + leak detection'
             compiler: gcc_64
@@ -131,6 +192,19 @@ jobs:
       if: runner.os == 'macOS'
       uses: leafo/gh-actions-luarocks@v6
 
+    - name: (macOS) Identify the runner image
+      if: runner.os == 'macOS'
+      id: image
+      run: echo "version=${ImageVersion}" >> "$GITHUB_OUTPUT"
+
+    - name: (macOS) Restore Lua rocks cache
+      if: runner.os == 'macOS'
+      id: cache-luarocks
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/.luarocks
+        key: luarocks-${{ matrix.os }}-${{ runner.arch }}-${{ steps.image.outputs.version }}
+
     - name: (macOS) Install dependencies
       if: runner.os == 'macOS'
       env:
@@ -187,7 +261,8 @@ jobs:
         echo "PKG_CONFIG_PATH=${HOMEBREW_PREFIX}/opt/pcre2/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
         # Install lua-yajl early to generate translation statistics
-        luarocks --lua-version 5.1 install --local lua-yajl YAJL_DIR=${HOMEBREW_PREFIX}/opt/yajl
+        luarocks --lua-version 5.1 show lua-yajl >/dev/null 2>&1 \
+          || luarocks --lua-version 5.1 install --local lua-yajl YAJL_DIR=${HOMEBREW_PREFIX}/opt/yajl
 
         # Allow stats generation script to see location of lua-yajl
         eval "$(luarocks path --local --lua-version "5.1")"
@@ -382,10 +457,19 @@ jobs:
         CMAKE_BUILD_TYPE: ${{ startsWith(github.ref, 'refs/tags/Mudlet-') && 'Release' || '' }}
         USE_SANITIZER: ${{ matrix.enable_asan == 'true' && !startsWith(github.ref, 'refs/tags/Mudlet-') && 'Address' || '' }}
         WITH_SENTRY: 'ON'
+        EXP_FORCE_DSYM: ${{ matrix.force_dsym }}
         SENTRY_SEND_DEBUG: ${{ (startsWith(github.ref, 'refs/tags/') || github.event_name == 'schedule' || github.event.inputs.scheduled == 'true') && '1' || '0' }}
         SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         MUDLET_SANITIZERS: ${{ github.event_name == 'pull_request' && 'address' || '' }}
         SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+    - name: (EXP) Save ccache
+      if: always()
+      continue-on-error: true
+      uses: actions/cache/save@v6
+      with:
+        path: ${{runner.workspace}}/ccache
+        key: ccache-${{matrix.ccache_id}}-sha-${{ github.sha }}
 
     - name: check ccache stats post build
       run: |
@@ -394,7 +478,13 @@ jobs:
 
     - name: install dependencies for packaging/tests
       run: |
-        LUAROCKS="luarocks --lua-version 5.1 install --local"
+        rock() {
+          local version=""
+          if [ $# -gt 1 ] && [[ "$2" != *=* ]]; then version="$2"; fi
+          luarocks --lua-version 5.1 show "$1" $version >/dev/null 2>&1 \
+            || luarocks --lua-version 5.1 install --local "$@"
+        }
+        LUAROCKS=rock
 
         $LUAROCKS LuaFileSystem
         $LUAROCKS luautf8
@@ -427,6 +517,13 @@ jobs:
         RUNNER_OS: ${{runner.os}}
         DEPLOY: ${{matrix.deploy}}
 
+    - name: (EXP) Save Lua rocks cache
+      if: runner.os == 'macOS' && steps.cache-luarocks.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.luarocks
+        key: luarocks-${{ matrix.os }}-${{ runner.arch }}-${{ steps.image.outputs.version }}
+
     - name: (Linux) Run C++ tests
       if: runner.os == 'Linux' && matrix.run_tests == 'true'
       working-directory: '${{runner.workspace}}/b/ninja'
@@ -440,9 +537,15 @@ jobs:
         MUDLET_MEDIA_TESTS_REQUIRE_PLAYBACK: 1
 
     - name: (macOS) Run C++ tests
-      if: runner.os == 'macOS' && matrix.run_tests == 'true'
+      if: runner.os == 'macOS' && matrix.run_tests == 'true' && matrix.concurrent != 'true'
       working-directory: '${{runner.workspace}}/b/ninja'
-      run: ctest --output-on-failure -j $(sysctl -n hw.ncpu)
+      run: |
+        iostat -w 5 > "$RUNNER_TEMP/iostat-ctest.log" 2>&1 &
+        sampler=$!
+        ctest --output-on-failure -j ${{ matrix.ctest_jobs || '$(sysctl -n hw.ncpu)' }}
+        kill $sampler || true
+        echo "--- iostat during ctest ---"
+        cat "$RUNNER_TEMP/iostat-ctest.log"
 
     # Skipped after the full ctest run, which covers these, and with BUILD_TESTING=OFF (bare ctest exits 8)
     - name: Run QTest
@@ -454,6 +557,15 @@ jobs:
       uses: webfactory/ssh-agent@v0.10.0
       with:
         ssh-private-key: ${{secrets.UPLOAD_PRIVATEKEY}}
+
+    - name: (EXP) Keep an unpackaged copy of the app for ctest
+      if: matrix.concurrent == 'true'
+      working-directory: '${{runner.workspace}}/b/ninja'
+      run: cp -cR src/mudlet.app "$RUNNER_TEMP/mudlet-for-ctest.app"
+
+    - name: (EXP) packaging timer start
+      if: runner.os == 'macOS'
+      run: date -u +%s > "$RUNNER_TEMP/pkg-start"
 
     - name: package Mudlet
       if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.deploy == 'deploy'
@@ -487,6 +599,12 @@ jobs:
         # needed so CI/*.after_success.sh can query existing releases to skip duplicate PTBs
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: (EXP) packaging result
+      if: runner.os == 'macOS'
+      run: |
+        echo "packaging took $(( $(date -u +%s) - $(cat "$RUNNER_TEMP/pkg-start") ))s"
+        ls -la "${{runner.workspace}}/b/ninja/upload" || true
+
     - name: Upload packaged Mudlet
       uses: actions/upload-artifact@v7
       if: env.UPLOAD_FILENAME
@@ -495,7 +613,7 @@ jobs:
         path: ${{env.FOLDER_TO_UPLOAD}}
 
     - name: Submit to make.mudlet.org
-      if: env.UPLOAD_FILENAME
+      if: false
       # --fail-with-body: gha_queue.php reports refusals (e.g. a duplicate artifact name after a
       # job re-run) as a 4xx with the reason in the body, which plain curl would exit 0 on
       run: curl --fail-with-body --retry 5 -X POST "https://make.mudlet.org/snapshots/gha_queue.php?artifact_name=${{env.UPLOAD_FILENAME}}&unzip=1"
@@ -672,22 +790,37 @@ jobs:
 
     - name: (macOS) Run Lua tests
       if: matrix.run_tests == 'true' && runner.os == 'macOS'
-      # ~100s on a healthy Intel runner and measured at 172s on a slow one, so a
-      # tighter limit fails on runner speed rather than on anything the suite did
-      timeout-minutes: 6
-      run: ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline
-      env:
-        AUTORUN_BUSTED_TESTS: 'true'
-        MUDLET_TEST_MODE: 1
-        MUDLET_TEST_REQUIRE_TTS_MOCK: 1
-        MUDLET_TEST_REQUIRE_HTTP_FIXTURE: 1
-        MUDLET_TEST_REQUIRE_MMCP_PEER: 1
-        MUDLET_TEST_REQUIRE_TELNET_FIXTURE: 1
-        # No MUDLET_TEST_REQUIRE_MEDIA: Qt Multimedia starts no player on the
-        # macOS runners, so the media effect specs pend here by design.
-        TESTS_DIRECTORY: ${{github.workspace}}/src/mudlet-lua/tests
-        QUIT_MUDLET_AFTER_TESTS: 'true'
-        ASAN_OPTIONS: detect_leaks=0
+      timeout-minutes: 12
+      shell: bash
+      run: |
+        lua_env=(AUTORUN_BUSTED_TESTS=true MUDLET_TEST_MODE=1 MUDLET_TEST_REQUIRE_TTS_MOCK=1
+          MUDLET_TEST_REQUIRE_HTTP_FIXTURE=1 MUDLET_TEST_REQUIRE_MMCP_PEER=1 MUDLET_TEST_REQUIRE_TELNET_FIXTURE=1
+          TESTS_DIRECTORY="${{github.workspace}}/src/mudlet-lua/tests" QUIT_MUDLET_AFTER_TESTS=true ASAN_OPTIONS=detect_leaks=0)
+        iostat -w 5 > "$RUNNER_TEMP/iostat-lua.log" 2>&1 &
+        sampler=$!
+        if [ "${{ matrix.concurrent }}" != "true" ]; then
+          env "${lua_env[@]}" ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline
+          kill $sampler || true
+          cat "$RUNNER_TEMP/iostat-lua.log"
+          exit 0
+        fi
+        cd "${{runner.workspace}}/b/ninja"
+        [ -d src/mudlet.app ] || mv "$RUNNER_TEMP/mudlet-for-ctest.app" src/mudlet.app
+        ( env "${lua_env[@]}" ~/Desktop/Mudlet.app/Contents/MacOS/mudlet --profile "Mudlet self-test" --mirror --offline > "$RUNNER_TEMP/lua.log" 2>&1
+          echo $? > "$RUNNER_TEMP/lua.exit"; echo "Lua tests finished at $(date -u +%T)" >> "$RUNNER_TEMP/lua.log" ) &
+        luapid=$!
+        echo "started at $(date -u +%T)"
+        set +e
+        ctest --output-on-failure -j ${{ matrix.ctest_jobs }}
+        ctest_rc=$?
+        echo "ctest finished at $(date -u +%T) rc=$ctest_rc"
+        wait $luapid
+        kill $sampler || true
+        cat "$RUNNER_TEMP/lua.log"
+        cat "$RUNNER_TEMP/iostat-lua.log"
+        lua_rc=$(cat "$RUNNER_TEMP/lua.exit")
+        echo "ctest rc=$ctest_rc lua rc=$lua_rc"
+        [ "$ctest_rc" = 0 ] && [ "$lua_rc" = 0 ]
 
     - name: (Linux) Show the captured Discord frames on failure
       if: failure() && matrix.run_tests == 'true' && runner.os == 'Linux'

@@ -163,7 +163,7 @@ if(APPLE)
             COMMAND strip -x $<TARGET_FILE:${EXE_MUDLET_TARGET}>
             COMMENT "Creating .dSYM bundle and stripping executable"
         )
-    else()
+    elseif(SENTRY_SEND_DEBUG OR "$ENV{EXP_FORCE_DSYM}" STREQUAL "true")
         add_custom_command(TARGET ${EXE_MUDLET_TARGET} POST_BUILD
             COMMAND dsymutil $<TARGET_FILE:${EXE_MUDLET_TARGET}> -o $<TARGET_FILE:${EXE_MUDLET_TARGET}>.dSYM
             COMMENT "Creating .dSYM bundle without stripping"
