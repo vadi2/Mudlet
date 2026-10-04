@@ -197,9 +197,11 @@ function ST.getPanel()
   return ST.panel
 end
 
+-- Each entry is preceded by a blank line, so entries whose lines wrap are
+-- still easy to tell apart.
 function ST.panelEntry(entry)
   ST.out(PANEL, {
-    { "dim_gray", "\n" .. os.date("%H:%M", entry.t) .. "  " },
+    { "dim_gray", "\n\n" .. os.date("%H:%M", entry.t) .. "  " },
     { "light_goldenrod", entry.sv },
     { "dim_gray", "\n       " },
     { "pale_green", entry.en },
