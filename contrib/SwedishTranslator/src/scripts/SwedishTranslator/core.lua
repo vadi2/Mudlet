@@ -26,7 +26,7 @@ local function defaults()
     email = "",
     cache = {},   -- [lowercased swedish] = { en = english, t = os.time() }
     vocab = {},   -- [lowercased word] = { en = english, box = 1..5, right = n, wrong = n, added = os.time() }
-    history = {}, -- { { sv = swedish, en = english, t = os.time() } }, oldest first
+    history = {}, -- { { sv = swedish, en = english, t = os.time(), m = message id or nil } }, oldest first
   }
 end
 
@@ -89,7 +89,7 @@ local function adopt(state, loaded)
   end
   for _, entry in ipairs(type(loaded.history) == "table" and loaded.history or {}) do
     if type(entry) == "table" and type(entry.sv) == "string" and type(entry.en) == "string" then
-      state.history[#state.history + 1] = { sv = entry.sv, en = entry.en, t = tonumber(entry.t) or 0 }
+      state.history[#state.history + 1] = { sv = entry.sv, en = entry.en, t = tonumber(entry.t) or 0, m = tonumber(entry.m) }
     else
       dropped = dropped + 1
     end

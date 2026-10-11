@@ -187,6 +187,7 @@ function ST.getPanel()
     -- Mudlet keeps the window when the Lua state is rebuilt (e.g. after a
     -- profile's scripts are reset), so start it over from the saved history.
     ST.panel:clear()
+    ST.panelMessage = nil
     ST.out(PANEL, { { "gold", "Svenska → English\n" }, { "dim_gray", "Your translations collect here.\n" } })
     local history = ST.state.history
     for i = math.max(1, #history - 19), #history do
@@ -197,21 +198,20 @@ function ST.getPanel()
   return ST.panel
 end
 
--- Each entry is preceded by a blank line, so entries whose lines wrap are
--- still easy to tell apart.
+-- Lines of the same game message stay together; a blank line separates
+-- messages, so wrapped lines still read as one block.
 function ST.panelEntry(entry)
+  local sameMessage = entry.m ~= nil and entry.m == ST.panelMessage
+  ST.panelMessage = entry.m
   ST.out(PANEL, {
-    { "dim_gray", "\n\n" .. os.date("%H:%M", entry.t) .. "  " },
-    { "light_goldenrod", entry.sv },
-    { "dim_gray", "\n       " },
-    { "pale_green", entry.en },
-    { "dim_gray", "\n" },
+    { "light_goldenrod", (sameMessage and "\n" or "\n\n") .. entry.sv },
+    { "pale_green", "\n" .. entry.en },
   })
 end
 
 function views.panel(entry)
   ST.getPanel()
-  ST.panelEntry({ sv = entry.sv, en = entry.en, t = os.time() })
+  ST.panelEntry({ sv = entry.sv, en = entry.en, m = entry.message })
 end
 
 function ST.getSubtitle()
@@ -330,6 +330,7 @@ function ST.process(text, source, opts)
     sv = ST.trim(text),
     line = text,
     lineNumber = opts.lineNumber,
+    message = opts.message,
     source = source,
     tokens = ST.tokenize(text),
     glosses = {},
@@ -368,7 +369,7 @@ function ST.process(text, source, opts)
         ST.out("main", { { "dim_gray", string.format("\n  (%d %s could not be glossed: %s)", glossFailure.count,
           glossFailure.count == 1 and "word" or "words", tostring(glossFailure.reason)) } })
       end
-      ST.addHistory(entry.sv, entry.en)
+      ST.addHistory(entry.sv, entry.en, entry.message)
     end
     ST.finish("main")
     if opts.done then

@@ -5,13 +5,13 @@ local ST = SwedishTranslator
 
 local MAX_BOX = 5
 
-function ST.addHistory(sv, en)
+function ST.addHistory(sv, en, message)
   local history = ST.state.history
   local last = history[#history]
   if last and last.sv == sv then
     return
   end
-  history[#history + 1] = { sv = sv, en = en, t = os.time() }
+  history[#history + 1] = { sv = sv, en = en, t = os.time(), m = message }
   ST.scheduleSave()
 end
 
@@ -210,9 +210,18 @@ function ST.applyAutoTrigger()
   end
 end
 
+-- A game message (a room, a reply) arrives as one burst of lines, so a pause
+-- longer than this between lines starts a new message.
+local MESSAGE_GAP_SECONDS = 0.3
+
 function ST.onGameLine(text)
+  local now = getEpoch()
+  if not ST.lastGameLineAt or now - ST.lastGameLineAt > MESSAGE_GAP_SECONDS then
+    ST.gameMessage = math.floor(now * 1000)
+  end
+  ST.lastGameLineAt = now
   if ST.state.auto and ST.looksSwedish(text) then
-    ST.process(text, "auto", { lineNumber = getLineNumber("main") })
+    ST.process(text, "auto", { lineNumber = getLineNumber("main"), message = ST.gameMessage })
   end
 end
 
