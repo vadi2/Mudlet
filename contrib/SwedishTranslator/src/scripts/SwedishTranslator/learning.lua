@@ -53,6 +53,15 @@ function ST.saveWord(key, english)
     end)
     return
   end
+  -- The service hands back an unknown word (a typo, or gibberish) unchanged,
+  -- and a word that is its own English has nothing to learn.
+  local function bare(text)
+    return (ST.lower(text):gsub("[%p%s]", ""))
+  end
+  if bare(english) == bare(key) then
+    ST.warn(string.format("no English translation found for '%s' - is it spelled right?", key))
+    return
+  end
   local vocab = ST.state.vocab
   if vocab[key] then
     vocab[key].en = english
