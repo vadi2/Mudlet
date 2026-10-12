@@ -227,15 +227,33 @@ end
 -- longer than this between lines starts a new message.
 local MESSAGE_GAP_SECONDS = 0.3
 
+local function hasWords(text)
+  for _, token in ipairs(ST.tokenize(text)) do
+    if token.key then
+      return true
+    end
+  end
+  return false
+end
+
 function ST.onGameLine(text)
   local now = getEpoch()
   if not ST.lastGameLineAt or now - ST.lastGameLineAt > MESSAGE_GAP_SECONDS then
     ST.gameMessage = math.floor(now * 1000)
   end
   ST.lastGameLineAt = now
-  if ST.state.auto and ST.looksSwedish(text) then
-    ST.process(text, "auto", { lineNumber = getLineNumber("main"), message = ST.gameMessage })
+  if not ST.state.auto then
+    return
   end
+  if ST.looksSwedish(text) then
+    ST.swedishMessage = ST.gameMessage
+  elseif ST.swedishMessage ~= ST.gameMessage or not hasWords(text) then
+    -- A short line or the end of a wrapped sentence ("bäcken till andra sidan.")
+    -- can have too few telltale words to judge on its own; within a message
+    -- already known to be Swedish it is translated anyway.
+    return
+  end
+  ST.process(text, "auto", { lineNumber = getLineNumber("main"), message = ST.gameMessage })
 end
 
 -- Right-click a selection -------------------------------------------------------
