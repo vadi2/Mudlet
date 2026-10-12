@@ -37,6 +37,7 @@ function ST.help()
     { "sv auto [on|off]", "auto-translate Swedish lines coming from the game" },
     { "sv save <word>", "add a word to your word list" },
     { "sv words", "show your word list" },
+    { "sv forget <word>", "remove one word from your word list" },
     { "sv quiz", "flashcard quiz on your saved words" },
     { "sv history [n]", "show your last n translations" },
     { "sv email <address|off>", "raise MyMemory's free daily limit from 5k to 50k characters" },
@@ -267,6 +268,11 @@ if not ST.state then
 end
 ST.registerMouseEvent()
 ST.applyAutoTrigger()
+-- Bring back the panel and its saved history right away, rather than leaving
+-- it empty until the next translation arrives.
+if ST.state.views.panel then
+  ST.getPanel()
+end
 
 registerNamedEventHandler(ST.handlerUser, "selection", ST.mouseEvent, function(...) ST.onSelection(...) end)
 registerNamedEventHandler(ST.handlerUser, "exit", "sysExitEvent", function() ST.save() end)

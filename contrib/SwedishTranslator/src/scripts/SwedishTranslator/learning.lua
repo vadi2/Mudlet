@@ -67,6 +67,10 @@ end
 
 function ST.forgetWord(key)
   key = ST.lower(ST.trim(key))
+  if key == "" then
+    ST.warn("which word? e.g. sv forget hund")
+    return
+  end
   if not ST.state.vocab[key] then
     ST.warn(string.format("'%s' is not in your word list", key))
     return
