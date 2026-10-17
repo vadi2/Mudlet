@@ -350,10 +350,17 @@ function ST.onHttpDone(_, url, body)
 end
 
 -- Qt's error text embeds the whole request URL - the text being translated, and
--- the user's e-mail when one is set - so describe the failure without it.
+-- the user's e-mail when one is set - so describe the failure without it. The
+-- URL is shown decoded and so can contain spaces: cut it up to Qt's " - server
+-- replied" suffix, or to the end.
 local function describeHttpError(message)
-  message = tostring(message):gsub("https?://%S+", "the translation service")
-  if message:find("Too Many Requests", 1, true) then
+  message = tostring(message)
+  local urlStart = message:find("https?://")
+  if urlStart then
+    local suffix = message:match(".*() %- server replied", urlStart)
+    message = message:sub(1, urlStart - 1) .. "the translation service" .. (suffix and message:sub(suffix) or "")
+  end
+  if message:find("Too Many Requests", 1, true) or message:find("status code 429", 1, true) then
     pauseService(RATE_LIMIT_PAUSE_SECONDS, "MyMemory is rate-limiting requests - wait a minute, or raise the limit with sv email")
     return ST.pauseReason
   end

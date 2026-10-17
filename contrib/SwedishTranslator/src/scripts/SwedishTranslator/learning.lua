@@ -245,6 +245,11 @@ function ST.onGameLine(text)
   if not ST.state.auto then
     return
   end
+  -- Prompts and status lines ("96/96hp 40/96mp") follow Swedish text closely
+  -- enough to join its message, and their numbers change too often to cache.
+  if text:find("%d+/%d+") then
+    return
+  end
   if ST.looksSwedish(text) then
     ST.swedishMessage = ST.gameMessage
   elseif ST.swedishMessage ~= ST.gameMessage or not hasWords(text) then

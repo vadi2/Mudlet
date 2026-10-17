@@ -268,6 +268,9 @@ if not ST.state then
 end
 ST.registerMouseEvent()
 ST.applyAutoTrigger()
+-- When the package is being installed its triggers are added after this script
+-- runs, so apply again once the install has finished.
+tempTimer(0, function() ST.applyAutoTrigger() end)
 -- Bring back the panel and its saved history right away, rather than leaving
 -- it empty until the next translation arrives.
 if ST.state.views.panel then
