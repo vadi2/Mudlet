@@ -1,0 +1,13 @@
+[
+  {
+    "name": "SwedishTranslator auto-translate",
+    "isActive": "no",
+    "patterns": [
+      {
+        "pattern": "\\S",
+        "type": "regex"
+      }
+    ],
+    "script": "SwedishTranslator.onGameLine(line)"
+  }
+]

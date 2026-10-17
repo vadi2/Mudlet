@@ -1,0 +1,26 @@
+[
+  {
+    "name": "core",
+    "isActive": "yes"
+  },
+  {
+    "name": "dictionary",
+    "isActive": "yes"
+  },
+  {
+    "name": "backend",
+    "isActive": "yes"
+  },
+  {
+    "name": "views",
+    "isActive": "yes"
+  },
+  {
+    "name": "learning",
+    "isActive": "yes"
+  },
+  {
+    "name": "commands",
+    "isActive": "yes"
+  }
+]
