@@ -140,6 +140,122 @@ local function pickQuizWord(avoid)
   return pool[#pool] and pool[#pool].key
 end
 
+-- The card on screen. Links and the sv a/show/y/n commands both act on it; a
+-- link left over from an earlier card passes that card and is ignored.
+local card
+
+local function hint(text)
+  ST.out("main", { { "dim_gray", "  " .. text } })
+end
+
+local function currentCard(given)
+  if card and not card.graded and (given == nil or given == card) then
+    return card
+  end
+  if given == nil then
+    ST.warn("no quiz word is waiting - start one with sv quiz")
+  end
+  return nil
+end
+
+local function gradeLinks(this)
+  ST.link("main", "[✓ I knew it]", function() ST.quizGrade(true, this) end, "Move it up a box: you will see it less often")
+  ST.out("main", { { "dim_gray", "  " } })
+  ST.link("main", "[✗ I didn't]", function() ST.quizGrade(false, this) end, "Back to box 1: you will see it more often")
+end
+
+function ST.quizGrade(knewIt, given)
+  local this = currentCard(given)
+  if not this then
+    return
+  end
+  this.graded = true
+  local word = this.word
+  if knewIt then
+    word.right = word.right + 1
+    word.box = math.min(MAX_BOX, word.box + 1)
+  else
+    word.wrong = word.wrong + 1
+    word.box = 1
+  end
+  ST.scheduleSave()
+  ST.out("main", { { "dim_gray", "\n  " .. boxMeter(word.box) .. "  " } })
+  ST.link("main", "[next word ▶]", function() ST.quiz() end, "Another word")
+  ST.out("main", { { "dim_gray", "  " } })
+  ST.link("main", "[stop]", function() ST.quizStop() end, "End the quiz")
+  hint("sv next | sv stop")
+end
+
+function ST.quizShow(given)
+  local this = currentCard(given)
+  if not this then
+    return
+  end
+  this.revealed = true
+  ST.out("main", { { "dim_gray", "\n  → " }, { "pale_green", this.word.en }, { "dim_gray", "   " } })
+  gradeLinks(this)
+  hint("sv y | sv n")
+end
+
+-- "The dog." and "dog" are the same answer; a translation listing several
+-- meanings ("to go, walk") accepts any one of them.
+local function normalize(text)
+  text = ST.lower(text):gsub("[%p]", " "):gsub("%s+", " ")
+  text = ST.trim(text)
+  for _, lead in ipairs({ "the ", "a ", "an ", "to " }) do
+    if text:sub(1, #lead) == lead then
+      text = text:sub(#lead + 1)
+      break
+    end
+  end
+  return text
+end
+
+local function acceptedAnswers(english)
+  local accepted = { [normalize(english)] = true }
+  local alternatives = ST.lower(english):gsub("%s+or%s+", ",")
+  for part in alternatives:gmatch("[^,;/]+") do
+    accepted[normalize(part)] = true
+  end
+  accepted[""] = nil
+  return accepted
+end
+
+function ST.quizAnswer(text)
+  local this = currentCard()
+  if not this then
+    return
+  end
+  text = ST.trim(text or "")
+  if text == "" then
+    ST.warn("type your answer after it, e.g. sv a dog - or sv show to see it")
+    return
+  end
+  if this.revealed then
+    ST.warn("the answer is already showing - grade it with sv y or sv n")
+    return
+  end
+  if acceptedAnswers(this.word.en)[normalize(text)] then
+    ST.out("main", { { "pale_green", "\n  ✓ right: " }, { "pale_green", this.word.en } })
+    ST.quizGrade(true, this)
+    return
+  end
+  this.revealed = true
+  ST.out("main", {
+    { "light_coral", "\n  ✗ " .. text },
+    { "dim_gray", "  →  " },
+    { "pale_green", this.word.en },
+    { "dim_gray", "   " },
+  })
+  gradeLinks(this)
+  hint("sv n, or sv y if yours means the same")
+end
+
+function ST.quizStop()
+  card = nil
+  ST.msg("quiz over - lycka till!")
+end
+
 function ST.quiz()
   if table.size(ST.state.vocab) == 0 then
     ST.msg("save a few words first (click them in the hover view, or sv save <word>), then quiz yourself")
@@ -147,36 +263,13 @@ function ST.quiz()
   end
   local key = pickQuizWord(ST.lastQuizWord)
   ST.lastQuizWord = key
-  local word = ST.state.vocab[key]
-  local answered = false
-
-  local function grade(knewIt)
-    if answered then
-      return
-    end
-    answered = true
-    if knewIt then
-      word.right = word.right + 1
-      word.box = math.min(MAX_BOX, word.box + 1)
-    else
-      word.wrong = word.wrong + 1
-      word.box = 1
-    end
-    ST.scheduleSave()
-    ST.out("main", { { "dim_gray", "\n  " .. boxMeter(word.box) .. "  " } })
-    ST.link("main", "[next word ▶]", function() ST.quiz() end, "Another word")
-    ST.out("main", { { "dim_gray", "  " } })
-    ST.link("main", "[stop]", function() ST.msg("quiz over - lycka till!") end, "End the quiz")
-  end
+  local this = { key = key, word = ST.state.vocab[key] }
+  card = this
 
   ST.msg("quiz: what does ", "gold")
   ST.out("main", { { "white", key }, { "gold", " mean?  " } })
-  ST.link("main", "[show answer]", function()
-    ST.out("main", { { "dim_gray", "\n  → " }, { "pale_green", word.en }, { "dim_gray", "   " } })
-    ST.link("main", "[✓ I knew it]", function() grade(true) end, "Move it up a box: you will see it less often")
-    ST.out("main", { { "dim_gray", "  " } })
-    ST.link("main", "[✗ I didn't]", function() grade(false) end, "Back to box 1: you will see it more often")
-  end, "Say the answer out loud first!")
+  ST.link("main", "[show answer]", function() ST.quizShow(this) end, "Say the answer out loud first!")
+  hint("sv a <english> | sv show")
 end
 
 -- Auto-translate ---------------------------------------------------------------

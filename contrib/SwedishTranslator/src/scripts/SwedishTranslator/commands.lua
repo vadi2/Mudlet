@@ -39,6 +39,9 @@ function ST.help()
     { "sv words", "show your word list" },
     { "sv forget <word>", "remove one word from your word list" },
     { "sv quiz", "flashcard quiz on your saved words" },
+    { "sv a <english>", "answer the quiz word (or sv show to see the answer)" },
+    { "sv y / sv n", "grade it: you knew it / you didn't" },
+    { "sv next / sv stop", "next quiz word / end the quiz" },
     { "sv history [n]", "show your last n translations" },
     { "sv email <address|off>", "raise MyMemory's free daily limit from 5k to 50k characters" },
     { "sv clear <history|words|cache>", "forget saved data" },
@@ -134,6 +137,13 @@ commands.views = function() ST.showViews() end
 commands.demo = function() ST.demo() end
 commands.words = function() ST.showWords() end
 commands.quiz = function() ST.quiz() end
+commands.next = function() ST.quiz() end
+commands.a = function(args) ST.quizAnswer(args) end
+commands.answer = commands.a
+commands.show = function() ST.quizShow() end
+commands.y = function() ST.quizGrade(true) end
+commands.n = function() ST.quizGrade(false) end
+commands.stop = function() ST.quizStop() end
 
 commands.view = function(args)
   local name, state = args:match("^(%S+)%s*(%S*)$")

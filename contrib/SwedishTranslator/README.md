@@ -21,6 +21,7 @@ or run `lua installPackage("/path/to/SwedishTranslator.mpackage")`. Then type `s
 | `sv view <name> [on\|off]`, `sv only <name>...` | switch visualizations from the command line |
 | `sv auto [on\|off]` | translate Swedish lines arriving from the game |
 | `sv save <word>`, `sv words`, `sv quiz` | personal word list and a spaced-repetition quiz |
+| `sv a <english>`, `sv show`, `sv y`, `sv n`, `sv next`, `sv stop` | play the quiz from the keyboard instead of clicking: type an answer (a match counts as known; after a miss, `sv y` accepts a synonym or typo), or show the answer and grade yourself |
 | `sv forget <word>` | remove one word from your word list (or click `[forget]` in `sv words`) |
 | `sv history [n]` | the last n translations |
 | `sv email <address\|off>` | raise MyMemory's free limit from 5,000 to 50,000 characters a day |
