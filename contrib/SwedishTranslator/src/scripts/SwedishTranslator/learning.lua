@@ -1,0 +1,388 @@
+-- Learning aids: history, a personal word list with a spaced-repetition quiz,
+-- auto-translation of Swedish game text, and right-click translation of a selection.
+SwedishTranslator = SwedishTranslator or {}
+local ST = SwedishTranslator
+
+local MAX_BOX = 5
+
+function ST.addHistory(sv, en, message)
+  local history = ST.state.history
+  local last = history[#history]
+  if last and last.sv == sv then
+    return
+  end
+  history[#history + 1] = { sv = sv, en = en, t = os.time(), m = message }
+  ST.scheduleSave()
+end
+
+function ST.showHistory(count)
+  local history = ST.state.history
+  if #history == 0 then
+    ST.msg("nothing translated yet - try: sv Hej, hur mår du?")
+    return
+  end
+  count = math.min(math.max(1, math.floor(count or 10)), #history)
+  ST.msg(string.format("your last %d %s:", count, count == 1 and "translation" or "translations"), "gold")
+  for i = #history - count + 1, #history do
+    local entry = history[i]
+    ST.out("main", {
+      { "dim_gray", "\n  " .. os.date("%d %b %H:%M", entry.t) .. "  " },
+      { "light_goldenrod", entry.sv },
+      { "dim_gray", "  →  " },
+      { "pale_green", entry.en },
+    })
+  end
+end
+
+-- Word list ------------------------------------------------------------------
+
+function ST.saveWord(key, english)
+  key = ST.lower(ST.trim(key))
+  if key == "" then
+    ST.warn("which word? e.g. sv save hund")
+    return
+  end
+  if not english then
+    ST.lookupWord(key, function(ok, result)
+      if ok then
+        ST.saveWord(key, result)
+      else
+        ST.warn(string.format("could not look up '%s': %s", key, result))
+      end
+      ST.finish("main")
+    end)
+    return
+  end
+  -- The service hands back an unknown word (a typo, or gibberish) unchanged,
+  -- and a word that is its own English has nothing to learn.
+  local function bare(text)
+    return (ST.lower(text):gsub("[%p%s]", ""))
+  end
+  if bare(english) == bare(key) then
+    ST.warn(string.format("no English translation found for '%s' - is it spelled right?", key))
+    return
+  end
+  local vocab = ST.state.vocab
+  if vocab[key] then
+    vocab[key].en = english
+    ST.msg(string.format("'%s' (%s) is already in your word list", key, english))
+  else
+    vocab[key] = { en = english, box = 1, right = 0, wrong = 0, added = os.time() }
+    local count = table.size(vocab)
+    ST.msg(string.format("saved '%s' = %s  (%d %s in your list)", key, english, count, count == 1 and "word" or "words"), "pale_green")
+  end
+  ST.scheduleSave()
+end
+
+function ST.forgetWord(key)
+  key = ST.lower(ST.trim(key))
+  if key == "" then
+    ST.warn("which word? e.g. sv forget hund")
+    return
+  end
+  if not ST.state.vocab[key] then
+    ST.warn(string.format("'%s' is not in your word list", key))
+    return
+  end
+  ST.state.vocab[key] = nil
+  ST.msg(string.format("removed '%s' from your word list", key))
+  ST.scheduleSave()
+end
+
+local function boxMeter(box)
+  return string.rep("●", box) .. string.rep("○", MAX_BOX - box)
+end
+
+function ST.showWords()
+  local keys = table.keys(ST.state.vocab)
+  if #keys == 0 then
+    ST.msg("your word list is empty - click words in the hover view, or use sv save <word>")
+    return
+  end
+  table.sort(keys)
+  local width = 0
+  for _, key in ipairs(keys) do
+    width = math.max(width, ST.width(key))
+  end
+  ST.msg(string.format("your word list (%d %s; ● = how well you know it):", #keys, #keys == 1 and "word" or "words"), "gold")
+  for _, key in ipairs(keys) do
+    local word = ST.state.vocab[key]
+    ST.out("main", {
+      { "dim_gray", "\n  " },
+      { "light_goldenrod", ST.pad(key, width) },
+      { "dim_gray", "  " .. boxMeter(word.box) .. "  " },
+      { "pale_green", word.en },
+      { "dim_gray", "  " },
+    })
+    ST.link("main", "[forget]", function() ST.forgetWord(key) end, "Remove '" .. key .. "' from your word list")
+  end
+  ST.out("main", { { "dim_gray", "\n  " } })
+  ST.link("main", "[start a quiz]", function() ST.quiz() end, "Practice these words")
+end
+
+-- Picks a word, favouring the ones in low boxes (not yet known well).
+local function pickQuizWord(avoid)
+  local total, pool = 0, {}
+  for key, word in pairs(ST.state.vocab) do
+    if key ~= avoid or table.size(ST.state.vocab) == 1 then
+      local weight = (MAX_BOX + 1 - word.box) ^ 2
+      total = total + weight
+      pool[#pool + 1] = { key = key, weight = weight }
+    end
+  end
+  local roll = math.random() * total
+  for _, candidate in ipairs(pool) do
+    roll = roll - candidate.weight
+    if roll <= 0 then
+      return candidate.key
+    end
+  end
+  return pool[#pool] and pool[#pool].key
+end
+
+-- The card on screen. Links and the sv a/show/y/n commands both act on it; a
+-- link left over from an earlier card passes that card and is ignored.
+local card
+
+local function hint(text)
+  ST.out("main", { { "dim_gray", "  " .. text } })
+end
+
+local function currentCard(given)
+  if card and not card.graded and (given == nil or given == card) then
+    return card
+  end
+  if given == nil then
+    ST.warn("no quiz word is waiting - start one with sv quiz")
+  end
+  return nil
+end
+
+local function gradeLinks(this)
+  ST.link("main", "[✓ I knew it]", function() ST.quizGrade(true, this) end, "Move it up a box: you will see it less often")
+  ST.out("main", { { "dim_gray", "  " } })
+  ST.link("main", "[✗ I didn't]", function() ST.quizGrade(false, this) end, "Back to box 1: you will see it more often")
+end
+
+function ST.quizGrade(knewIt, given)
+  local this = currentCard(given)
+  if not this then
+    return
+  end
+  this.graded = true
+  local word = this.word
+  if knewIt then
+    word.right = word.right + 1
+    word.box = math.min(MAX_BOX, word.box + 1)
+  else
+    word.wrong = word.wrong + 1
+    word.box = 1
+  end
+  ST.scheduleSave()
+  ST.out("main", { { "dim_gray", "\n  " .. boxMeter(word.box) .. "  " } })
+  ST.link("main", "[next word ▶]", function() ST.quiz() end, "Another word")
+  ST.out("main", { { "dim_gray", "  " } })
+  ST.link("main", "[stop]", function() ST.quizStop() end, "End the quiz")
+  hint("sv next | sv stop")
+end
+
+function ST.quizShow(given)
+  local this = currentCard(given)
+  if not this then
+    return
+  end
+  this.revealed = true
+  ST.out("main", { { "dim_gray", "\n  → " }, { "pale_green", this.word.en }, { "dim_gray", "   " } })
+  gradeLinks(this)
+  hint("sv y | sv n")
+end
+
+-- "The dog." and "dog" are the same answer; a translation listing several
+-- meanings ("to go, walk") accepts any one of them.
+local function normalize(text)
+  text = ST.lower(text):gsub("[%p]", " "):gsub("%s+", " ")
+  text = ST.trim(text)
+  for _, lead in ipairs({ "the ", "a ", "an ", "to " }) do
+    if text:sub(1, #lead) == lead then
+      text = text:sub(#lead + 1)
+      break
+    end
+  end
+  return text
+end
+
+local function acceptedAnswers(english)
+  local accepted = { [normalize(english)] = true }
+  local alternatives = ST.lower(english):gsub("%s+or%s+", ",")
+  for part in alternatives:gmatch("[^,;/]+") do
+    accepted[normalize(part)] = true
+  end
+  accepted[""] = nil
+  return accepted
+end
+
+function ST.quizAnswer(text)
+  local this = currentCard()
+  if not this then
+    return
+  end
+  text = ST.trim(text or "")
+  if text == "" then
+    ST.warn("type your answer after it, e.g. sv a dog - or sv show to see it")
+    return
+  end
+  if this.revealed then
+    ST.warn("the answer is already showing - grade it with sv y or sv n")
+    return
+  end
+  if acceptedAnswers(this.word.en)[normalize(text)] then
+    ST.out("main", { { "pale_green", "\n  ✓ right: " }, { "pale_green", this.word.en } })
+    ST.quizGrade(true, this)
+    return
+  end
+  this.revealed = true
+  ST.out("main", {
+    { "light_coral", "\n  ✗ " .. text },
+    { "dim_gray", "  →  " },
+    { "pale_green", this.word.en },
+    { "dim_gray", "   " },
+  })
+  gradeLinks(this)
+  hint("sv n, or sv y if yours means the same")
+end
+
+function ST.quizStop()
+  card = nil
+  ST.msg("quiz over - lycka till!")
+end
+
+function ST.quiz()
+  if table.size(ST.state.vocab) == 0 then
+    ST.msg("save a few words first (click them in the hover view, or sv save <word>), then quiz yourself")
+    return
+  end
+  local key = pickQuizWord(ST.lastQuizWord)
+  ST.lastQuizWord = key
+  local this = { key = key, word = ST.state.vocab[key] }
+  card = this
+
+  ST.msg("quiz: what does ", "gold")
+  ST.out("main", { { "white", key }, { "gold", " mean?  " } })
+  ST.link("main", "[show answer]", function() ST.quizShow(this) end, "Say the answer out loud first!")
+  hint("sv a <english> | sv show")
+end
+
+-- Auto-translate ---------------------------------------------------------------
+
+-- Short, frequent Swedish words that are rare in English (and in French or
+-- Spanish), so seeing them is good evidence a line is Swedish. Words that are
+-- common in those languages too - "till", "den", "var", "de", "en", "du" - are
+-- deliberately left out. This is a heuristic: it mostly leaves English alone.
+local MARKERS = {}
+for _, word in ipairs({
+  "och", "är", "att", "det", "jag", "inte", "på", "som", "med", "för", "har", "av",
+  "kan", "så", "här", "där", "vad", "hur", "eller", "ett", "hon", "sig", "mig", "dig",
+  "från", "efter", "också", "bara", "skulle", "finns", "kommer", "går", "hej", "tack",
+  "nej", "vill", "ska", "inga", "något", "någon", "mycket", "nu", "vi", "ni",
+}) do
+  MARKERS[word] = true
+end
+
+function ST.looksSwedish(line)
+  if #line < 3 or #line > 450 then
+    return false
+  end
+  local words, score = 0, 0
+  for _, token in ipairs(ST.tokenize(line)) do
+    if token.key then
+      words = words + 1
+      if MARKERS[token.key] or ST.hasSwedishLetter(token.key) then
+        score = score + 1
+      end
+    end
+  end
+  return score >= 2 or (score >= 1 and words <= 2)
+end
+
+-- The trigger in src/triggers matches every line, so it ships disabled and is
+-- only switched on while auto-translate is; its name must stay the same as here.
+ST.autoTrigger = "SwedishTranslator auto-translate"
+
+function ST.applyAutoTrigger()
+  if ST.state.auto then
+    enableTrigger(ST.autoTrigger)
+  else
+    disableTrigger(ST.autoTrigger)
+  end
+end
+
+-- A game message (a room, a reply) arrives as one burst of lines, so a pause
+-- longer than this between lines starts a new message.
+local MESSAGE_GAP_SECONDS = 0.3
+
+local function hasWords(text)
+  for _, token in ipairs(ST.tokenize(text)) do
+    if token.key then
+      return true
+    end
+  end
+  return false
+end
+
+function ST.onGameLine(text)
+  local now = getEpoch()
+  if not ST.lastGameLineAt or now - ST.lastGameLineAt > MESSAGE_GAP_SECONDS then
+    ST.gameMessage = math.floor(now * 1000)
+  end
+  ST.lastGameLineAt = now
+  if not ST.state.auto then
+    return
+  end
+  -- Prompts and status lines ("96/96hp 40/96mp") follow Swedish text closely
+  -- enough to join its message, and their numbers change too often to cache.
+  if text:find("%d+/%d+") then
+    return
+  end
+  if ST.looksSwedish(text) then
+    ST.swedishMessage = ST.gameMessage
+  elseif ST.swedishMessage ~= ST.gameMessage or not hasWords(text) then
+    -- A short line or the end of a wrapped sentence ("bäcken till andra sidan.")
+    -- can have too few telltale words to judge on its own; within a message
+    -- already known to be Swedish it is translated anyway.
+    return
+  end
+  ST.process(text, "auto", { lineNumber = getLineNumber("main"), message = ST.gameMessage })
+end
+
+-- Right-click a selection -------------------------------------------------------
+
+ST.mouseEvent = "SwedishTranslator.translateSelection"
+
+-- Mudlet hands over the selection as buffer coordinates (0-based columns,
+-- inclusive at both ends); rebuild the selected text from the console's lines.
+function ST.onSelection(_, _, console, startColumn, startLine, endColumn, endLine)
+  if startLine > endLine or (startLine == endLine and startColumn > endColumn) then
+    startColumn, startLine, endColumn, endLine = endColumn, endLine, startColumn, startLine
+  end
+  local lines = getLines(console, startLine, endLine + 1)
+  if type(lines) ~= "table" or #lines == 0 then
+    ST.warn("select some Swedish text first, then right-click it")
+    ST.finish("main")
+    return
+  end
+  lines[#lines] = utf8.sub(lines[#lines], 1, endColumn + 1)
+  lines[1] = utf8.sub(lines[1], startColumn + 1)
+  local text = ST.trim(table.concat(lines, " "))
+  if text == "" then
+    ST.warn("select some Swedish text first, then right-click it")
+    ST.finish("main")
+    return
+  end
+  ST.process(text, "selection")
+end
+
+function ST.registerMouseEvent()
+  if getMouseEvents()[ST.mouseEvent] == nil then
+    addMouseEvent(ST.mouseEvent, ST.mouseEvent, "Translate Swedish → English", "Translate the selected Swedish text")
+  end
+end
