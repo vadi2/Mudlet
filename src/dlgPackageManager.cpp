@@ -23,8 +23,12 @@
 
 #include "dlgPackageManager.h"
 
+#include "GripSplitter.h"
 #include "MudletApp.h"
+#include "TMainConsole.h"
+#include "dlgSystemMessageArea.h"
 #include "mudlet.h"
+#include "uiDesign.h"
 
 #include <QCloseEvent>
 #include <QFileDialog>
@@ -32,14 +36,39 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QMenu>
 #include <QMessageBox>
 #include <QNetworkAccessManager>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPalette>
+#include <QPointer>
 #include <QProgressDialog>
+#include <QSaveFile>
 #include <QSettings>
+#include <QTabBar>
+#include <QTextDocument>
 #include <QTimer>
+#include <QToolButton>
 #include <QVersionNumber>
 
 using namespace std::chrono_literals;
+
+#include <algorithm>
+
+// The tab strip's pane inset, so the search field lines up with the first chip
+static constexpr int scmPackagesColumnInset = uiDesign::scmTabPaneInset;
+
+// Not the .ui file's 96px: the picture stands beside the name rather than over it
+static constexpr int scmPackagesIconSize = 48;
+static constexpr int scmPackagesIconGlyphSize = 24;
+static constexpr int scmPackagesButtonGlyphSize = 16;
+static constexpr int scmPackagesCaptionGap = 12;
+// Narrower, the notes and the button row wrap into a column of single words
+static constexpr int scmPackagesDetailsMinimumWidth = 320;
+static constexpr int scmPackagesHeadlineFloorCharacters = 6;
+static constexpr int scmPackagesListShareDenominator = 3;
+static constexpr char scmPackagesSplitterKey[] = "packageManagerSplitterState";
 
 
 dlgPackageManager::dlgPackageManager(QWidget* parent, Host* pHost)
@@ -47,9 +76,10 @@ dlgPackageManager::dlgPackageManager(QWidget* parent, Host* pHost)
 , mpHost(pHost)
 {
     setupUi(this);
-    label_packageName->installEventFilter(this); // re-elides the package name on resize
     connect(lineEdit_searchBar, &QLineEdit::textChanged, this, &dlgPackageManager::slot_searchTextChanged);
-    connect(mpHost->mpConsole, &QWidget::destroyed, this, &dlgPackageManager::close);
+    connect(mpHost->mainConsoleView(), &QWidget::destroyed, this, &dlgPackageManager::close);
+    packageList->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(packageList, &QWidget::customContextMenuRequested, this, &dlgPackageManager::slot_packageContextMenu);
     connect(packageList, &QListWidget::currentItemChanged, this, &dlgPackageManager::slot_itemChanged);
     connect(packageList, &QListWidget::itemSelectionChanged, this, &dlgPackageManager::slot_toggleInstallRepoButton);
     connect(packageList, &QListWidget::itemSelectionChanged, this, &dlgPackageManager::slot_toggleRemoveButton);
@@ -62,18 +92,17 @@ dlgPackageManager::dlgPackageManager(QWidget* parent, Host* pHost)
     //: Package manager - window title
     setWindowTitle(tr("Package Manager - %1").arg(mpHost->getName()));
 
-    pushButton_website->setIcon(QIcon(qsl(":/icons/applications-internet.png")));
     pushButton_website->hide();
-    pushButton_report->setIcon(QIcon(qsl(":/icons/flag-red.png")));
     pushButton_report->hide();
 
     setupNavigationButtons();
-    applyNavigationStyles();
 
     packageList->setSortingEnabled(true);
 
     mpPackageItemDelegate = new PackageItemDelegate(this);
     packageList->setItemDelegate(mpPackageItemDelegate);
+
+    buildShell();
 
     repositoryPackages = QJsonArray();
     if (!readPackageRepositoryFile()) {
@@ -82,7 +111,12 @@ dlgPackageManager::dlgPackageManager(QWidget* parent, Host* pHost)
 
     pushButton_installRepo->setEnabled(false);
     mCurrentView = NavigationView::Installed;
+    mpNavigationGroup->button(static_cast<int>(NavigationView::Installed))->setChecked(true);
+    syncViewBar();
     slot_setPackageList();
+
+    applyPackageManagerShellStyle();
+    connect(mudlet::self(), &mudlet::signal_appearanceChanged, this, &dlgPackageManager::slot_applyAppearance);
 
     // Connected last: resetPackageList() dereferences mpNavigationGroup, made by setupNavigationButtons()
     connect(mpHost, &Host::signal_packageListChanged, this, &dlgPackageManager::resetPackageList);
@@ -90,33 +124,178 @@ dlgPackageManager::dlgPackageManager(QWidget* parent, Host* pHost)
     setAttribute(Qt::WA_DeleteOnClose);
 }
 
-void dlgPackageManager::applyNavigationStyles()
+// Moves and restyles the .ui file's controls but renames none: connections and tests reach them by name
+void dlgPackageManager::buildShell()
 {
-    navigationFrame->setStyleSheet(qsl("QFrame#navigationFrame {"
-                                       "  border: 1px solid palette(mid);"
-                                       "  border-radius: 6px;"
-                                       "  background-color: palette(window);"
-                                       "}"
-                                       "QPushButton {"
-                                       "  border: none;"
-                                       "  border-radius: 4px;"
-                                       "  padding: 6px 16px;"
-                                       "  background-color: transparent;"
-                                       "}"
-                                       "QPushButton:checked {"
-                                       "  background-color: palette(highlight);"
-                                       "  color: palette(highlighted-text);"
-                                       "}"
-                                       "QPushButton:hover:!checked {"
-                                       "  background-color: palette(midlight);"
-                                       "}"));
+    // The .ui file's 900x600 minimum is more than the columns need; the layout's own floor takes over
+    setMinimumSize(0, 0);
+
+    mainVerticalLayout->setContentsMargins(0, 0, 0, 0);
+    mainVerticalLayout->setSpacing(0);
+    horizontalLayout_2->setContentsMargins(0, 0, 0, 0);
+    horizontalLayout_2->setSpacing(0);
+    verticalLayout_left->setContentsMargins(scmPackagesColumnInset, scmPackagesColumnInset, scmPackagesColumnInset, scmPackagesColumnInset);
+    verticalLayout_right->setContentsMargins(scmPackagesColumnInset, scmPackagesColumnInset, scmPackagesColumnInset, scmPackagesColumnInset);
+    uiDesign::markAsShellSurface(leftPanel);
+    uiDesign::markAsShellSurface(rightPanel);
+
+    // Out of the .ui file's row first: a splitter takes its panes as its own children
+    uiDesign::removeFromLayoutTree(horizontalLayout_2, leftPanel);
+    uiDesign::removeFromLayoutTree(horizontalLayout_2, rightPanel);
+    mpSplitter = new uiDesign::GripSplitter(Qt::Horizontal, this);
+    mpSplitter->setObjectName(qsl("packagesSplitter"));
+    uiDesign::markAsShellSurface(mpSplitter);
+    mpSplitter->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    mpSplitter->setChildrenCollapsible(false);
+    mpSplitter->addWidget(leftPanel);
+    mpSplitter->addWidget(rightPanel);
+    // Per pane as well: QSplitter::isCollapsible() answers the default for a pane never
+    // told, not what setChildrenCollapsible() left
+    mpSplitter->setCollapsible(0, false);
+    mpSplitter->setCollapsible(1, false);
+    mpSplitter->setStretchFactor(0, 0);
+    mpSplitter->setStretchFactor(1, 1);
+    // No cap on the list column: a drag that stops dead reads as a broken handle
+    leftPanel->setMaximumWidth(QWIDGETSIZE_MAX);
+    rightPanel->setMinimumWidth(scmPackagesDetailsMinimumWidth);
+    mainVerticalLayout->insertWidget(mainVerticalLayout->indexOf(horizontalLayout_2), mpSplitter);
+    // Its resize catches a drag, a window resize and a restored split alike, and
+    // setSizes() announces nothing of its own
+    rightPanel->installEventFilter(this);
+
+    // The .ui file's buttons stay, hidden, as the one path into a view change: slots and
+    // tests press them, and the bar clicks them rather than doing the work itself
+    headerBar->hide();
+    mpViewBar = new QTabBar(leftPanel);
+    mpViewBar->setObjectName(qsl("packagesViewBar"));
+    mpViewBar->setExpanding(false);
+    mpViewBar->setDrawBase(false);
+    mpViewBar->setFocusPolicy(Qt::TabFocus);
+    uiDesign::markAsShellSurface(mpViewBar);
+    //: Package manager - what the row of Explore / Installed / Updates chips is, read out to a screen reader
+    mpViewBar->setAccessibleName(tr("Packages to show"));
+    {
+        // The first addTab() emits currentChanged, which would click Explore before the view is chosen
+        const QSignalBlocker held(mpViewBar);
+        for (const QAbstractButton* pButton :
+             {static_cast<QAbstractButton*>(pushButton_explore), static_cast<QAbstractButton*>(pushButton_installed), static_cast<QAbstractButton*>(pushButton_updates)}) {
+            const int index = mpViewBar->addTab(pButton->text());
+            mpViewBar->setAccessibleTabName(index, pButton->text());
+        }
+    }
+    uiDesign::prepareTabStrip(mpViewBar);
+    // Aligned by the layout: the macOS style answers Qt::AlignCenter for tab placement,
+    // while Fusion, the dark appearance's base style, answers the leading edge
+    verticalLayout_left->insertWidget(0, mpViewBar, 0, Qt::AlignLeft);
+    connect(mpViewBar, &QTabBar::currentChanged, this, [this](const int index) {
+        QAbstractButton* pButton = mpNavigationGroup->button(index);
+        if (pButton && !pButton->isChecked()) {
+            pButton->click();
+        }
+    });
+
+    // Empty until the style pass inks it
+    mpAction_searchGlyph = lineEdit_searchBar->addAction(QIcon(), QLineEdit::LeadingPosition);
+
+    // The row recipe's hover and chosen washes already tell the rows apart
+    packageList->setAlternatingRowColors(false);
+    // Rows elide, so there is never anything to scroll to sideways
+    packageList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    label_importStatus->hide();
+    mpNotice = new dlgSystemMessageArea(leftPanel);
+    mpNotice->setObjectName(qsl("packagesNotice"));
+    mpNotice->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Maximum);
+    if (QLayout* pNoticeLayout = mpNotice->layout()) {
+        pNoticeLayout->setContentsMargins(0, 0, 0, 0);
+    }
+    mpNotice->notificationAreaIconLabelError->hide();
+    mpNotice->notificationAreaIconLabelInformation->hide();
+    mpNotice->notificationAreaIconLabelWarning->show();
+    mpNotice->hide();
+    verticalLayout_left->insertWidget(verticalLayout_left->indexOf(label_importStatus) + 1, mpNotice);
+    connect(mpNotice->messageAreaCloseButton, &QAbstractButton::clicked, mpNotice, &QWidget::hide);
+
+    //: Package manager - button under the list of packages, which opens a file picker
+    pushButton_installFile->setText(tr("Install from a file"));
+    pushButton_installFile->setSizePolicy(QSizePolicy::Expanding, pushButton_installFile->sizePolicy().verticalPolicy());
+
+    uiDesign::removeFromLayoutTree(horizontalLayout, pushButton_installRepo);
+    uiDesign::removeFromLayoutTree(horizontalLayout, pushButton_remove);
+    QLayoutItem* pTrailingSpacer = horizontalLayout_4->takeAt(horizontalLayout_4->indexOf(horizontalSpacer));
+    horizontalLayout_4->insertWidget(0, pushButton_installRepo);
+    horizontalLayout_4->insertWidget(1, pushButton_remove);
+    if (pTrailingSpacer) {
+        horizontalLayout_4->insertItem(2, pTrailingSpacer);
+    }
+
+    pushButton_website->setFlat(false);
+    pushButton_report->setFlat(false);
+    //: Package manager - button that opens the package's own web page
+    const QString websiteWord = tr("Website");
+    //: Package manager - button that opens the page an issue with the package is reported on
+    const QString reportWord = tr("Report an issue");
+    pushButton_website->setText(websiteWord);
+    pushButton_report->setText(reportWord);
+    // A narrow row leaves these two as glyphs alone, so a screen reader needs the word here
+    pushButton_website->setAccessibleName(websiteWord);
+    pushButton_report->setAccessibleName(reportWord);
+    mActionRowLinks = {{pushButton_website, websiteWord, 0, 0}, {pushButton_report, reportWord, 0, 0}};
+
+    label_icon->setFixedSize(scmPackagesIconSize, scmPackagesIconSize);
+    // The pixmap arrives cut and scaled at the device pixel ratio; label scaling would undo both
+    label_icon->setScaledContents(false);
+    label_icon->clear();
+
+    QFont nameFont = font();
+    nameFont.setPointSize(uiDesign::typeSize(uiDesign::TypeStep::Title));
+    nameFont.setWeight(QFont::DemiBold);
+    label_packageName->setFont(nameFont);
+
+    // A QLabel's minimum is its whole text, which let the package shown decide how narrow the window could go
+    for (QLabel* pLabel : {label_packageName, label_author}) {
+        pLabel->setMinimumWidth(QFontMetrics(pLabel->font()).averageCharWidth() * scmPackagesHeadlineFloorCharacters);
+    }
+
+    // The .ui file pins it 100px wide, which a number beside the name does not need
+    label_version->setMinimumWidth(0);
+    label_version->setAlignment(Qt::AlignLeading | Qt::AlignLeft | Qt::AlignBottom);
+    // Free to grow down, so its box is the row's full depth and AlignBottom has an effect
+    label_version->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+    // Maximum, so the version stands right after the name rather than at the column's end
+    label_packageName->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
+    label_author->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
+    label_author->setFont(font());
+    label_version->setFont(font());
+
+    uiDesign::removeFromLayoutTree(horizontalLayout_3, label_version);
+    horizontalLayout_3->setSpacing(scmPackagesCaptionGap);
+    horizontalLayout_3->addStretch(1);
+
+    mpLayout_headlineRow = new QHBoxLayout();
+    mpLayout_headlineRow->setObjectName(qsl("packagesHeadlineRow"));
+    mpLayout_headlineRow->setContentsMargins(0, 0, 0, 0);
+    mpLayout_headlineRow->setSpacing(scmPackagesCaptionGap);
+    const int namePlace = verticalLayout_details->indexOf(label_packageName);
+    uiDesign::removeFromLayoutTree(verticalLayout_details, label_packageName);
+    mpLayout_headlineRow->addWidget(label_packageName);
+    mpLayout_headlineRow->addWidget(label_version);
+    mpLayout_headlineRow->addStretch(1);
+    verticalLayout_details->insertLayout(namePlace, mpLayout_headlineRow);
+
+    if (QLayoutItem* pCaptionRow = verticalLayout_details->takeAt(verticalLayout_details->indexOf(horizontalLayout_3))) {
+        verticalLayout_details->addItem(pCaptionRow);
+    }
+    // The notes field's hairline is already the seam; this rule would double it
+    line->hide();
 }
 
 void dlgPackageManager::clearPackageDetails()
 {
     label_icon->clear();
-    packageDescription->clear();
-    mPackageName.clear();
+    label_icon->setStyleSheet(QString());
+    showPlainDescription(QString());
+    mPackageNameShown.clear();
     label_packageName->clear();
     label_packageName->setToolTip(QString());
     label_title->clear();
@@ -124,6 +303,45 @@ void dlgPackageManager::clearPackageDetails()
     label_version->clear();
     pushButton_website->hide();
     pushButton_report->hide();
+}
+
+void dlgPackageManager::showPackageIcon(const QPixmap& face)
+{
+    if (face.isNull()) {
+        showPackagePlaceholder();
+        return;
+    }
+
+    label_icon->setStyleSheet(QString());
+
+    const qreal ratio = label_icon->devicePixelRatioF();
+    QPixmap cut(QSize(scmPackagesIconSize, scmPackagesIconSize) * ratio);
+    cut.setDevicePixelRatio(ratio);
+    cut.fill(Qt::transparent);
+
+    QPainter painter(&cut);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform);
+    QPainterPath corner;
+    corner.addRoundedRect(QRectF(0, 0, scmPackagesIconSize, scmPackagesIconSize), uiDesign::scmRadiusInput, uiDesign::scmRadiusInput);
+    painter.setClipPath(corner);
+    painter.drawPixmap(QRect(0, 0, scmPackagesIconSize, scmPackagesIconSize), face);
+    painter.end();
+
+    label_icon->setPixmap(cut);
+}
+
+void dlgPackageManager::showPackagePlaceholder()
+{
+    const uiDesign::ThemeTokens tokens = uiDesign::themeTokens();
+    label_icon->setStyleSheet(qsl("#label_icon { background-color: %1; border: %2px solid %3; border-radius: %4px; }")
+                                      .arg(tokens.card.name(), QString::number(uiDesign::scmInputBorderWidth), tokens.border.name(), QString::number(uiDesign::scmRadiusInput)));
+
+    const qreal ratio = label_icon->devicePixelRatioF();
+    QPixmap glyph = uiDesign::tintedGlyph(uiDesign::glyphPixmap(qsl(":/icons/packages-package.svg")), tokens.mutedText)
+                            .scaled(QSize(scmPackagesIconGlyphSize, scmPackagesIconGlyphSize) * ratio, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    glyph.setDevicePixelRatio(ratio);
+    label_icon->setPixmap(glyph);
 }
 
 void dlgPackageManager::downloadIcon(const QString& packageName)
@@ -135,9 +353,7 @@ void dlgPackageManager::downloadIcon(const QString& packageName)
         if (packageObj.contains(qsl("icon"))) {
             iconPath = packageObj[qsl("icon")].toString();
         } else {
-            iconPath = qsl(":/icons/package-manager.png");
-            QPixmap pixmap(iconPath);
-            label_icon->setPixmap(pixmap.scaled(96, 96, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            showPackagePlaceholder();
             return;
         }
     }
@@ -159,76 +375,92 @@ void dlgPackageManager::downloadRepositoryIndex()
     QNetworkRequest request(QUrl(qsl("https://raw.githubusercontent.com/Mudlet/mudlet-package-repository/refs/heads/main/packages/mpkg.packages.json")));
     request.setTransferTimeout(20000);
     QNetworkReply* reply = manager->get(request);
-    // Parented so closing the dialog mid-download frees it: otherwise only the handler below would,
-    // and that never runs once the reply, a grandchild of this dialog, is gone.
-    QFile* file = new QFile(outputPath, this);
 
-    if (!file->open(QIODevice::WriteOnly)) {
-        file->deleteLater();
-        reply->deleteLater();
-        manager->deleteLater();
-        return;
-    }
-
-    QObject::connect(reply, &QNetworkReply::readyRead, [file, reply]() {
-        const QByteArray data = reply->readAll();
-        if (file->write(data) != data.size()) {
-            qWarning() << "dlgPackageManager::downloadRepositoryIndex() ERROR - failed to write downloaded data:" << file->errorString();
-            reply->abort();
-        }
-    });
-
-    QObject::connect(reply, &QNetworkReply::finished, [reply, file, manager, this]() {
+    QObject::connect(reply, &QNetworkReply::finished, [reply, outputPath, manager, this]() {
         if (reply->error() != QNetworkReply::NoError) {
             qWarning() << "dlgPackageManager::downloadRepositoryIndex() ERROR - network request failed:" << reply->errorString();
         } else {
             const QByteArray data = reply->readAll();
-            if (!data.isEmpty() && file->write(data) != data.size()) {
-                qWarning() << "dlgPackageManager::downloadRepositoryIndex() ERROR - failed to write final data:" << file->errorString();
+            // A captive portal or proxy can answer with a page of its own and a success status
+            const QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (!doc.isObject() || !doc.object().value(qsl("packages")).isArray()) {
+                qWarning() << "dlgPackageManager::downloadRepositoryIndex() ERROR - the download is not a package index, discarding it";
+            } else {
+                // Opened only once a whole index is in hand, so a failed, refused or abandoned download never
+                // touches the previous one. On Unix, a profile directory that cannot take the temporary file
+                // falls back to rewriting the index in place, which a write failing partway leaves truncated.
+                QSaveFile file(outputPath);
+                file.setDirectWriteFallback(true);
+                if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit()) {
+                    qWarning() << "dlgPackageManager::downloadRepositoryIndex() ERROR - failed to save the repository index:" << file.errorString();
+                }
             }
         }
-        file->close();
         reply->deleteLater();
-        file->deleteLater();
         manager->deleteLater();
-        readPackageRepositoryFile();
-        populatePackagesWithUpdates();
-        updateUpdatesBadge();
+        // A successful read refreshes the updates list and badge itself
+        if (!readPackageRepositoryFile()) {
+            populatePackagesWithUpdates();
+            updateUpdatesBadge();
+        } else if (mCurrentView != NavigationView::Installed) {
+            // Explore and Updates are listed from the index, so what is on show predates this one
+            slot_setPackageList();
+        }
     });
-}
-
-// The name is elided to fit, but the details are first filled before layout gives the label its
-// width, so the full name is kept and re-elided whenever the label's width or font changes.
-void dlgPackageManager::elidePackageName()
-{
-    const int available = label_packageName->contentsRect().width();
-    if (available <= 0) {
-        // elidedText() returns nothing below an ellipsis's width; a blank heading reads as "no package selected"
-        return;
-    }
-
-    const QFontMetrics metrics(label_packageName->font());
-    const QString elidedName = metrics.elidedText(mPackageName, Qt::ElideRight, available);
-    label_packageName->setText(elidedName);
-    label_packageName->setToolTip(elidedName == mPackageName ? QString() : mPackageName);
-}
-
-bool dlgPackageManager::eventFilter(QObject* pWatched, QEvent* pEvent)
-{
-    if (pWatched == label_packageName && (pEvent->type() == QEvent::Resize || pEvent->type() == QEvent::FontChange)) {
-        elidePackageName();
-    }
-    return QDialog::eventFilter(pWatched, pEvent);
 }
 
 void dlgPackageManager::fillPackageDetails(const QString& name, const QString& title, const QString& author, const QString& version)
 {
-    mPackageName = name;
-    elidePackageName();
     label_title->setText(title);
-    label_author->setText(author);
-    //: Package manager - label showing package version
-    label_version->setText(tr("Version ") + version);
+    //: Package manager - who wrote the package, on the caption line under its name. %1 is the author's name
+    label_author->setText(author.isEmpty() ? QString() : tr("by %1").arg(author));
+    // Before showPackageName(): the name is cut to what the version leaves of the row
+    label_version->setText(version);
+    showPackageName(name);
+}
+
+void dlgPackageManager::showPackageName(const QString& name)
+{
+    mPackageNameShown = name;
+    // Measured off the row, not the label: the label keeps the last package's width
+    // until the layout runs again
+    int room = label_packageName->width();
+    if (mpLayout_headlineRow && mpLayout_headlineRow->geometry().width() > 0) {
+        room = mpLayout_headlineRow->geometry().width() - scmPackagesCaptionGap - label_version->sizeHint().width();
+    }
+    const QFontMetrics metrics(label_packageName->font());
+    const QString elidedName = metrics.elidedText(name, Qt::ElideRight, std::max(0, room));
+    if (elidedName.isEmpty() && !name.isEmpty()) {
+        // elidedText() returns nothing below an ellipsis's width; a blank heading reads as "no package selected"
+        return;
+    }
+    label_packageName->setText(elidedName);
+    label_packageName->setToolTip(elidedName == name ? QString() : name);
+}
+
+// Kept for relayDescription(): a QTextDocument applies its default stylesheet only
+// when its text is set, so a theme change has to set the text again
+void dlgPackageManager::showDescription(const QString& markdown)
+{
+    mDescription = markdown;
+    mDescriptionIsMarkdown = true;
+    packageDescription->setMarkdown(markdown);
+}
+
+void dlgPackageManager::showPlainDescription(const QString& text)
+{
+    mDescription = text;
+    mDescriptionIsMarkdown = false;
+    packageDescription->setPlainText(text);
+}
+
+void dlgPackageManager::relayDescription()
+{
+    if (mDescriptionIsMarkdown) {
+        packageDescription->setMarkdown(mDescription);
+    } else {
+        packageDescription->setPlainText(mDescription);
+    }
 }
 
 bool dlgPackageManager::hasNewerVersion(const QString& installed, const QString& repo) const
@@ -238,12 +470,36 @@ bool dlgPackageManager::hasNewerVersion(const QString& installed, const QString&
     return repoVersion > installedVersion;
 }
 
+QString dlgPackageManager::updateVersionText(const QString& installedVersion, const QString& repoVersion) const
+{
+    //: Package manager - the version beside a package's name in the Updates view: the one installed, then the one waiting. %1 is the installed version, %2 the new one
+    return tr("%1 → %2").arg(installedVersion, repoVersion);
+}
+
+QString dlgPackageManager::updateRowVersion(const QString& packageName) const
+{
+    const QString installedVersion = mpHost ? mpHost->mPackageInfo.value(packageName).value(qsl("version")) : QString();
+    const QString repoVersion = packageLookup.value(packageName).value(qsl("version")).toString();
+    if (installedVersion.isEmpty() || repoVersion.isEmpty()) {
+        return {};
+    }
+    return updateVersionText(installedVersion, repoVersion);
+}
+
+void dlgPackageManager::setRowVersion(QListWidgetItem* pItem, const QString& version)
+{
+    if (!pItem || version.isEmpty()) {
+        return;
+    }
+    pItem->setData(PackageItemDelegate::cPackageVersionRole, version);
+}
+
 void dlgPackageManager::populatePackagesWithUpdates()
 {
     mPackagesWithUpdates.clear();
 
     for (const QString& packageName : std::as_const(mpHost->mInstalledPackages)) {
-        if (!packageLookup.contains(packageName)) {
+        if (!matchesRepositoryPackage(packageName)) {
             continue;
         }
 
@@ -305,6 +561,7 @@ void dlgPackageManager::resetPackageList()
     clearPackageDetails();
     mCurrentView = NavigationView::Installed;
     mpNavigationGroup->button(static_cast<int>(NavigationView::Installed))->setChecked(true);
+    syncViewBar();
     packageList->clear();
 
     for (int i = 0; i < mpHost->mInstalledPackages.size(); i++) {
@@ -316,14 +573,11 @@ void dlgPackageManager::resetPackageList()
         if (!title.isEmpty()) {
             item->setData(Qt::UserRole, title);
         }
+        setRowVersion(item, packageInfo.value(qsl("version")));
         const auto iconName = packageInfo.value(qsl("icon"));
         if (!iconName.isEmpty()) {
             const auto iconDir = MudletApp::getMudletPath(enums::profileDataItemPath, mpHost->getName(), qsl("%1/.mudlet/Icon/%2").arg(mpHost->mInstalledPackages.at(i), iconName));
             item->setIcon(QIcon(iconDir));
-        } else {
-            QPixmap emptyPixmap(16, 16);
-            emptyPixmap.fill(Qt::transparent);
-            item->setIcon(QIcon(emptyPixmap));
         }
         packageList->addItem(item);
     }
@@ -331,6 +585,73 @@ void dlgPackageManager::resetPackageList()
     populatePackagesWithUpdates();
     updateUpdatesBadge();
     packageList->setCurrentRow(0);
+    slot_toggleInstallRepoButton();
+    slot_toggleRemoveButton();
+}
+
+// A package's toolbars are main-window docks, and showing one (a floating one above all)
+// raises the main window over this dialog. Deferred past the install event and the docks' show.
+void dlgPackageManager::comeBackToFront()
+{
+    QTimer::singleShot(0ms, this, [this]() {
+        if (!isVisible()) {
+            return;
+        }
+        raise();
+        activateWindow();
+    });
+}
+
+// A row inside a selection keeps it: Remove and Install act on every selected row,
+// so a right-click that threw the rest away would be a trap
+void dlgPackageManager::slot_packageContextMenu(const QPoint& pos)
+{
+    QListWidgetItem* pItem = packageList->itemAt(pos);
+    if (!pItem) {
+        return;
+    }
+    packageList->setCurrentItem(pItem, pItem->isSelected() ? QItemSelectionModel::NoUpdate : QItemSelectionModel::ClearAndSelect);
+
+    // QPointer: exec() runs an event loop, and the profile closing meanwhile deletes
+    // this window and the menu parented to it
+    QPointer<QMenu> pMenu = buildPackageContextMenu(pItem);
+    if (!pMenu) {
+        return;
+    }
+    pMenu->exec(packageList->viewport()->mapToGlobal(pos));
+    if (pMenu) {
+        pMenu->deleteLater();
+    }
+}
+
+QMenu* dlgPackageManager::buildPackageContextMenu(QListWidgetItem* pItem)
+{
+    if (!pItem || !mpHost) {
+        return nullptr;
+    }
+
+    auto* pMenu = new QMenu(this);
+    pMenu->setObjectName(qsl("packagesContextMenu"));
+    // Built on demand, so it takes the recipe here rather than from the style pass
+    pMenu->setStyleSheet(uiDesign::menuStyleSheet(uiDesign::themeTokens()));
+    uiDesign::letPopupsTakeTheFieldsCorner(pMenu);
+
+    if (mCurrentView == NavigationView::Installed) {
+        //: Package manager - the list's right-click menu, over an installed package: takes it off the profile
+        QAction* pRemove = pMenu->addAction(tr("Remove"));
+        pRemove->setObjectName(qsl("packagesMenuRemove"));
+        connect(pRemove, &QAction::triggered, this, &dlgPackageManager::slot_removePackages);
+        return pMenu;
+    }
+
+    QAction* pInstall = pMenu->addAction(mCurrentView == NavigationView::Updates
+                                                 //: Package manager - the list's right-click menu in the Updates view: brings the package up to date
+                                                 ? tr("Update")
+                                                 //: Package manager - the list's right-click menu in the Explore view: fetches the package
+                                                 : tr("Install"));
+    pInstall->setObjectName(qsl("packagesMenuInstall"));
+    connect(pInstall, &QAction::triggered, this, &dlgPackageManager::slot_installPackageFromRepository);
+    return pMenu;
 }
 
 void dlgPackageManager::setupNavigationButtons()
@@ -341,8 +662,19 @@ void dlgPackageManager::setupNavigationButtons()
     mpNavigationGroup->addButton(pushButton_explore, static_cast<int>(NavigationView::Explore));
     mpNavigationGroup->addButton(pushButton_installed, static_cast<int>(NavigationView::Installed));
     mpNavigationGroup->addButton(pushButton_updates, static_cast<int>(NavigationView::Updates));
+    syncViewBar();
 
     connect(mpNavigationGroup, &QButtonGroup::idClicked, this, &dlgPackageManager::slot_navigationButtonClicked);
+}
+
+// Blocked, or the bar would click the button that has just changed the view
+void dlgPackageManager::syncViewBar()
+{
+    if (!mpViewBar) {
+        return;
+    }
+    const QSignalBlocker held(mpViewBar);
+    mpViewBar->setCurrentIndex(static_cast<int>(mCurrentView));
 }
 
 void dlgPackageManager::slot_installPackageFromFile()
@@ -373,6 +705,7 @@ void dlgPackageManager::slot_installPackageFromFile()
     }
 
     resetPackageList();
+    comeBackToFront();
 
     if (!failedPackages.isEmpty()) {
         //: Package manager - status message shown when some packages failed to import. %1 is a comma-separated list of package names
@@ -382,7 +715,12 @@ void dlgPackageManager::slot_installPackageFromFile()
 
 void dlgPackageManager::slot_installPackageFromRepository()
 {
-    const QList<QListWidgetItem*> selected = packageList->selectedItems();
+    // Names, not items: a warning below runs an event loop, in which a package
+    // installed or removed by a script rebuilds the list and frees its items
+    QStringList selected;
+    for (const QListWidgetItem* item : packageList->selectedItems()) {
+        selected << item->text();
+    }
     if (selected.isEmpty()) {
         return;
     }
@@ -418,8 +756,8 @@ void dlgPackageManager::slot_installPackageFromRepository()
             const QString& filePath = it.value();
 
             if (mpHost) {
-                // Before both calls: the previous pass's install leaves a save in flight, during which an uninstall
-                // is refused and an install waits for the save to finish - long after the archive below is deleted.
+                // Before both calls: during a save an uninstall is refused and an install waits for
+                // the save to finish - long after the archive below is deleted.
                 mpHost->waitForProfileSave();
                 bool readyToInstall = true;
                 if (mpHost->mInstalledPackages.contains(packageName)) {
@@ -446,6 +784,7 @@ void dlgPackageManager::slot_installPackageFromRepository()
         manager->deleteLater();
 
         resetPackageList();
+        comeBackToFront();
 
         if (!failedPackages.isEmpty()) {
             //: Package manager - status message shown when some packages downloaded from the repository failed to install. %1 is a comma-separated list of package names
@@ -468,9 +807,7 @@ void dlgPackageManager::slot_installPackageFromRepository()
         progress->deleteLater();
     });
 
-    for (QListWidgetItem* item : selected) {
-        const QString packageName = item->text();
-
+    for (const QString& packageName : std::as_const(selected)) {
         QJsonObject foundObj;
         if (packageLookup.contains(packageName)) {
             foundObj = packageLookup.value(packageName);
@@ -583,11 +920,14 @@ void dlgPackageManager::slot_itemChanged(QListWidgetItem* pItem)
     if (mCurrentView == NavigationView::Installed) {
         auto packageInfo{mpHost->mPackageInfo.value(packageName)};
         if (packageInfo.isEmpty()) {
-            packageDescription->clear();
+            showPackageName(packageName);
+            showPackagePlaceholder();
+            //: Package manager - shown in the details pane for an installed package that came with no details, such as a plain .xml package. %1 is the package name
+            showPlainDescription(tr("'%1' was installed without any details to show: it has no title, author, version or description.").arg(packageName));
             return;
         }
 
-        if (packageLookup.contains(packageName)) {
+        if (matchesRepositoryPackage(packageName)) {
             pushButton_website->show();
             pushButton_report->show();
         }
@@ -596,37 +936,38 @@ void dlgPackageManager::slot_itemChanged(QListWidgetItem* pItem)
         if (!description.isEmpty()) {
             QString packageDir = MudletApp::getMudletPath(enums::profileDataItemPath, mpHost->getName(), packageName);
             description.replace(QLatin1String("$packagePath"), packageDir);
-            packageDescription->setMarkdown(description);
+            showDescription(description);
         }
 
         auto iconName = packageInfo.value(qsl("icon"));
         if (!iconName.isEmpty()) {
             const auto iconDir = MudletApp::getMudletPath(enums::profileDataItemPath, mpHost->getName(), qsl("%1/.mudlet/Icon/%2").arg(packageName, iconName));
-            label_icon->setPixmap(QPixmap(iconDir).scaled(96, 96, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            showPackageIcon(QPixmap(iconDir));
         } else {
-            QPixmap pixmap(":/icons/package-manager.png");
-            label_icon->setPixmap(pixmap.scaled(96, 96, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            showPackagePlaceholder();
         }
 
         fillPackageDetails(packageName, packageInfo.value(qsl("title")), packageInfo.value(qsl("author")), packageInfo.value(qsl("version")));
 
     } else if (mCurrentView == NavigationView::Explore) {
-        pushButton_website->show();
-        pushButton_report->show();
-        downloadIcon(packageName);
-
         if (packageLookup.contains(packageName)) {
+            pushButton_website->show();
+            pushButton_report->show();
+            downloadIcon(packageName);
+
             QJsonObject packageObj = packageLookup.value(packageName);
             fillPackageDetails(
                     packageObj.value(qsl("mpackage")).toString(), packageObj.value(qsl("title")).toString(), packageObj.value(qsl("author")).toString(), packageObj.value(qsl("version")).toString());
-            packageDescription->setMarkdown(packageObj.value(qsl("description")).toString());
+            showDescription(packageObj.value(qsl("description")).toString());
+        } else {
+            showMissingFromIndex(packageName);
         }
     } else if (mCurrentView == NavigationView::Updates) {
-        pushButton_website->show();
-        pushButton_report->show();
-        downloadIcon(packageName);
-
         if (packageLookup.contains(packageName)) {
+            pushButton_website->show();
+            pushButton_report->show();
+            downloadIcon(packageName);
+
             QJsonObject packageObj = packageLookup.value(packageName);
             const auto packageInfo = mpHost->mPackageInfo.value(packageName);
             const QString installedVersion = packageInfo.value(qsl("version"));
@@ -634,10 +975,13 @@ void dlgPackageManager::slot_itemChanged(QListWidgetItem* pItem)
 
             fillPackageDetails(packageObj.value(qsl("mpackage")).toString(), packageObj.value(qsl("title")).toString(), packageObj.value(qsl("author")).toString(), repoVersion);
 
-            //: Package manager - version update indicator showing old and new versions
-            label_version->setText(tr("Version %1 → %2").arg(installedVersion, repoVersion));
+            label_version->setText(updateVersionText(installedVersion, repoVersion));
+            // Cut again: fillPackageDetails() cut the name to fit beside one number, not two
+            showPackageName(mPackageNameShown);
 
-            packageDescription->setMarkdown(packageObj.value(qsl("description")).toString());
+            showDescription(packageObj.value(qsl("description")).toString());
+        } else {
+            showMissingFromIndex(packageName);
         }
     }
 }
@@ -645,8 +989,14 @@ void dlgPackageManager::slot_itemChanged(QListWidgetItem* pItem)
 void dlgPackageManager::slot_navigationButtonClicked(int buttonId)
 {
     mCurrentView = static_cast<NavigationView>(buttonId);
+    syncViewBar();
     lineEdit_searchBar->clear();
     slot_setPackageList();
+}
+
+void dlgPackageManager::slot_applyAppearance()
+{
+    applyPackageManagerShellStyle();
 }
 
 void dlgPackageManager::slot_onIconDownloaded(QNetworkReply* reply)
@@ -668,10 +1018,9 @@ void dlgPackageManager::slot_onIconDownloaded(QNetworkReply* reply)
         const QByteArray imageData = reply->readAll();
         QPixmap pixmap;
         pixmap.loadFromData(imageData);
-        label_icon->setPixmap(pixmap.scaled(96, 96, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        showPackageIcon(pixmap);
     } else {
-        const QPixmap pixmap(qsl(":/icons/mudlet.png"));
-        label_icon->setPixmap(pixmap.scaled(96, 96, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        showPackagePlaceholder();
     }
     reply->deleteLater();
     reply->manager()->deleteLater();
@@ -687,12 +1036,25 @@ void dlgPackageManager::slot_openBugWebsite()
     mudlet::self()->openWebPage(qsl("https://github.com/Mudlet/mudlet-package-repository/issues/new?template=package-bug-or-issue.md&title=[Package%20Bug]%20") + currentItem->text());
 }
 
+// The index is keyed by name alone and anyone can make a package of the same name. The author is
+// copied into the index from the package's config.lua and rarely changes between versions
+bool dlgPackageManager::matchesRepositoryPackage(const QString& packageName) const
+{
+    const auto repositoryPackage = packageLookup.constFind(packageName);
+    if (repositoryPackage == packageLookup.cend() || !mpHost->mPackageInfo.contains(packageName)) {
+        return false;
+    }
+    return mpHost->mPackageInfo.value(packageName).value(qsl("author")) == repositoryPackage->value(qsl("author")).toString();
+}
+
 QString dlgPackageManager::packageHelpUrl(const QString& packageName) const
 {
     // a help URL set by the package's author takes precedence over the generic repository website
-    const QString url = mpHost->mPackageInfo.value(packageName).value(qsl("helpURL"));
-    if (!url.isEmpty()) {
-        return url;
+    if (matchesRepositoryPackage(packageName)) {
+        const QString url = mpHost->mPackageInfo.value(packageName).value(qsl("helpURL"));
+        if (!url.isEmpty()) {
+            return url;
+        }
     }
     return packageLookup.value(packageName).value(qsl("helpURL")).toString();
 }
@@ -704,13 +1066,32 @@ void dlgPackageManager::slot_openPackageWebsite()
         return;
     }
 
-    const QString helpUrl = packageHelpUrl(currentItem->text());
+    mudlet::self()->openWebPage(packageWebsiteUrl(currentItem->text()));
+}
+
+// The site addresses a package by slug: lower case, each run of non-alphanumerics one
+// hyphen ("Achaean System" is /packages/achaean-system)
+QString dlgPackageManager::packageWebsiteUrl(const QString& packageName) const
+{
+    const QString helpUrl = packageHelpUrl(packageName);
     if (!helpUrl.isEmpty()) {
-        mudlet::self()->openWebPage(helpUrl);
-        return;
+        return helpUrl;
     }
 
-    mudlet::self()->openWebPage(qsl("https://packages.mudlet.org/packages#pkg-") + currentItem->text());
+    QString slug;
+    bool pendingHyphen = false;
+    for (const QChar c : packageName.toLower()) {
+        if (c.isLetterOrNumber()) {
+            if (pendingHyphen && !slug.isEmpty()) {
+                slug.append(QLatin1Char('-'));
+            }
+            pendingHyphen = false;
+            slug.append(c);
+        } else {
+            pendingHyphen = true;
+        }
+    }
+    return qsl("https://packages.mudlet.org/packages/") + slug;
 }
 
 // Returns what to tell the user about refused removals, empty if none. Split from the slot so the
@@ -761,6 +1142,7 @@ void dlgPackageManager::slot_removePackages()
 
     populatePackagesWithUpdates();
     updateUpdatesBadge();
+    comeBackToFront();
 }
 
 void dlgPackageManager::slot_searchTextChanged(const QString& searchText)
@@ -780,14 +1162,11 @@ void dlgPackageManager::slot_searchTextChanged(const QString& searchText)
                 if (!title.isEmpty()) {
                     item->setData(Qt::UserRole, title);
                 }
+                setRowVersion(item, value.value(qsl("version")));
                 const auto iconName = value.value(qsl("icon"));
                 if (!iconName.isEmpty()) {
                     const auto iconDir = MudletApp::getMudletPath(enums::profileDataItemPath, mpHost->getName(), qsl("%1/.mudlet/Icon/%2").arg(name, iconName));
                     item->setIcon(QIcon(iconDir));
-                } else {
-                    QPixmap emptyPixmap(16, 16);
-                    emptyPixmap.fill(Qt::transparent);
-                    item->setIcon(QIcon(emptyPixmap));
                 }
                 packageList->addItem(item);
             }
@@ -806,6 +1185,7 @@ void dlgPackageManager::slot_searchTextChanged(const QString& searchText)
                 if (!title.isEmpty()) {
                     item->setData(Qt::UserRole, title);
                 }
+                setRowVersion(item, pkg[qsl("version")].toString());
                 if (pkg.contains(qsl("icon"))) {
                     const QPixmap pixmap(pkg[qsl("icon")].toString());
                     item->setIcon(QIcon(pixmap));
@@ -826,14 +1206,11 @@ void dlgPackageManager::slot_searchTextChanged(const QString& searchText)
                 if (!title.isEmpty()) {
                     item->setData(Qt::UserRole, title);
                 }
+                setRowVersion(item, updateRowVersion(packageName));
                 const auto iconName = packageInfo.value(qsl("icon"));
                 if (!iconName.isEmpty()) {
                     const auto iconDir = MudletApp::getMudletPath(enums::profileDataItemPath, mpHost->getName(), qsl("%1/.mudlet/Icon/%2").arg(packageName, iconName));
                     item->setIcon(QIcon(iconDir));
-                } else {
-                    QPixmap emptyPixmap(16, 16);
-                    emptyPixmap.fill(Qt::transparent);
-                    item->setIcon(QIcon(emptyPixmap));
                 }
                 packageList->addItem(item);
             }
@@ -848,6 +1225,7 @@ void dlgPackageManager::slot_setPackageList()
     }
 
     if (!lineEdit_searchBar->text().isEmpty()) {
+        clearPackageDetails();
         slot_searchTextChanged(lineEdit_searchBar->text());
         return;
     }
@@ -865,37 +1243,39 @@ void dlgPackageManager::slot_setPackageList()
             if (!title.isEmpty()) {
                 item->setData(Qt::UserRole, title);
             }
+            setRowVersion(item, packageInfo.value(qsl("version")));
             if (!iconName.isEmpty()) {
                 const auto iconDir = MudletApp::getMudletPath(enums::profileDataItemPath, mpHost->getName(), qsl("%1/.mudlet/Icon/%2").arg(mpHost->mInstalledPackages.at(i), iconName));
                 item->setIcon(QIcon(iconDir));
-            } else {
-                QPixmap emptyPixmap(16, 16);
-                emptyPixmap.fill(Qt::transparent);
-                item->setIcon(QIcon(emptyPixmap));
             }
             packageList->addItem(item);
         }
     } else if (mCurrentView == NavigationView::Explore) {
-        if (!readPackageRepositoryFile()) {
-            return;
-        }
-        for (const QJsonValue& packageVal : std::as_const(repositoryPackages)) {
-            auto item = new QListWidgetItem();
-            const QJsonObject packageObj = packageVal.toObject();
-            const QString packageName = packageObj.value("mpackage").toString();
-            const QString title = packageObj.value("title").toString();
-            item->setText(packageName);
-            if (!title.isEmpty()) {
-                item->setData(Qt::UserRole, title);
+        // No early return: the button toggles at the end must still run for this view
+        if (readPackageRepositoryFile()) {
+            for (const QJsonValue& packageVal : std::as_const(repositoryPackages)) {
+                auto item = new QListWidgetItem();
+                const QJsonObject packageObj = packageVal.toObject();
+                const QString packageName = packageObj.value("mpackage").toString();
+                const QString title = packageObj.value("title").toString();
+                item->setText(packageName);
+                if (!title.isEmpty()) {
+                    item->setData(Qt::UserRole, title);
+                }
+                setRowVersion(item, packageObj.value(qsl("version")).toString());
+                packageList->addItem(item);
             }
-            packageList->addItem(item);
+        } else {
+            //: Package manager - shown in the details pane of the Explore view when the list of packages in the repository has not been downloaded or cannot be read
+            showPlainDescription(tr(
+                    "The list of packages in the repository is not available: it is still downloading, or the download failed. If it does not appear here, reopen the package manager to try again."));
         }
     } else if (mCurrentView == NavigationView::Updates) {
         populatePackagesWithUpdates();
 
         if (mPackagesWithUpdates.isEmpty()) {
             //: Package manager - message shown in description area when no updates are available
-            packageDescription->setPlainText(tr("All packages are up to date."));
+            showPlainDescription(tr("All packages are up to date."));
         }
 
         for (const QString& packageName : std::as_const(mPackagesWithUpdates)) {
@@ -907,44 +1287,47 @@ void dlgPackageManager::slot_setPackageList()
             if (!title.isEmpty()) {
                 item->setData(Qt::UserRole, title);
             }
+            setRowVersion(item, updateRowVersion(packageName));
             if (!iconName.isEmpty()) {
                 const auto iconDir = MudletApp::getMudletPath(enums::profileDataItemPath, mpHost->getName(), qsl("%1/.mudlet/Icon/%2").arg(packageName, iconName));
                 item->setIcon(QIcon(iconDir));
-            } else {
-                QPixmap emptyPixmap(16, 16);
-                emptyPixmap.fill(Qt::transparent);
-                item->setIcon(QIcon(emptyPixmap));
             }
             packageList->addItem(item);
         }
     }
 
     packageList->setCurrentRow(0);
+    // The buttons follow the view, which no selection signal reports
+    slot_toggleInstallRepoButton();
+    slot_toggleRemoveButton();
 }
 
 void dlgPackageManager::slot_toggleInstallRepoButton()
 {
+    pushButton_installRepo->setVisible(mCurrentView != NavigationView::Installed);
+
     if (mCurrentView == NavigationView::Explore || mCurrentView == NavigationView::Updates) {
         const QList selection = packageList->selectedItems();
         const int selectionCount = selection.size();
         pushButton_installRepo->setEnabled(selectionCount);
+        pushButton_installRepo->setIcon(mCurrentView == NavigationView::Updates ? mUpdateGlyph : mInstallGlyph);
 
         if (mCurrentView == NavigationView::Updates) {
-            if (selectionCount) {
-                //: Message on button in package manager to update one or multiple (%n is the count) selected packages.
-                pushButton_installRepo->setText(tr("Update (%n)", nullptr, selectionCount));
+            if (selectionCount > 1) {
+                //: Message on button in package manager to bring several chosen packages up to date. %n is the number of selected packages.
+                pushButton_installRepo->setText(tr("Update %n packages", nullptr, selectionCount));
             } else {
-                //: Message on button in package manager when there are no selected packages - button will also be disabled.
+                //: Message on button in package manager to bring the chosen package up to date; also its wording with nothing chosen, where the button is disabled.
                 pushButton_installRepo->setText(tr("Update"));
             }
             //: Tooltip for button in package manager when in Updates view
             pushButton_installRepo->setToolTip(tr("Update selected packages"));
         } else {
-            if (selectionCount) {
-                //: Message on button in package manager to install one or multiple (%n is the count) selected packages.
-                pushButton_installRepo->setText(tr("Install (%n)", nullptr, selectionCount));
+            if (selectionCount > 1) {
+                //: Message on button in package manager to fetch several chosen packages. %n is the number of selected packages.
+                pushButton_installRepo->setText(tr("Install %n packages", nullptr, selectionCount));
             } else {
-                //: Message on button in package manager when there are no selected packages - button will also be disabled.
+                //: Message on button in package manager to fetch the chosen package; also its wording with nothing chosen, where the button is disabled.
                 pushButton_installRepo->setText(tr("Install"));
             }
             //: Tooltip for button in package manager when in Explore view
@@ -954,22 +1337,26 @@ void dlgPackageManager::slot_toggleInstallRepoButton()
         //: Message on button in package manager initially and when the view is the "Installed" one
         pushButton_installRepo->setText(tr("Install"));
         pushButton_installRepo->setEnabled(false);
+        pushButton_installRepo->setIcon(mInstallGlyph);
         //: Tooltip for button in package manager when in Explore view
         pushButton_installRepo->setToolTip(tr("Install package from repository"));
     }
+    scheduleActionRowFit();
 }
 
 void dlgPackageManager::slot_toggleRemoveButton()
 {
+    pushButton_remove->setVisible(mCurrentView == NavigationView::Installed);
+
     if (mCurrentView == NavigationView::Installed) {
         const QList selection = packageList->selectedItems();
         const int selectionCount = selection.size();
         pushButton_remove->setEnabled(selectionCount);
-        if (selectionCount) {
-            //: Message on button in package manager to remove one or multiple (%n is the count) selected packages.
-            pushButton_remove->setText(tr("Remove (%n)", nullptr, selectionCount));
+        if (selectionCount > 1) {
+            //: Message on button in package manager to take several chosen packages off the profile. %n is the number of selected packages.
+            pushButton_remove->setText(tr("Remove %n packages", nullptr, selectionCount));
         } else {
-            //: Message on button in package manager when there are no selected packages - button will also be disabled.
+            //: Message on button in package manager to take the chosen package off the profile; also its wording with nothing chosen, where the button is disabled.
             pushButton_remove->setText(tr("Remove"));
         }
     } else {
@@ -977,32 +1364,312 @@ void dlgPackageManager::slot_toggleRemoveButton()
         pushButton_remove->setText(tr("Remove"));
         pushButton_remove->setEnabled(false);
     }
+    scheduleActionRowFit();
 }
 
+// No hide timer: which packages failed to install must stay until the reader closes it
 void dlgPackageManager::showImportStatus(const QString& message)
 {
-    label_importStatus->setText(message);
-    label_importStatus->setStyleSheet(qsl("QLabel { padding: 8px; }"));
-    label_importStatus->show();
-    QTimer::singleShot(4s, label_importStatus, &QWidget::hide);
+    if (!mpNotice) {
+        return;
+    }
+    mpNotice->notificationAreaIconLabelError->hide();
+    mpNotice->notificationAreaIconLabelInformation->hide();
+    mpNotice->notificationAreaIconLabelWarning->show();
+    mpNotice->notificationAreaMessageBox->setText(message);
+    mpNotice->show();
+}
+
+// Every index read relists Explore and Updates, so no row should get here; a blank pane would read as a broken dialog
+void dlgPackageManager::showMissingFromIndex(const QString& packageName)
+{
+    qWarning() << "dlgPackageManager::showMissingFromIndex() WARNING - package not found in the repository index:" << packageName;
+    showPackageName(packageName);
+    showPackagePlaceholder();
+    //: Package manager - shown in the details pane when the selected package is not in the downloaded package index. %1 is the package name
+    showPlainDescription(tr("The details of '%1' could not be found in the package index. It may have been renamed or removed; try reopening the package manager.").arg(packageName));
 }
 
 void dlgPackageManager::updateUpdatesBadge()
 {
-    const int count = mPackagesWithUpdates.size();
-    if (count) {
+    if (mPackagesWithUpdates.size()) {
         //: Package manager - navigation button showing one or more available updates
-        pushButton_updates->setText(tr("Updates (%1)").arg(count));
+        pushButton_updates->setText(tr("Updates (%1)").arg(mPackagesWithUpdates.size()));
     } else {
         //: Package manager - navigation button for when there are no updates
         pushButton_updates->setText(tr("Updates"));
     }
+    // The hidden button is what slots and tests read; the chip is what the reader sees
+    if (mpViewBar && mpViewBar->count() > static_cast<int>(NavigationView::Updates)) {
+        const int updates = static_cast<int>(NavigationView::Updates);
+        mpViewBar->setTabText(updates, pushButton_updates->text());
+        mpViewBar->setAccessibleTabName(updates, pushButton_updates->text());
+    }
+}
+
+// Sheets go on the columns, never the dialog: mudlet replaces a dialog's sheet with the
+// profile's Lua one on show, and these container-scoped rules beat the profile's
+void dlgPackageManager::applyPackageManagerShellStyle()
+{
+    const uiDesign::ThemeTokens tokens = uiDesign::themeTokens();
+
+    const QString leftRules = qsl("#leftPanel { background-color: %1; }").arg(tokens.pane.name())
+                              // Only its QTabBar rules apply; ::pane and ::tab-bar miss on a plain widget
+                              + uiDesign::tabBarStyleSheet(qsl("#leftPanel"), tokens) + uiDesign::inputStyleSheet(tokens, qsl("#leftPanel")) + uiDesign::buttonStyleSheet(tokens, qsl("#leftPanel"));
+    leftPanel->setStyleSheet(leftRules);
+
+    packageList->setStyleSheet(uiDesign::itemRowStyleSheet(qsl("QListWidget#packageList"), tokens, tokens.pane, PackageItemDelegate::cRowGutter)
+                               + uiDesign::scrollBarStyleSheet(qsl("QListWidget#packageList"), tokens, tokens.pane));
+    // Mirrored in the palette, which is what a view is asked for its row inks; the
+    // platform's answers white on the accent's wash
+    QPalette rowInks = packageList->palette();
+    rowInks.setColor(QPalette::Text, tokens.text);
+    rowInks.setColor(QPalette::HighlightedText, tokens.accentText);
+    packageList->setPalette(rowInks);
+
+    const QColor versionInk = uiDesign::readableOn(tokens.page, uiDesign::stateColor(uiDesign::scmStateHue_ok, tokens.darkPage), tokens.text, uiDesign::scmTextMinimumRatio);
+    // Bottom-aligned in a box as deep as the name's, the two baselines sit their descents
+    // apart; the lift puts the number on the name's baseline
+    const int baselineLift = std::max(0, QFontMetrics(label_packageName->font()).descent() - QFontMetrics(label_version->font()).descent());
+    label_version->setContentsMargins(0, 0, 0, baselineLift);
+
+    const QString rightRules = qsl("#rightPanel { background-color: %1; }").arg(tokens.page.name()) + uiDesign::inputStyleSheet(tokens, qsl("#rightPanel"))
+                               + uiDesign::buttonStyleSheet(tokens, qsl("#rightPanel")) + qsl("#label_packageName, #label_title { color: %1; background: transparent; }").arg(tokens.text.name())
+                               + qsl("#label_author { color: %1; background: transparent; font-size: %2pt; font-weight: normal; }")
+                                         .arg(tokens.mutedText.name(), QString::number(uiDesign::typeSize(uiDesign::TypeStep::Caption)))
+                               + qsl("#label_version { color: %1; background: transparent; font-weight: normal; }").arg(versionInk.name())
+                               + uiDesign::scrollBarStyleSheet(qsl("#packageDescription"), tokens, tokens.field);
+    rightPanel->setStyleSheet(rightRules);
+
+    // The handle paints each neighbour's tone up to its hairline, and cannot read
+    // a colour a stylesheet filled
+    leftPanel->setProperty(uiDesign::scmProp_paneTone, tokens.pane);
+    rightPanel->setProperty(uiDesign::scmProp_paneTone, tokens.page);
+    if (mpSplitter && mpSplitter->handle(1)) {
+        mpSplitter->handle(1)->update();
+    }
+
+    // A QTextDocument takes colours only from its default stylesheet; withLinkColour() is for a QLabel
+    packageDescription->document()->setDefaultStyleSheet(
+            qsl("body { color: %1; }"
+                "h1, h2, h3, h4, h5, h6 { color: %1; }"
+                // On the window's type scale: the document's own h1 is twice the body text
+                "h1 { font-size: %6pt; }"
+                "h2 { font-size: %7pt; }"
+                "h3, h4, h5, h6 { font-size: %8pt; }"
+                "a { color: %2; }"
+                "pre, code { background-color: %3; color: %1; border: %4px solid %5; }")
+                    .arg(tokens.text.name(), tokens.accentText.name(), tokens.page.name(), QString::number(uiDesign::scmInputBorderWidth), tokens.border.name())
+                    .arg(QString::number(uiDesign::typeSize(uiDesign::TypeStep::Display)),
+                         QString::number(uiDesign::typeSize(uiDesign::TypeStep::Title)),
+                         QString::number(uiDesign::typeSize(uiDesign::TypeStep::Body))));
+    relayDescription();
+
+    // Tinted pixmaps keep the old appearance's ink until taken again here
+    if (mpAction_searchGlyph) {
+        mpAction_searchGlyph->setIcon(QIcon(uiDesign::tintedGlyph(uiDesign::glyphPixmap(qsl(":/icons/settings-search.svg")), tokens.mutedText)));
+    }
+    mInstallGlyph = uiDesign::tintedIcon(qsl(":/icons/packages-install.svg"), tokens);
+    mUpdateGlyph = uiDesign::tintedIcon(qsl(":/icons/packages-update.svg"), tokens);
+    pushButton_installFile->setIcon(uiDesign::tintedIcon(qsl(":/icons/packages-install-file.svg"), tokens));
+    pushButton_remove->setIcon(uiDesign::tintedIcon(qsl(":/icons/editor-delete.svg"), tokens));
+    pushButton_website->setIcon(uiDesign::tintedIcon(qsl(":/icons/about-homepage.svg"), tokens));
+    pushButton_report->setIcon(uiDesign::tintedIcon(qsl(":/icons/about-bug.svg"), tokens));
+    for (QAbstractButton* pButton : {static_cast<QAbstractButton*>(pushButton_installFile),
+                                     static_cast<QAbstractButton*>(pushButton_installRepo),
+                                     static_cast<QAbstractButton*>(pushButton_remove),
+                                     static_cast<QAbstractButton*>(pushButton_website),
+                                     static_cast<QAbstractButton*>(pushButton_report)}) {
+        pButton->setIconSize(QSize(scmPackagesButtonGlyphSize, scmPackagesButtonGlyphSize));
+    }
+    // After the icons and their size, which the measurement includes
+    measureActionRowButtons();
+    // The toggles hand Install the glyph just tinted for its view
+    slot_toggleInstallRepoButton();
+    slot_toggleRemoveButton();
+
+    if (QToolButton* pClose = mpNotice ? mpNotice->messageAreaCloseButton : nullptr) {
+        pClose->setIcon(uiDesign::tintedIcon(qsl(":/icons/editor-clear.svg"), tokens));
+        pClose->setIconSize(QSize(scmPackagesButtonGlyphSize, scmPackagesButtonGlyphSize));
+    }
+
+    // A sheet on label_icon is the one sign the placeholder glyph is showing
+    if (!label_icon->styleSheet().isEmpty()) {
+        showPackagePlaceholder();
+    }
+
+    mpPackageItemDelegate->restyle(tokens);
+
+    uiDesign::keepClickFocusOffControls(leftPanel);
+    uiDesign::keepClickFocusOffControls(rightPanel);
+    uiDesign::letPopupsTakeTheFieldsCorner(leftPanel);
+    uiDesign::letPopupsTakeTheFieldsCorner(rightPanel);
 }
 
 void dlgPackageManager::closeEvent(QCloseEvent* event)
 {
+    if (mpSplitter) {
+        if (QSettings* pSettings = MudletApp::getQSettings()) {
+            pSettings->setValue(QString::fromLatin1(scmPackagesSplitterKey), mpSplitter->saveState());
+        }
+    }
     if (mudlet::self() && !mudlet::self()->isGoingDown() && mpHost && !mpHost->isClosingDown()) {
         emit packageManagerClosing(mpHost->getName());
     }
     QDialog::closeEvent(event);
+}
+
+void dlgPackageManager::showEvent(QShowEvent* event)
+{
+    QDialog::showEvent(event);
+    // Not in the constructor: on macOS a native window created before it is shown drops the
+    // geometry it is handed. First show only, so a hide and re-show keeps a seam dragged since.
+    if (!mSplitterRestored) {
+        mSplitterRestored = true;
+        restoreColumnSplit();
+    }
+    scheduleHeadlineFit();
+    scheduleActionRowFit();
+}
+
+// Deferred: the layout settles the rows' new widths only after the resize event
+bool dlgPackageManager::eventFilter(QObject* pWatched, QEvent* pEvent)
+{
+    if (pWatched == rightPanel && pEvent->type() == QEvent::Resize) {
+        scheduleHeadlineFit();
+        scheduleActionRowFit();
+    }
+    return QDialog::eventFilter(pWatched, pEvent);
+}
+
+void dlgPackageManager::scheduleHeadlineFit()
+{
+    if (mPackageNameShown.isEmpty()) {
+        return;
+    }
+    QTimer::singleShot(0ms, this, [this]() {
+        showPackageName(mPackageNameShown);
+    });
+}
+
+// Asked of the buttons, since style padding, font and translation move both numbers, and taken
+// again each style pass. The glyph-only width becomes the floor: a QPushButton's
+// minimumSizeHint() is its whole sizeHint(), which would hold the window open.
+void dlgPackageManager::measureActionRowButtons()
+{
+    for (ActionRowLink& link : mActionRowLinks) {
+        QPushButton* pButton = link.pButton;
+        pButton->ensurePolished();
+        pButton->setMinimumWidth(0);
+        pButton->setText(link.word);
+        link.worded = pButton->sizeHint().width();
+        pButton->setText(QString());
+        link.glyphOnly = pButton->sizeHint().width();
+        pButton->setMinimumWidth(link.glyphOnly);
+        // Left glyph-only if already so, or a narrow window flashes the words on every appearance change
+        if (mActionRowWordsShown) {
+            pButton->setText(link.word);
+        }
+    }
+}
+
+int dlgPackageManager::actionRowWordedNeed() const
+{
+    if (!horizontalLayout_4) {
+        return 0;
+    }
+    int need = 0;
+    int items = 0;
+    for (int index = 0, count = horizontalLayout_4->count(); index < count; ++index) {
+        const QLayoutItem* pItem = horizontalLayout_4->itemAt(index);
+        QWidget* pWidget = pItem->widget();
+        if (pWidget && pWidget->isHidden()) {
+            // A layout leaves a hidden widget out altogether, its gap with it
+            continue;
+        }
+        ++items;
+        if (!pWidget) {
+            // The spacer asks for no width once the row is short of it
+            continue;
+        }
+        // The worded width whatever the button shows now, or the two thresholds would collapse into one
+        int wanted = pWidget->sizeHint().width();
+        for (const ActionRowLink& link : mActionRowLinks) {
+            if (link.pButton == pWidget && link.worded > 0) {
+                wanted = link.worded;
+                break;
+            }
+        }
+        need += wanted;
+    }
+    const QMargins rowMargins = horizontalLayout_4->contentsMargins();
+    return need + std::max(0, items - 1) * horizontalLayout_4->spacing() + rowMargins.left() + rowMargins.right();
+}
+
+// Words come back only a gap's width above where they were dropped, so a drag across the
+// breakpoint settles instead of flickering
+void dlgPackageManager::fitActionRowToItsColumn()
+{
+    if (mActionRowFitting || mActionRowLinks.isEmpty() || !rightPanel || !verticalLayout_right) {
+        return;
+    }
+    // Both hidden: nothing to fit until a package that shows either is chosen
+    const bool anyOnShow = std::any_of(mActionRowLinks.cbegin(), mActionRowLinks.cend(), [](const ActionRowLink& link) {
+        return !link.pButton->isHidden();
+    });
+    if (!anyOnShow) {
+        return;
+    }
+
+    const QMargins columnMargins = verticalLayout_right->contentsMargins();
+    const int room = rightPanel->width() - columnMargins.left() - columnMargins.right();
+    const int need = actionRowWordedNeed();
+    if (room <= 0 || need <= 0) {
+        return;
+    }
+    const bool wordsWanted = mActionRowWordsShown ? room >= need : room >= need + horizontalLayout_4->spacing();
+    if (wordsWanted == mActionRowWordsShown) {
+        return;
+    }
+
+    mActionRowFitting = true;
+    mActionRowWordsShown = wordsWanted;
+    for (const ActionRowLink& link : mActionRowLinks) {
+        link.pButton->setText(wordsWanted ? link.word : QString());
+    }
+    mActionRowFitting = false;
+}
+
+void dlgPackageManager::scheduleActionRowFit()
+{
+    if (mActionRowFitPending) {
+        return;
+    }
+    mActionRowFitPending = true;
+    QTimer::singleShot(0ms, this, [this]() {
+        mActionRowFitPending = false;
+        fitActionRowToItsColumn();
+    });
+}
+
+void dlgPackageManager::restoreColumnSplit()
+{
+    if (!mpSplitter) {
+        return;
+    }
+
+    QSettings* pSettings = MudletApp::getQSettings();
+    const QByteArray saved = pSettings ? pSettings->value(QString::fromLatin1(scmPackagesSplitterKey)).toByteArray() : QByteArray();
+    if (!saved.isEmpty() && mpSplitter->restoreState(saved)) {
+        // restoreState() also restores the saved handle width, which may be another version's
+        mpSplitter->setHandleWidth(uiDesign::GripSplitter::scmHandleThickness);
+        return;
+    }
+
+    const int across = mpSplitter->width() - uiDesign::GripSplitter::scmHandleThickness;
+    if (across <= 0) {
+        return;
+    }
+    const int list = std::max(leftPanel->minimumWidth(), across / scmPackagesListShareDenominator);
+    mpSplitter->setSizes({list, across - list});
 }

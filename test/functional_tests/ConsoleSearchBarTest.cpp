@@ -19,6 +19,7 @@
 
 #include <QDir>
 #include <QLineEdit>
+#include <QScrollBar>
 #include <QTemporaryDir>
 #include <QtTest/QtTest>
 #include <chrono>
@@ -28,6 +29,7 @@
 #include "Host.h"
 #include "MudletInstanceCoordinator.h"
 #include "MudletApp.h"
+#include "TLuaInterpreter.h"
 #include "TMainConsole.h"
 #include "TTextEdit.h"
 #include "TelnetServerStub.h"
@@ -101,6 +103,21 @@ private:
         return count;
     }
 
+    // Deep enough that the scroll bar is off its minimum, with the buffer one line short of a trim
+    static void fillToTheBrimAround(TConsole* console, const QString& text)
+    {
+        console->buffer.setBufferSize(100, 20);
+        while (console->buffer.size() < 70) {
+            console->print(qsl("filler line\n"));
+        }
+        console->print(text + qsl("\n"));
+        while (console->buffer.size() < 100) {
+            console->print(qsl("filler line\n"));
+        }
+    }
+
+    static bool runLua(TConsole* console, const QString& script) { return console->mpHost->getLuaInterpreter()->compileAndExecuteScript(script); }
+
     bool waitForTextInBuffer(TMainConsole* console, const QString& text, const int timeoutMs = 5000)
     {
         return QTest::qWaitFor(
@@ -116,7 +133,7 @@ private:
         if (!host) {
             return nullptr;
         }
-        TMainConsole* console = host->mpConsole;
+        TMainConsole* console = host->mainConsoleView();
 
         // Room for the longest fixture line, so that what the assertions below
         // count as one line cannot be wrapped into two:
@@ -132,7 +149,7 @@ private:
     // assertion ends the test instead of the null host doing it.
     Host* startProfile(const QString& hostname, const QString& address, const QString& port)
     {
-        QTimer::singleShot(0, qApp, [hostname, address, port]() {
+        QTimer::singleShot(0ms, qApp, [hostname, address, port]() {
             const auto dialog = []() {
                 return mudlet::self()->mpConnectionDialog.data();
             };
@@ -143,7 +160,7 @@ private:
                         [&dialog]() {
                             return dialog() && dialog()->isVisible();
                         },
-                        5000)) {
+                        5s)) {
                 qWarning() << "the connection dialog never appeared";
                 return;
             }
@@ -153,7 +170,7 @@ private:
                             [field]() {
                                 return QApplication::focusWidget() == field;
                             },
-                            5000)) {
+                            5s)) {
                     return true;
                 }
                 qWarning() << "focus never reached the" << name << "field";
@@ -181,7 +198,7 @@ private:
         });
 
         QSignalSpy spy(mudlet::self(), &mudlet::signal_profileLoaded);
-        if (!spy.wait(5000)) {
+        if (!spy.wait(5s)) {
             qWarning() << "Profile took too long to load.";
             return nullptr;
         }
@@ -192,7 +209,7 @@ private:
         }
 
         QSignalSpy spy2(&(host->mTelnet), &cTelnet::signal_connected);
-        if (!spy2.wait(2000)) {
+        if (!spy2.wait(2s)) {
             qWarning() << "Could not connect with the host.";
             return nullptr;
         }
@@ -260,12 +277,15 @@ private slots:
         const int earlierLine = lineHolding(console, qsl("gorbash sleeps"));
         QVERIFY(laterLine > earlierLine && earlierLine > -1);
 
+        // Taken first, as the split-screen tutorial the search opens adds a line after it
+        const int lastLine = console->buffer.getLastLineNumber();
         console->mpBufferSearchBox->setText(qsl("gorbash"));
         console->slot_searchBufferUp();
 
         QCOMPARE(console->mCurrentSearchResult, laterLine);
         QCOMPARE(markedCharactersOn(console, laterLine), 14);
         QCOMPARE(markedCharactersOn(console, earlierLine), 0);
+        QCOMPARE(console->buffer.mCursorY, std::min(laterLine + 3, lastLine));
     }
 
     // Searching for the same thing again is how the earlier times it was said
@@ -285,6 +305,7 @@ private slots:
         QCOMPARE(console->mCurrentSearchResult, earlierLine);
         QCOMPARE(markedCharactersOn(console, earlierLine), 7);
         QCOMPARE(markedCharactersOn(console, laterLine), 14);
+        QCOMPARE(console->buffer.mCursorY, std::min(earlierLine + 3, console->buffer.getLastLineNumber()));
     }
 
     void test_searchingDownComesBackTowardsTheEndOfTheBuffer()
@@ -302,6 +323,88 @@ private slots:
 
         console->slot_searchBufferDown();
         QCOMPARE(console->mCurrentSearchResult, laterLine);
+        QCOMPARE(console->buffer.mCursorY, std::min(laterLine + 3, console->buffer.getLastLineNumber()));
+    }
+
+    // The first search back from the end opens the split screen, and the lower
+    // pane that opens must not push the match out of the upper one.
+    void test_theSearchThatOpensTheSplitScreenStopsJustBelowTheMatch()
+    {
+        auto* console = startSearchableProfile();
+        QVERIFY2(console, "the profile never started, or the fixture text never reached its buffer - see the warning above");
+
+        // Deep enough in the buffer that the scroll bar is not held at its minimum
+        mpServer->sendRaw(QByteArray("filler line\r\n").repeated(200) + "the marked line\r\n" + QByteArray("filler line\r\n").repeated(100));
+        int markedLine = -1;
+        QVERIFY(QTest::qWaitFor(
+                [console, &markedLine]() {
+                    markedLine = lineHolding(console, qsl("the marked line"));
+                    return markedLine > -1 && console->buffer.getLastLineNumber() > markedLine + 99;
+                },
+                5000));
+        QVERIFY(console->mLowerPane->isHidden());
+
+        console->mpBufferSearchBox->setText(qsl("marked line"));
+        console->slot_searchBufferUp();
+        QCOMPARE(console->mCurrentSearchResult, markedLine);
+        QCOMPARE(console->mpScrollBar->value(), markedLine + 3);
+        QTest::qWait(100);
+
+        QVERIFY(!console->mLowerPane->isHidden());
+        // More rows than the split-screen tutorial prints, or the old padded scroll would land here too
+        QVERIFY(console->mLowerPane->getRowCount() > 1);
+        QCOMPARE(console->buffer.mCursorY, markedLine + 3);
+        QVERIFY(markedLine + 3 > console->mpScrollBar->minimum());
+        QCOMPARE(console->mpScrollBar->value(), markedLine + 3);
+    }
+
+    // The split-screen tutorial prints into this buffer, and in a full one that
+    // trims the top, so it must not move the line the search is scrolling to.
+    void test_theSplitScreenTutorialInAFullBufferDoesNotMoveTheSearchOffItsMatch()
+    {
+        auto* console = startSearchableProfile();
+        QVERIFY2(console, "the profile never started, or the fixture text never reached its buffer - see the warning above");
+        mudlet::self()->mScrollbackTutorialsShown = 0;
+        QVERIFY2(mudlet::self()->showSplitscreenTutorial(), "the tutorial is off, so nothing here would trim the buffer");
+
+        QVERIFY2(console->buffer.size() < 70, "the buffer is too full to fill to its limit around the marked line");
+        fillToTheBrimAround(console, qsl("the marked line"));
+        QCOMPARE(console->buffer.size(), 100);
+        const int markedLine = lineHolding(console, qsl("the marked line"));
+        QVERIFY(console->mLowerPane->isHidden());
+
+        console->mpBufferSearchBox->setText(qsl("marked line"));
+        console->slot_searchBufferUp();
+        QTest::qWait(100);
+
+        QVERIFY2(lineHolding(console, qsl("Split-screen scrollback activated")) > -1, "the tutorial was not printed");
+        const int movedTo = lineHolding(console, qsl("the marked line"));
+        QVERIFY2(movedTo >= 0 && movedTo < markedLine, "the tutorial did not trim the buffer, so nothing here was exercised");
+        QCOMPARE(console->buffer.mCursorY, movedTo + 3);
+        QCOMPARE(console->mpScrollBar->value(), movedTo + 3);
+        QCOMPARE(console->mCurrentSearchResult, movedTo);
+    }
+
+    // As above, for a script's scrollTo(): the line it names is the line it lands on.
+    void test_theSplitScreenTutorialInAFullBufferDoesNotMoveAScrollToOffItsLine()
+    {
+        auto* console = startSearchableProfile();
+        QVERIFY2(console, "the profile never started, or the fixture text never reached its buffer - see the warning above");
+        mudlet::self()->mScrollbackTutorialsShown = 0;
+        QVERIFY2(mudlet::self()->showSplitscreenTutorial(), "the tutorial is off, so nothing here would trim the buffer");
+
+        QVERIFY2(console->buffer.size() < 70, "the buffer is too full to fill to its limit around the marked line");
+        fillToTheBrimAround(console, qsl("the marked line"));
+        QCOMPARE(console->buffer.size(), 100);
+        const int markedLine = lineHolding(console, qsl("the marked line"));
+
+        QVERIFY(runLua(console, qsl("scrollTo('main', %1)").arg(markedLine)));
+        QTest::qWait(100);
+
+        QVERIFY2(lineHolding(console, qsl("Split-screen scrollback activated")) > -1, "the tutorial was not printed");
+        const int movedTo = lineHolding(console, qsl("the marked line"));
+        QVERIFY2(movedTo >= 0 && movedTo < markedLine, "the tutorial did not trim the buffer, so nothing here was exercised");
+        QCOMPARE(console->buffer.mCursorY, movedTo);
     }
 
     // A search that has not moved off the end of the buffer yet has nothing
@@ -360,6 +463,96 @@ private slots:
         QCOMPARE(console->mCurrentSearchResult, dustyLine);
         QCOMPARE(markedCharactersOn(console, dustyLine), 5);
         QCOMPARE(markedCharactersOn(console, laterLine), 0);
+    }
+
+    // Trimming the oldest lines moves every line up, so the search has to move
+    // with them or the next step starts from a line it has not searched yet.
+    void test_aTrimMovesTheSearchWithTheLineItFound()
+    {
+        auto* console = startSearchableProfile();
+        QVERIFY2(console, "the profile never started, or the fixture text never reached its buffer - see the warning above");
+
+        const int laterLine = lineHolding(console, qsl("GORBASH stirs"));
+        console->mpBufferSearchBox->setText(qsl("gorbash"));
+        console->slot_searchBufferUp();
+        QCOMPARE(console->mCurrentSearchResult, laterLine);
+
+        QVERIFY2(console->buffer.size() < 100, "the buffer is already past the smallest limit, so the trim below would take the fixture with it");
+        console->buffer.setBufferSize(100, 1);
+        for (int i = 0; i < 200 && lineHolding(console, qsl("GORBASH stirs")) == laterLine; ++i) {
+            console->print(qsl("filler\n"));
+        }
+        const int movedTo = lineHolding(console, qsl("GORBASH stirs"));
+        QVERIFY2(movedTo >= 0 && movedTo < laterLine, "the buffer was never trimmed, so nothing here was exercised");
+
+        QCOMPARE(console->mCurrentSearchResult, movedTo);
+
+        console->mpBufferSearchBox->setText(qsl("nothing"));
+        console->slot_searchBufferUp();
+        QCOMPARE(markedCharactersOn(console, movedTo), 0);
+    }
+
+    // A new term clears only the lines the search has marked, so those have to
+    // be followed wherever the lines go, and wherever their characters are copied.
+    void test_aNewTermClearsMarksOnALineThatMovedUpWhenALineAboveWasDeleted()
+    {
+        auto* console = startSearchableProfile();
+        QVERIFY2(console, "the profile never started, or the fixture text never reached its buffer - see the warning above");
+
+        console->mpBufferSearchBox->setText(qsl("gorbash"));
+        console->slot_searchBufferUp();
+        QCOMPARE(markedLineCount(console), 1);
+
+        const int laterLine = lineHolding(console, qsl("GORBASH stirs"));
+        QVERIFY(runLua(console, qsl("moveCursor('main', 0, %1) deleteLine()").arg(lineHolding(console, qsl("a dusty road")))));
+        QCOMPARE(lineHolding(console, qsl("GORBASH stirs")), laterLine - 1);
+        QCOMPARE(markedCharactersOn(console, laterLine - 1), 14);
+
+        console->mpBufferSearchBox->setText(qsl("nothing"));
+        console->slot_searchBufferUp();
+
+        QCOMPARE(markedLineCount(console), 1);
+    }
+
+    // A mark is cleared only in the console that was searched, so a copy of the
+    // text taken anywhere else must not take the mark with it.
+    void test_aCopyOfAMarkedLineDoesNotCarryTheMark()
+    {
+        auto* console = startSearchableProfile();
+        QVERIFY2(console, "the profile never started, or the fixture text never reached its buffer - see the warning above");
+
+        const int laterLine = lineHolding(console, qsl("GORBASH stirs"));
+        const int dustyLine = lineHolding(console, qsl("a dusty road"));
+        console->mpBufferSearchBox->setText(qsl("gorbash"));
+        console->slot_searchBufferUp();
+        QCOMPARE(markedLineCount(console), 1);
+
+        QVERIFY(runLua(console, qsl("moveCursor('main', 0, %1) selectCurrentLine() copy() moveCursor('main', 0, %2) paste() moveCursorEnd() appendBuffer()").arg(laterLine).arg(dustyLine)));
+        QVERIFY2(console->buffer.lineBuffer.at(dustyLine).contains(qsl("GORBASH stirs")), "the paste never happened, so nothing here was exercised");
+        QCOMPARE(lineHolding(console, qsl("GORBASH stirs")), console->buffer.getLastLineNumber() - 1);
+
+        QCOMPARE(markedLineCount(console), 1);
+        QCOMPARE(markedCharactersOn(console, laterLine), 14);
+    }
+
+    void test_aNewTermClearsMarksThatARewrapMovedOntoLaterLines()
+    {
+        auto* console = startSearchableProfile();
+        QVERIFY2(console, "the profile never started, or the fixture text never reached its buffer - see the warning above");
+
+        const int laterLine = lineHolding(console, qsl("GORBASH stirs"));
+        console->mpBufferSearchBox->setText(qsl("gorbash"));
+        console->slot_searchBufferUp();
+
+        console->setWrapAt(12);
+        QVERIFY(runLua(console, qsl("wrapLine('main', %1)").arg(laterLine)));
+        QVERIFY2(markedCharactersOn(console, laterLine) < 14, "the rewrap left the whole match on one line, so nothing here was exercised");
+        QCOMPARE(markedLineCount(console), 2);
+
+        console->mpBufferSearchBox->setText(qsl("nothing"));
+        console->slot_searchBufferUp();
+
+        QCOMPARE(markedLineCount(console), 1);
     }
 
     void test_aTermThatIsNowhereInTheBufferSaysSo()

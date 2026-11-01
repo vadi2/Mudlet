@@ -20,6 +20,8 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
+#include "uiDesign.h"
+
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QPointer>
@@ -65,11 +67,13 @@ public:
     // showing. mudlet reaches these through addonToolBarFor()/addonOptionsMenuFor().
     QToolBar* toolBar() const { return mpToolBar; }
     QMenu* optionsMenu() const { return mpOptionsMenu; }
+    QMenu* createPopupMenu() override;
     void updateDiscordNamedIcon();
     void setReattaching(bool reattaching) { mIsReattaching = reattaching; }
     void refreshTabBar();                             // Update tab text to account for CDC identifiers
     void updateWindowMenu();                          // Update the window menu with current window list
     void switchToProfile(const QString& profileName); // Switch to a specific profile tab
+    void markTabActivity(const QString& profileName, bool isLowerPriorityChange);
     void refreshAfterApplicationStyleChange();
 
     // Dock widget management methods
@@ -92,6 +96,7 @@ public:
 
     // Toolbar synchronization methods
     void setToolBarVisibility(bool visible);
+    void setMenuBarVisibility(bool visible);
     bool isToolBarVisible() const;
     bool canHideToolBar() const;
 
@@ -184,7 +189,9 @@ private slots:
 private:
     void setupUI();
     void createMenus();
+    void showMuteState();
     void createToolBar();
+    void restyleToolBarIcons();
     void connectToolBarActions();
     void updateTabIndicator(int tabIndex = -1);                            // -1 means current tab
     void updateDockWidgetVisibilityForProfile(const QString& profileName); // Show/hide docked widgets based on active profile
@@ -209,6 +216,7 @@ private:
     TTabBar* mpTabBar{nullptr};
     QToolBar* mpToolBar{nullptr};
     QMenu* mpOptionsMenu{nullptr};
+    QList<uiDesign::ActionGlyph> mToolBarGlyphs;
 
     // Toolbar actions - mirroring main window
     QAction* mpActionConnect{nullptr};
@@ -260,6 +268,8 @@ private:
     QAction* mpMenuPreferencesAction{nullptr};
     QAction* mpMenuToggleTimeStampAction{nullptr};
     QAction* mpMenuMuteMediaAction{nullptr};
+    QAction* mpMenuMuteAPIAction{nullptr};
+    QAction* mpMenuMuteGameAction{nullptr};
     QAction* mpMenuMultiViewAction{nullptr};
 
     // Toolbar buttons

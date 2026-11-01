@@ -131,13 +131,9 @@ private:
 
     static QMap<QString, QString> expectedRoom1UserData() { return {{qsl("quest.stage 日本語"), qsl("величина <>&\"' ]]>")}, {qsl("plain"), qsl("value")}}; }
 
-    static QMap<QString, QString> expectedRoom2UserData()
-    {
-        // The border presentation properties travel inside userData (see
-        // TMap::serialize()/TRoom::restore()) so they are part of the
-        // expected representation on both sides of the round trip:
-        return {{qsl("note"), qsl("second <room> & 'data'")}, {ROOM_UI_BORDERCOLOR, scmBorderColor.name(QColor::HexArgb)}, {ROOM_UI_BORDERTHICKNESS, qsl("4")}};
-    }
+    // The border properties travel in the file's copy of the user data (see
+    // TMap::serialize()/TRoom::restore()), never in the live room's:
+    static QMap<QString, QString> expectedRoom2UserData() { return {{qsl("note"), qsl("second <room> & 'data'")}}; }
 
     static AreaBounds captureBounds(TArea* pArea)
     {
@@ -206,6 +202,7 @@ private:
         pR1->customLinesColor.insert(qsl("n"), scmCustomLineColor);
         pR1->customLinesStyle.insert(qsl("n"), Qt::DashLine);
         pR1->customLinesArrow.insert(qsl("n"), true);
+        pR1->calcRoomDimensions();
 
         TRoom* pR2 = pDB->getRoom(scmRoom2);
         QVERIFY(pR2);
@@ -322,14 +319,14 @@ private:
         QCOMPARE(pAreaA->mUserData, expectedAreaAUserData());
 
         // Nothing on the load path sets out to build the per-area index of
-        // rooms holding custom lines. It falls out of three separate calls
-        // made for something else - TRoom::restore()'s room dimensions, the
-        // span recalculation at the end of TMap::restore(), and TArea::clean()
-        // during the audit - so cutting any one of them leaves it built by the
-        // other two and every other assertion here still passing. This is what
-        // is left to notice the day the last one goes: the mapper consults the
-        // index only for rooms that are off screen, so what silently stops
-        // being drawn is a custom line running into view from outside it.
+        // rooms holding custom lines. It falls out of two separate calls made
+        // for something else - the span recalculation at the end of
+        // TMap::restore(), and TArea::clean() during the audit - so cutting
+        // either one leaves it built by the other and every other assertion
+        // here still passing. This is what is left to notice the day the last
+        // one goes: the mapper consults the index only for rooms that are off
+        // screen, so what silently stops being drawn is a custom line running
+        // into view from outside it.
         QVERIFY2(
                 pAreaA->getCustomLineRoomsForZ(0).contains(scmRoom1),
                 qPrintable(qsl("room %1 holds a custom line but is missing from area A's index for z 0, loaded from format version %2").arg(QString::number(scmRoom1), QString::number(savedVersion))));
@@ -382,6 +379,11 @@ private:
         QCOMPARE(pR1->customLinesColor, (QMap<QString, QColor>{{qsl("n"), scmCustomLineColor}}));
         QCOMPARE(pR1->customLinesStyle, (QMap<QString, Qt::PenStyle>{{qsl("n"), Qt::DashLine}}));
         QCOMPARE(pR1->customLinesArrow, (QMap<QString, bool>{{qsl("n"), true}}));
+        // The mapper culls a room with custom lines by these, so wrong ones hide the lines.
+        QCOMPARE(pR1->min_x, 0.0);
+        QCOMPARE(pR1->max_x, 3.0);
+        QCOMPARE(pR1->min_y, -2.5);
+        QCOMPARE(pR1->max_y, 4.0);
         // The format 19 leg runs after the format 17/18 ones, so this also
         // guards against a < 19 save leaving a stray system.fallback_symbol
         // entry behind in the live source room's user data:
@@ -460,7 +462,9 @@ private:
         // a symbol color, room 3 is hidden:
         QCOMPARE(mpSource->mpMap->mUserData, expectedMapUserData());
         QCOMPARE(mpSource->mpMap->mpRoomDB->getRoom(scmRoom1)->userData, expectedRoom1UserData());
+        QCOMPARE(mpSource->mpMap->mpRoomDB->getRoom(scmRoom2)->userData, expectedRoom2UserData());
         QVERIFY(mpSource->mpMap->mpRoomDB->getRoom(scmRoom3)->userData.isEmpty());
+        QCOMPARE(mpSource->mpMap->mpRoomDB->getArea(mAreaA)->mUserData, expectedAreaAUserData());
 
         TMap* pTargetMap = mpTarget->mpMap.data();
         pTargetMap->mapClear();
@@ -637,6 +641,56 @@ private slots:
         QVERIFY2(pRoom1, "the room that was already there was evicted by the room refused for its id");
         QCOMPARE(pRoom1->mSymbol, qsl("⚔"));
         QCOMPARE(pRoom1->userData, expectedRoom1UserData());
+    }
+
+    // A load moves the map generation on, which is how holders of room, area
+    // and label ids (T2DMap's label dialog) tell theirs are stale; a binary
+    // file refused part way leaves that and the rest of the map as they were
+    void test_aRefusedLoadKeepsTheMapAndItsGeneration()
+    {
+        TMap* pSourceMap = mpSource->mpMap.data();
+        const QString fileName = qsl("%1/map_generation.dat").arg(mSaveDir.path());
+        const QString jsonFileName = qsl("%1/map_generation.json").arg(mSaveDir.path());
+        const QString cutFileName = qsl("%1/map_generation_cut.dat").arg(mSaveDir.path());
+        QVERIFY(saveMapToFile(pSourceMap, fileName, pSourceMap->mDefaultVersion));
+        const auto [wrote, writeMessage] = pSourceMap->writeJsonMapFile(jsonFileName);
+        QVERIFY2(wrote, qPrintable(writeMessage));
+        QFile whole(fileName);
+        QVERIFY(whole.open(QIODevice::ReadOnly));
+        const QByteArray data = whole.readAll();
+        QFile cut(cutFileName);
+        QVERIFY(cut.open(QIODevice::WriteOnly));
+        QCOMPARE(cut.write(data.left(data.size() - 3)), data.size() - 3);
+        cut.close();
+
+        TMap* pTargetMap = mpTarget->mpMap.data();
+        pTargetMap->mapClear();
+        unsigned int generation = pTargetMap->mpRoomDB->mapGeneration();
+        QVERIFY(pTargetMap->restore(fileName));
+        QVERIFY2(pTargetMap->mpRoomDB->mapGeneration() > generation, "loading a binary map file did not move the map generation on");
+        generation = pTargetMap->mpRoomDB->mapGeneration();
+        const auto [read, readMessage] = pTargetMap->readJsonMapFile(jsonFileName);
+        QVERIFY2(read, qPrintable(readMessage));
+        QVERIFY2(pTargetMap->mpRoomDB->mapGeneration() > generation, "loading a JSON map file did not move the map generation on");
+        generation = pTargetMap->mpRoomDB->mapGeneration();
+
+        // None of these is what the file holds
+        const TRoomDB* pRoomDB = pTargetMap->mpRoomDB.get();
+        pTargetMap->mMapSymbolFont = QFont(qsl("Bitstream Vera Sans Mono"), 9);
+        pTargetMap->mMapSymbolFontFudgeFactor = 0.75;
+        pTargetMap->mIsOnlyMapSymbolFontToBeUsed = false;
+        pTargetMap->mVersion = 18;
+        pTargetMap->mSaveVersion = 19;
+        QVERIFY2(!pTargetMap->restore(cutFileName), "a binary map file cut short was not refused");
+
+        QCOMPARE(pTargetMap->mpRoomDB.get(), pRoomDB);
+        QCOMPARE(pTargetMap->mpRoomDB->mapGeneration(), generation);
+        QCOMPARE(pTargetMap->mMapSymbolFont.family(), qsl("Bitstream Vera Sans Mono"));
+        QCOMPARE(pTargetMap->mMapSymbolFont.pointSize(), 9);
+        QCOMPARE(pTargetMap->mMapSymbolFontFudgeFactor, 0.75);
+        QVERIFY(!pTargetMap->mIsOnlyMapSymbolFontToBeUsed);
+        QCOMPARE(pTargetMap->mVersion, 18);
+        QCOMPARE(pTargetMap->mSaveVersion, 19);
     }
 
     // Maps written before the special exit command gained a '0'/'1' lock flag

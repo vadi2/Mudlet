@@ -25,7 +25,11 @@
 
 #include <QMap>
 #include <QPointer>
+#include <QStyleOptionViewItem>
 #include <QTreeWidget>
+
+#include <map>
+#include <memory>
 
 class Host;
 class TVar;
@@ -49,6 +53,7 @@ class TTreeWidget : public QTreeWidget
 public:
     Q_DISABLE_COPY(TTreeWidget)
     explicit TTreeWidget(QWidget* pW);
+    ~TTreeWidget() override;
     Qt::DropActions supportedDropActions() const override;
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dragLeaveEvent(QDragLeaveEvent* event) override;
@@ -58,8 +63,8 @@ public:
     bool dropMimeData(QTreeWidgetItem* parent, int index, const QMimeData* data, Qt::DropAction action) override;
     void rowsAboutToBeRemoved(const QModelIndex& parent, int start, int end) override;
     void rowsInserted(const QModelIndex& parent, int start, int end) override;
-    void mousePressEvent(QMouseEvent* event) override;
-    void mouseReleaseEvent(QMouseEvent* event) override;
+    // QAbstractItemView::initViewItemOption() is protected, and the delegates measure rows from outside the view
+    [[nodiscard]] QStyleOptionViewItem viewItemOption() const;
     void setHost(Host* pH);
     void setTreeType(TreeType type);
     void beginInsertRows(const QModelIndex& parent, int first, int last);
@@ -71,14 +76,11 @@ public:
     TVar* variableForRow(VarUnit* pVarUnit, QTreeWidgetItem* pItem) const;
     TVar* newVariableForRow(VarUnit* pVarUnit, QTreeWidgetItem* pItem) const;
     void setVariableForRow(VarUnit* pVarUnit, QTreeWidgetItem* pItem, TVar* pVariable);
-    void setNewVariableForRow(VarUnit* pVarUnit, QTreeWidgetItem* pItem, TVar* pVariable);
+    void setNewVariableForRow(VarUnit* pVarUnit, QTreeWidgetItem* pItem, std::unique_ptr<TVar> pVariable);
     void forgetRow(QTreeWidgetItem* pItem);
+    // Gives up the row's unsaved variable without deleting it, for when the variable tree adopts it
     void forgetNewVariableForRow(QTreeWidgetItem* pItem);
     bool rowCanBeSaved(VarUnit* pVarUnit, QTreeWidgetItem* pItem) const;
-
-    void updateTriggerIcon(QTreeWidgetItem* pItem, int triggerID);
-    void updateTriggerIconsRecursively(QTreeWidgetItem* pItem);
-    QTreeWidgetItem* findItemByTriggerID(QTreeWidgetItem* pParent, int triggerID);
 
 signals:
     void itemMoved(int itemID, int oldParentID, int newParentID, int oldPosition, int newPosition);
@@ -93,7 +95,8 @@ private:
         int oldPosition;
     };
 
-    void addVariableRows(VarUnit* pVarUnit, QTreeWidgetItem* pParent, TVar* pVariable, bool showHidden);
+    struct VariableRowLook;
+    void addVariableRows(VarUnit* pVarUnit, QTreeWidgetItem* pParent, TVar* pVariable, bool showHidden, const VariableRowLook& look);
     bool rowsStandForCurrentVariables(VarUnit* pVarUnit) const;
     void adoptVariableTree(VarUnit* pVarUnit);
 
@@ -105,10 +108,9 @@ private:
     int mChildID;      // Deprecated: kept for compatibility, will be removed
     TreeType mTreeType = TreeType::None;
     QMap<QTreeWidgetItem*, TVar*> mVariableForRow;
-    QMap<QTreeWidgetItem*, TVar*> mNewVariableForRow;
+    // An unsaved new variable is in no table yet, so its row's entry is the only owner it has
+    std::map<QTreeWidgetItem*, std::unique_ptr<TVar>> mNewVariableForRow;
     quint64 mVariablesGeneration = 0;
-    // CHECK: Should this actually be a: QPersistentModelIndex ?
-    QModelIndex mClickedItem;
 };
 
 #endif // MUDLET_TTREEWIDGET_H

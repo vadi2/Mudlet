@@ -6,6 +6,12 @@
 name: 🔨 Build Mudlet - PR (windows)
 on:
   pull_request:
+    # Kept in step with docs-only-pr.yml, which reports this workflow's checks
+    # for the pull requests these paths leave it out of.
+    paths-ignore:
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '**.md'
 
 # An explicit block sets every unlisted scope to none, so every consumer here has
 # to be listed. actions: read is SignPath's - its action reads job details and
@@ -14,41 +20,12 @@ permissions:
   id-token: write
   contents: read
   actions: read
-  pull-requests: read
 
 jobs:
-  changes:
-    name: detect buildable changes
-    runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'Mudlet' }}
-    outputs:
-      build: ${{steps.filter.outputs.build}}
-    steps:
-    - name: Check whether anything affecting the build changed
-      id: filter
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        # Only genuinely inert paths are listed - CI, CMake and packaging scripts
-        # all affect the build. Anything unexpected falls through to building.
-        files=$(gh api --paginate \
-          "/repos/${{github.repository}}/pulls/${{github.event.pull_request.number}}/files" \
-          -q '.[].filename')
-        echo "Changed files:"
-        printf '%s\n' "$files"
-
-        if printf '%s\n' "$files" | grep -qvE '(^docs/|^\.github/ISSUE_TEMPLATE/|\.md$)'; then
-          echo "build=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "build=false" >> "$GITHUB_OUTPUT"
-          echo "::notice::Documentation-only change - skipping the build matrix"
-        fi
-
   compile-mudlet:
     name: ${{matrix.buildname}}
     runs-on: ${{matrix.os}}
-    needs: changes
-    if: ${{ github.repository_owner == 'Mudlet' && needs.changes.outputs.build == 'true' }}
+    if: ${{ (github.repository_owner == 'Mudlet' || github.repository_owner == 'vadi2') }}
     concurrency:
       group: ${{github.workflow}}-${{matrix.buildname}}-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -71,9 +48,6 @@ jobs:
       uses: actions/checkout@v7
       with:
         submodules: recursive
-        # Enough for CI/generate-changelog.lua.
-        # MAX_COMMITS_PER_CHANGELOG (100) commits
-        fetch-depth: 100
 
     - name: (Windows) Setup MSYS2
       if: matrix.buildname == 'windows64'
@@ -120,6 +94,7 @@ jobs:
         SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         WITH_SENTRY: "ON"
+        WITH_MCPSERVER: "ON"
       run: $GITHUB_WORKSPACE/CI/build-mudlet-for-windows.sh
 
     - name: check ccache stats post build
@@ -131,6 +106,9 @@ jobs:
         ccache --show-compression
 
     - name: (Windows) Run QTest
+      id: win_ctest
+      # FORK ONLY: package and upload the test build even when tests fail; the job still fails below
+      continue-on-error: true
       shell: msys2 {0}
       run: |
         LUA_PATH=$(luarocks --lua-version 5.1 path --lr-path)
@@ -138,7 +116,8 @@ jobs:
         LUA_CPATH=$(luarocks --lua-version 5.1 path --lr-cpath)
         export LUA_CPATH
 
-        ctest --test-dir $GITHUB_WORKSPACE/build-$MSYSTEM/test --output-on-failure -j $(nproc)
+        # Twice the cores: most of these tests wait on timers and sockets (#12196: 339s at -j4, 233s at -j8)
+        ctest --test-dir $GITHUB_WORKSPACE/build-$MSYSTEM/test --output-on-failure -j $(( 2 * $(nproc) ))
       env:
         # This runner has Qt's FFmpeg backend and can decode, so TMediaLoopTest must
         # demonstrate every media behaviour rather than skip any of them. Without a floor
@@ -147,12 +126,18 @@ jobs:
         MUDLET_MEDIA_TESTS_REQUIRE_PLAYBACK: 1
 
     - name: (Windows) Run Lua tests
-      # ~94s measured here, and a slow runner can take half again as long - kept in
-      # step with the other platforms
-      timeout-minutes: 6
+      id: win_lua
+      continue-on-error: true
+      # 270-315s measured here, and a slow runner has taken 354s - kept in step
+      # with the other platforms
+      timeout-minutes: 12
       shell: msys2 {0}
       env:
         AUTORUN_BUSTED_TESTS: 'true'
+        # Off by default; the flood specs pend without it
+        MUDLET_MATCH_THREADS: 2
+        # Its statistics sample would take lines the flood specs compare off the pool
+        MUDLET_MATCH_SAMPLE_EVERY: 0
         MUDLET_TEST_MODE: 1
         MUDLET_TEST_REQUIRE_TTS_MOCK: 1
         MUDLET_TEST_REQUIRE_HTTP_FIXTURE: 1
@@ -203,6 +188,8 @@ jobs:
         $GITHUB_WORKSPACE/build-$MSYSTEM/release/mudlet.exe --profile "Mudlet self-test" --offline
 
     - name: Passed Lua tests
+      id: win_lua_result
+      continue-on-error: true
       shell: msys2 {0}
       run: |
         if [ -e $TEMP/busted-tests-failed ]
@@ -251,7 +238,7 @@ jobs:
     - name: (Windows) Sign binaries with SignPath
       id: sign-binaries
       if: steps.upload-unsigned-binaries.outcome == 'success'
-      uses: signpath/github-action-submit-signing-request@v3
+      uses: signpath/github-action-submit-signing-request@v2
       with:
         api-token: ${{secrets.SIGNPATH_API_TOKEN}}
         organization-id: ${{secrets.SIGNPATH_ORGANIZATION_ID}}
@@ -316,8 +303,6 @@ jobs:
     - name: (Windows) Deploy
       shell: msys2 {0}
       env:
-        DBLSQD_USER: ${{secrets.DBLSQD_USER}}
-        DBLSQD_PASS: ${{secrets.DBLSQD_PASS}}
         DEPLOY_KEY_PASS: ${{secrets.DEPLOY_KEY_PASS}}
         X_WP_DOWNLOAD_TOKEN: ${{secrets.X_WP_DOWNLOAD_TOKEN}}
         DEPLOY_SSH_KEY: ${{secrets.UPLOAD_PRIVATEKEY}}
@@ -349,7 +334,7 @@ jobs:
     - name: (Windows) Sign installer with SignPath
       id: sign-installer
       if: steps.upload-unsigned-installer.outcome == 'success'
-      uses: signpath/github-action-submit-signing-request@v3
+      uses: signpath/github-action-submit-signing-request@v2
       with:
         api-token: ${{secrets.SIGNPATH_API_TOKEN}}
         organization-id: ${{secrets.SIGNPATH_ORGANIZATION_ID}}
@@ -402,15 +387,16 @@ jobs:
 
     - name: Upload artifact to make.mudlet.org
       shell: msys2 {0}
-      if: env.ARTIFACT_NAME
+      if: github.repository_owner == 'Mudlet' && env.ARTIFACT_NAME
       # --fail-with-body: gha_queue.php reports refusals (e.g. a duplicate artifact name after a
       # job re-run) as a 4xx with the reason in the body, which plain curl would exit 0 on
       run: curl --fail-with-body --retry 5 -X POST "https://make.mudlet.org/snapshots/gha_queue.php?artifact_name=${{env.ARTIFACT_NAME}}&unzip=${{env.ARTIFACT_UNZIP}}"
 
-    - name: Register PTB Release
+    - name: Passed tests
+      if: >-
+        steps.win_ctest.outcome == 'failure' || steps.win_lua.outcome == 'failure'
+        || steps.win_lua_result.outcome == 'failure'
       shell: msys2 {0}
-      if: ${{ (github.event_name == 'schedule' || github.event.inputs.scheduled == 'true') && env.VERSION_STRING != '' }}
-      env:
-        VERSION_STRING: ${{env.VERSION_STRING}}
-        BUILD_COMMIT: ${{env.BUILD_COMMIT}}
-      run: $GITHUB_WORKSPACE/CI/register-windows-release.sh
+      run: |
+        echo "Tests failed - see '(Windows) Run QTest' and '(Windows) Run Lua tests' above for detailed output."
+        exit 1

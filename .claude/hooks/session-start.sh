@@ -58,7 +58,8 @@ if ! dpkg -s qtkeychain-qt6-dev >/dev/null 2>&1; then
     qtkeychain-qt6-dev
 fi
 
-if [ ! -d "${QT_DIR}" ]; then
+# Checks for HttpServer, the newest module, so an older install picks it up
+if [ ! -d "${QT_DIR}/lib/cmake/Qt6HttpServer" ]; then
   echo "Installing Qt ${QT_VERSION} via aqtinstall..."
   if [ ! -x /opt/aqt-venv/bin/aqt ]; then
     ${SUDO} mkdir -p /opt/aqt-venv /opt/qt
@@ -68,7 +69,15 @@ if [ ! -d "${QT_DIR}" ]; then
   fi
   # aqt drops aqtinstall.log in the current directory - keep it out of the repo
   (cd /opt/qt && /opt/aqt-venv/bin/aqt install-qt linux desktop "${QT_VERSION}" \
-    linux_gcc_64 -O /opt/qt -m qt5compat qtmultimedia qtspeech)
+    linux_gcc_64 -O /opt/qt -m qt5compat qtmultimedia qtspeech qtwebsockets qthttpserver)
+fi
+
+# rcc stamps every resource with its file's mtime, which differs between
+# checkouts; pinned, the font and image resources share ccache hits too. Not
+# SOURCE_DATE_EPOCH: GCC would apply that to __DATE__, and the updater reads the
+# real build time.
+if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+  echo "export QT_RCC_SOURCE_DATE_OVERRIDE=1" >> "${CLAUDE_ENV_FILE}"
 fi
 
 # Test-suite and UI-driving dependencies: xvfb and xcb libraries for the
@@ -76,22 +85,37 @@ fi
 # libxcb-shape0, which Ubuntu's own Qt would have pulled in), gstreamer for
 # Qt Multimedia, and the docs/demo-videos.md toolchain (openbox, xdotool,
 # imagemagick, ffmpeg) for driving and recording the real UI headlessly.
-if ! dpkg -s libxcb-shape0 >/dev/null 2>&1; then
+TEST_PACKAGES=(
+  xvfb
+  libgstreamer-plugins-base1.0-0
+  libxcb-cursor0
+  libxcb-icccm4
+  libxcb-image0
+  libxcb-keysyms1
+  libxcb-render-util0
+  libxcb-shape0
+  libxcb-xinerama0
+  xdotool
+  openbox
+  imagemagick
+  ffmpeg
+)
+# Every package is asked about, as some arrive with unrelated ones - ffmpeg
+# brings libxcb-shape0 - and by status, since dpkg -s also succeeds for one that
+# was removed but not purged. Not fatal: the steps after this need none of them.
+test_packages_missing() {
+  local package
+  for package in "${TEST_PACKAGES[@]}"; do
+    [ "$(dpkg-query -W -f='${db:Status-Status}' "${package}" 2>/dev/null)" = installed ] || return 0
+  done
+  return 1
+}
+if test_packages_missing; then
   echo "Installing test-suite apt dependencies..."
-  DEBIAN_FRONTEND=noninteractive ${SUDO} apt-get install -y --no-install-recommends \
-    xvfb \
-    libgstreamer-plugins-base1.0-0 \
-    libxcb-cursor0 \
-    libxcb-icccm4 \
-    libxcb-image0 \
-    libxcb-keysyms1 \
-    libxcb-render-util0 \
-    libxcb-shape0 \
-    libxcb-xinerama0 \
-    xdotool \
-    openbox \
-    imagemagick \
-    ffmpeg
+  # The lists already on disk may still serve, so a failed update is no reason not to try
+  ${SUDO} apt-get update -qq || echo "WARNING: could not update the apt package lists"
+  DEBIAN_FRONTEND=noninteractive ${SUDO} apt-get install -y --no-install-recommends "${TEST_PACKAGES[@]}" \
+    || echo "WARNING: could not install the test-suite apt dependencies"
 fi
 
 # gcovr and jq for the improve-test-coverage skill. Guarded separately so
@@ -149,6 +173,26 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
     echo "export LUA_PATH='${LUA_PATH}'"
     echo "export LUA_CPATH='${LUA_CPATH}'"
   } >> "${CLAUDE_ENV_FILE}"
+fi
+
+# Let worktrees share ccache hits: base_dir makes paths below it relative, so
+# it is the main checkout's parent - never / or above /opt/qt and /usr, whose
+# include paths would then differ with worktree depth. hash_dir off keeps each
+# worktree's build directory out of the hash of a -g build, so a shared object's
+# debug info can name a sibling's; build with CCACHE_HASHDIR=1 to step through
+# one in a debugger. Both settings are global.
+CHECKOUT_ROOT=""
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+  CHECKOUT_ROOT="$(cd "${CLAUDE_PROJECT_DIR}" && cd "$(git rev-parse --git-common-dir)/.." && pwd)" || CHECKOUT_ROOT=""
+fi
+CCACHE_BASE_DIR=""
+if [ -n "${CHECKOUT_ROOT}" ]; then
+  CCACHE_BASE_DIR="$(dirname "${CHECKOUT_ROOT}")"
+fi
+if command -v ccache >/dev/null 2>&1 && [ -n "${CCACHE_BASE_DIR}" ] && [ "${CCACHE_BASE_DIR}" != "/" ]; then
+  ccache --set-config=base_dir="${CCACHE_BASE_DIR}" \
+    && ccache --set-config=hash_dir=false \
+    || echo "WARNING: could not configure ccache for sharing between worktrees"
 fi
 
 # PR-review tooling for the agent. Installed at user scope, so it lands in

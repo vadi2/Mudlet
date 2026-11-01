@@ -37,6 +37,7 @@
 #include <QTemporaryDir>
 #include <QtTest/QtTest>
 
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
@@ -88,6 +89,17 @@ private:
         mpManager->resize(900, 600);
         mpManager->show();
         QVERIFY(QTest::qWaitForWindowExposed(mpManager));
+    }
+
+    // The heading is only as wide as its own words, on a row it shares with the version, so a name
+    // is cut to the row less the version and the gap before it rather than to the label's width
+    int headingRoom() const
+    {
+        const auto* pRow = mpManager->findChild<QHBoxLayout*>(qsl("packagesHeadlineRow"));
+        if (!pRow) {
+            return -1;
+        }
+        return pRow->geometry().width() - pRow->spacing() - mpManager->label_version->sizeHint().width();
     }
 
 private slots:
@@ -149,10 +161,10 @@ private slots:
 
         auto* pHeading = mpManager->label_packageName;
         const QFontMetrics metrics(pHeading->font());
-        QVERIFY2(metrics.horizontalAdvance(mPackageName) <= pHeading->contentsRect().width(),
-                 qPrintable(qsl("SETUP: '%1' needs %2px but the heading is only %3px wide, so shortening it would be right")
-                                    .arg(mPackageName, QString::number(metrics.horizontalAdvance(mPackageName)), QString::number(pHeading->contentsRect().width()))));
-        QVERIFY2(pHeading->text() == mPackageName, qPrintable(qsl("the heading shows '%1' where the whole of '%2' fits").arg(pHeading->text(), mPackageName)));
+        QVERIFY2(metrics.horizontalAdvance(mPackageName) <= headingRoom(),
+                 qPrintable(qsl("SETUP: '%1' needs %2px but the heading has only %3px, so shortening it would be right")
+                                    .arg(mPackageName, QString::number(metrics.horizontalAdvance(mPackageName)), QString::number(headingRoom()))));
+        QTRY_VERIFY2(pHeading->text() == mPackageName, qPrintable(qsl("the heading shows '%1' where the whole of '%2' fits").arg(pHeading->text(), mPackageName)));
         QVERIFY2(pHeading->toolTip().isEmpty(), "a name shown in full does not need a tooltip repeating it");
     }
 
@@ -168,7 +180,7 @@ private slots:
 
         auto* pHeading = mpManager->label_packageName;
         const QFontMetrics metrics(pHeading->font());
-        QVERIFY2(metrics.horizontalAdvance(longName) > pHeading->contentsRect().width(), "SETUP: the deliberately over-long name fits after all");
+        QVERIFY2(metrics.horizontalAdvance(longName) > headingRoom(), "SETUP: the deliberately over-long name fits after all");
 
         const auto rows = mpManager->packageList->findItems(longName, Qt::MatchExactly);
         QVERIFY2(!rows.isEmpty(), "the over-long package was not listed at all");
@@ -176,7 +188,7 @@ private slots:
         QVERIFY2(!pHeading->text().isEmpty(), "the heading was blanked rather than shortened");
         QVERIFY2(pHeading->text() != longName, "an over-long package name was not shortened");
         QVERIFY2(longName.startsWith(pHeading->text().chopped(1)), qPrintable(qsl("the heading shows '%1', which is not the start of '%2'").arg(pHeading->text(), longName)));
-        QVERIFY2(metrics.horizontalAdvance(pHeading->text()) <= pHeading->contentsRect().width(), "the shortened package name still does not fit the heading");
+        QTRY_VERIFY2(metrics.horizontalAdvance(pHeading->text()) <= pHeading->contentsRect().width(), "the shortened package name still does not fit the heading");
         QCOMPARE(pHeading->toolTip(), longName);
     }
 
@@ -198,7 +210,7 @@ private slots:
         mpManager->resize(1600, 600);
         QTRY_VERIFY2(pHeading->text().length() > atNineHundred.length(), "widening the dialog did not give the heading back more of the name");
         const QFontMetrics metrics(pHeading->font());
-        QVERIFY2(metrics.horizontalAdvance(pHeading->text()) <= pHeading->contentsRect().width(), "the re-measured name does not fit the widened heading");
+        QTRY_VERIFY2(metrics.horizontalAdvance(pHeading->text()) <= pHeading->contentsRect().width(), "the re-measured name does not fit the widened heading");
 
         mpManager->resize(900, 600);
         QTRY_COMPARE(pHeading->text(), atNineHundred);

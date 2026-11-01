@@ -140,7 +140,9 @@ struct SherpaOnnxOnlineRecognizerResult
 };
 
 // Static member initialization
+#if defined(INCLUDE_SPEECH_ENGINES)
 QLibrary SherpaRecognizer::sSherpaLibrary;
+#endif
 bool SherpaRecognizer::sLibraryLoaded = false;
 bool SherpaRecognizer::sLibraryLoadAttempted = false;
 QString SherpaRecognizer::sLibraryLoadError;
@@ -193,6 +195,7 @@ int SherpaRecognizer::silenceTimeout() const
     return mpCapture->silenceTimeout();
 }
 
+#if defined(INCLUDE_SPEECH_ENGINES)
 // The sherpa-onnx C-API library depends on onnxruntime, which release
 // bundles place beside it. Loading those first lets the dynamic linker
 // satisfy the dependency from a directory it would not search on its own.
@@ -209,6 +212,7 @@ static void preloadBundledDependencies(const QString& directory)
         library.load();
     }
 }
+#endif
 
 bool SherpaRecognizer::loadSherpaLibrary()
 {
@@ -218,6 +222,9 @@ bool SherpaRecognizer::loadSherpaLibrary()
 
     sLibraryLoadAttempted = true;
 
+#if !defined(INCLUDE_SPEECH_ENGINES)
+    return false;
+#else
     // QLibrary automatically adds platform-specific prefix/suffix:
     // "sherpa-onnx-c-api" becomes libsherpa-onnx-c-api.dylib / .so, or
     // sherpa-onnx-c-api.dll on Windows
@@ -309,6 +316,7 @@ bool SherpaRecognizer::loadSherpaLibrary()
 
     sLibraryLoaded = true;
     return true;
+#endif
 }
 
 bool SherpaRecognizer::sherpaAvailable()
@@ -326,14 +334,31 @@ bool SherpaRecognizer::sherpaAvailable()
     return sLibraryLoaded;
 }
 
+bool SherpaRecognizer::libraryPresent()
+{
+#if !defined(INCLUDE_SPEECH_ENGINES)
+    return false;
+#else
+    if (sLibraryLoadAttempted) {
+        return sLibraryLoaded;
+    }
+    const QStringList paths = librarySearchPaths();
+    return std::any_of(paths.cbegin(), paths.cend(), [](const QString& path) {
+        return QFileInfo::exists(path);
+    });
+#endif
+}
+
 bool SherpaRecognizer::resetLibraryLoadState()
 {
     // Whether the module actually went. QLibrary::unload() refuses while
     // anything still holds it mapped, and reporting success then is how a
     // caller comes to delete a file the loader has not let go of.
+#if defined(INCLUDE_SPEECH_ENGINES)
     if (sSherpaLibrary.isLoaded() && !sSherpaLibrary.unload()) {
         return false;
     }
+#endif
 
     sLibraryLoaded = false;
     sLibraryLoadAttempted = false;
@@ -464,6 +489,14 @@ QStringList SherpaRecognizer::usableHotwords(const QStringList& words, QStringLi
 
 bool SherpaRecognizer::loadModel(const QString& modelPath)
 {
+    const unsigned int loadGeneration = modelLoadGeneration();
+    // Read before mModelPath below is overwritten. setSensitivity() and
+    // setVocabulary() apply themselves by rebuilding the model already in place
+    // through this function, and such a rebuild replaces nothing - see
+    // noteModelLoaded(). mRecognizer rather than mModelPath alone, because
+    // mModelPath is set before the load can still fail, so it can name a model
+    // that is not in place.
+    const bool rebuildingTheModelInPlace = (mRecognizer != nullptr) && (mModelPath == modelPath);
     if (!loadSherpaLibrary()) {
         setState(State::Error);
         //: Shown when speech recognition is asked to load a model but the recognition library itself is not installed
@@ -532,6 +565,16 @@ bool SherpaRecognizer::loadModel(const QString& modelPath)
     // The caller asked to load a model, not to stop listening; the utterance in
     // flight goes with the decoder released below, and the player is told so.
     endSessionForModelLoad();
+
+    // A handler reached from the report above loaded a model of its own, and was
+    // told it succeeded - it did. Carrying on here would free that model and put
+    // this call's own in its place, leaving both callers told they had won. So
+    // this load stands down and leaves the handler's model standing; sttInit()
+    // sees a model other than the one it asked for and refuses with the same
+    // words sttInit() uses for the same standing-down anywhere else.
+    if (modelLoadGeneration() != loadGeneration) {
+        return true;
+    }
 
     releaseSherpaResources();
 
@@ -682,6 +725,9 @@ bool SherpaRecognizer::loadModel(const QString& modelPath)
         emit errorOccurred(tr("Failed to load sherpa-onnx model from: %1").arg(modelPath));
         return false;
     }
+    // The commit: mModelPath is set earlier, but the load can still fail until
+    // the recognizer exists, and a load that fails has installed nothing.
+    noteModelLoaded(!rebuildingTheModelInPlace);
 
     // Try to determine language from model path (convention: sherpa-onnx-nemotron-speech-streaming-en-0.6b-...)
     const QString dirName = modelDir.dirName();

@@ -55,6 +55,8 @@
 
 #include "GroupedTest.h"
 
+using namespace std::chrono_literals;
+
 class PackageExporterTest : public QObject
 {
     Q_OBJECT
@@ -85,11 +87,10 @@ private:
 
     // The exporter maps its own tree items onto the profile's items, so this is
     // how a test says "tick the row for that trigger"
-    template <typename T>
-    QTreeWidgetItem* itemFor(const QMap<QTreeWidgetItem*, T*>& map, const QString& name) const
+    QTreeWidgetItem* itemFor(const QMap<QTreeWidgetItem*, int>& map, const QString& name) const
     {
         for (auto it = map.cbegin(); it != map.cend(); ++it) {
-            if (it.value()->getName() == name) {
+            if (it.key()->text(0) == name) {
                 return it.key();
             }
         }
@@ -98,8 +99,7 @@ private:
 
     // ticking through the raw pointer would crash the whole class if the row
     // were ever missing, which is exactly when a readable failure is wanted
-    template <typename T>
-    bool tickRow(const QMap<QTreeWidgetItem*, T*>& map, const QString& name) const
+    bool tickRow(const QMap<QTreeWidgetItem*, int>& map, const QString& name) const
     {
         QTreeWidgetItem* row = itemFor(map, name);
         if (!row) {
@@ -137,9 +137,16 @@ private:
         return label->text();
     }
 
-    // displayResultMessage() paints failures in this colour and nothing else in
-    // the dialog uses it, so it is the language-independent "did it fail" test
-    bool reportedFailure(dlgPackageExporter* exporter) const { return infoText(exporter).contains(qsl("#FF6B6B")); }
+    // displayResultMessage() shows the error glyph for a failure and the information
+    // one otherwise, which is the language-independent "did it fail" test
+    bool reportedFailure(dlgPackageExporter* exporter) const
+    {
+        auto* notice = exporter->findChild<QWidget*>(qsl("exporterNotice"));
+        Q_ASSERT(notice);
+        auto* errorGlyph = notice->findChild<QLabel*>(qsl("notificationAreaIconLabelError"));
+        Q_ASSERT(errorGlyph);
+        return !notice->isHidden() && !errorGlyph->isHidden();
+    }
 
     // The zip runs on a worker thread behind a QFutureWatcher, which hides the
     // Close button for the duration and shows it again from its finished
@@ -156,7 +163,7 @@ private:
                 [closeButton]() {
                     return !closeButton->isHidden();
                 },
-                30000);
+                30s);
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
         return settled;
     }
@@ -192,7 +199,7 @@ private slots:
         mpHost = TestProfile::create(mProfileName, mLocalhost, QString::number(mpServer->serverPort()));
         QVERIFY2(mpHost, "No active host available for the test.");
         QSignalSpy connectedSpy(&(mpHost->mTelnet), &cTelnet::signal_connected);
-        QVERIFY2(connectedSpy.wait(1000), "Could not connect with the host.");
+        QVERIFY2(connectedSpy.wait(1s), "Could not connect with the host.");
 
         // getActualPath() falls back to this setting when the user has not
         // browsed for a location, which is the only way a test can steer where
@@ -396,6 +403,7 @@ private slots:
         const auto cleanup = qScopeGuard([this, exporter, moduleName]() {
             delete exporter;
             if (mpHost->mInstalledModules.contains(moduleName)) {
+                mpHost->waitForProfileSave();
                 mpHost->uninstallPackage(moduleName, enums::PackageModuleType::ModuleFromUI);
             }
         });
@@ -416,6 +424,9 @@ private slots:
         QVERIFY2(QFileInfo::exists(moduleFile), "module mode did not write the package into the profile directory");
         QVERIFY2(mpHost->mInstalledModules.contains(moduleName), "module mode exported the file but never installed it");
 
+        // the install schedules a profile save 100ms out, which the export wait
+        // above can let start, and uninstallPackage() refuses while one runs
+        mpHost->waitForProfileSave();
         QVERIFY2(mpHost->uninstallPackage(moduleName, enums::PackageModuleType::ModuleFromUI), "the module it installed could not be uninstalled again");
     }
 

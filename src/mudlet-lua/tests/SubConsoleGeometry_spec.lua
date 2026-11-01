@@ -1,5 +1,5 @@
 describe("Sub-console geometry", function()
-  -- User windows cannot be deleted from Lua, so names have to be unique per run.
+  -- Unique names per run, so a window an earlier run left behind is never measured instead.
   local runCounter = 0
   local function uniqueName(stem)
     runCounter = runCounter + 1
@@ -101,6 +101,54 @@ describe("Sub-console geometry", function()
             ("event %d disagrees with getUserWindowSize"):format(index))
         end
       end
+    end)
+  end)
+
+  describe("a docked user window opened after another was deleted", function()
+    it("gets the height the deleted one had", function()
+      local deletedName = uniqueName("sgDeletedUserWindow")
+      local laterName = uniqueName("sgLaterUserWindow")
+      finally(function()
+        deleteMiniConsole(deletedName)
+        deleteMiniConsole(laterName)
+      end)
+
+      -- On the left: the map widget other specs open stays docked on the right
+      -- for the rest of the session, leaving a window docked next to it no height.
+      assert.is_true(openUserWindow(deletedName, false, true, "left"), "the first user window did not open")
+      pumpEvents(100)
+      local deletedWidth, deletedHeight = getUserWindowSize(deletedName)
+      assert.is_number(deletedWidth, "the first user window has no dock of its own")
+      assert.is_true(deletedHeight > 0, "the first user window came up with no height, so there is nothing to compare with")
+      deleteMiniConsole(deletedName)
+      -- the dock's deferred delete cannot run inside a pump, so it is still alive
+      -- when the next window is docked
+      pumpEvents(100)
+
+      assert.is_true(openUserWindow(laterName, false, true, "left"), "the second user window did not open")
+      pumpEvents(100)
+      local _, laterHeight = getUserWindowSize(laterName)
+      assert.equals(deletedHeight, laterHeight)
+    end)
+  end)
+
+  describe("getUserWindowSize", function()
+    it("refuses a name no user window has", function()
+      local unknown = uniqueName("sgNoSuchUserWindow")
+      assert.are.same({nil, ("user window name '%s' not found"):format(unknown)}, {getUserWindowSize(unknown)})
+      assert.are.same({nil, "user window name '42' not found"}, {getUserWindowSize(42)})
+      local miniConsole = uniqueName("sgMiniConsole")
+      finally(function() deleteMiniConsole(miniConsole) end)
+      assert.is_true(createMiniConsole(miniConsole, 0, 0, 100, 50))
+      assert.are.same({nil, ("user window name '%s' not found"):format(miniConsole)}, {getUserWindowSize(miniConsole)})
+    end)
+
+    it("answers the main window's size for the main window", function()
+      local width, height = getMainWindowSize()
+      assert.are.same({width, height}, {getUserWindowSize("main")})
+      assert.are.same({width, height}, {getUserWindowSize()})
+      -- the creators take "main" in any case
+      assert.are.same({width, height}, {getUserWindowSize("Main")})
     end)
   end)
 end)

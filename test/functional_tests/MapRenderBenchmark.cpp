@@ -31,7 +31,8 @@
  *
  *   MUDLET_BENCH_MAP=/path/to/map.dat QT_QPA_PLATFORM=offscreen ./MapRenderBenchmark
  *
- * Without that variable the whole benchmark skips. The reference map is
+ * Without that variable the whole benchmark skips. An .xml map is converted to
+ * the binary format before the timed restore. The reference map is
  * Ssaliss' 2.2-million-room Aetherspace map from Lusternia, the one the mapper
  * has been stress-tested against since 2015:
  * https://bugs.launchpad.net/mudlet/+bug/1500927 (attachment 4578177, 7z).
@@ -70,6 +71,7 @@
 #include <cstdio>
 #include <limits>
 
+#include "BenchMapTestHelper.h"
 #include "MudletApp.h"
 #include "PortableModeTestHelper.h"
 #include "ProfileTestHelper.h"
@@ -101,6 +103,8 @@
 #ifndef BENCH_BUILD_ASAN
 #define BENCH_BUILD_ASAN 0
 #endif
+
+using namespace std::chrono_literals;
 
 extern void qInitResources_mudlet();
 extern void qInitResources_qm();
@@ -273,24 +277,27 @@ private slots:
         Host* host = TestProfile::create(mHostname, mLocalhost, QString::number(mPort));
         QVERIFY(host);
         QSignalSpy connected(&(host->mTelnet), &cTelnet::signal_connected);
-        QVERIFY2(connected.wait(3000), "could not connect to the stub");
+        QVERIFY2(connected.wait(3s), "could not connect to the stub");
 
         // The mapper has to exist before the map is restored into it, exactly
         // as Host::loadMapFile() arranges it.
         host->showHideOrCreateMapper(false);
         QVERIFY(host->mpMap);
-        QVERIFY(host->mpMap->mpMapper);
+        QVERIFY(host->mpMap->mapper());
         TMap* pMap = host->mpMap.data();
 
+        QString conversionError;
+        const QString mapToRestore = binaryBenchMap(host, mMapPath, mConfigDir.path(), conversionError);
+        QVERIFY2(!mapToRestore.isEmpty(), qPrintable(qsl("could not convert the XML map at \"%1\": %2").arg(mMapPath, conversionError)));
         QElapsedTimer loadTimer;
         loadTimer.start();
-        QVERIFY2(pMap->restore(mMapPath), qPrintable(qsl("could not restore the map at \"%1\"").arg(mMapPath)));
+        QVERIFY2(pMap->restore(mapToRestore), qPrintable(qsl("could not restore the map at \"%1\"").arg(mapToRestore)));
         const double restoreSeconds = loadTimer.nsecsElapsed() / 1.0e9;
         loadTimer.restart();
         pMap->audit();
         const double auditSeconds = loadTimer.nsecsElapsed() / 1.0e9;
 
-        T2DMap* p2dMap = host->mpMap->mpMapper->mp2dMap;
+        T2DMap* p2dMap = host->mpMap->mapper()->mp2dMap;
         QVERIFY(p2dMap);
         p2dMap->init();
 

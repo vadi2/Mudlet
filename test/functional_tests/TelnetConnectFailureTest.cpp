@@ -73,10 +73,10 @@ public:
         QElapsedTimer waited;
         waited.start();
         while (!mServer.listen(QHostAddress::LocalHost, mPort)) {
-            if (waited.hasExpired(5000)) {
+            if (waited.durationElapsed() > 5s) {
                 return false;
             }
-            QTest::qWait(100);
+            QTest::qWait(100ms);
         }
         return true;
     }
@@ -195,7 +195,7 @@ private slots:
                          [&]() {
                              return mpServer->connectionCount() > 1;
                          },
-                         8000),
+                         8s),
                  "the profile did not connect to the stub a second time");
 
         QVERIFY2(waitForTextInBuffer(host, qsl("connection made")), "a connection that was made put nothing on screen, so this test cannot see connection messages at all");
@@ -240,6 +240,8 @@ private slots:
         Host* host = startProfile();
         QVERIFY(host);
         host->mTelnet.setAutoReconnect(true);
+        QVERIFY2(host->mTelnet.mFailedConnectionRetryDelay == 5s, "a profile that reconnects automatically no longer waits 5s before its first retry");
+        host->mTelnet.mFailedConnectionRetryDelay = 200ms;
 
         const int connectionsBefore = mpServer->connectionCount();
         // The game goes down, and the profile's attempt to reach it is refused.
@@ -255,7 +257,7 @@ private slots:
                          [&]() {
                              return mpServer->connectionCount() > connectionsBefore;
                          },
-                         30000),
+                         30s),
                  "the profile never tried the game again, so reconnecting automatically is a single attempt");
     }
 
@@ -270,6 +272,10 @@ private slots:
         mpServer->stop();
         QVERIFY(connectToADeadPort(host, mpServer->serverPort()));
         QVERIFY2(waitForTextInBuffer(host, qsl("Trying again")), "no retry was scheduled, so calling one off proves nothing");
+        QVERIFY(host->mTelnet.mTimerFailedConnectionRetry && host->mTelnet.mTimerFailedConnectionRetry->isActive());
+        const std::chrono::milliseconds retryDueIn = host->mTelnet.mTimerFailedConnectionRetry->remainingTimeAsDuration();
+        QElapsedTimer sinceRetryScheduled;
+        sinceRetryScheduled.start();
 
         host->mTelnet.disconnectIt();
 
@@ -280,13 +286,15 @@ private slots:
                          [&]() {
                              return host->mTelnet.getConnectionState() == QAbstractSocket::UnconnectedState;
                          },
-                         20000),
+                         20s),
                  "the profile was still trying to connect long after the disconnect");
         QTest::qWait(3s);
 
         const int connectionsBefore = mpServer->connectionCount();
         QVERIFY2(mpServer->restart(), "the stub could not take its port back");
-        QTest::qWait(15s);
+        const auto sinceScheduled = std::chrono::duration_cast<std::chrono::milliseconds>(sinceRetryScheduled.durationElapsed());
+        QVERIFY2(sinceScheduled < retryDueIn, "the game came back after the retry was due, so a retry left running would have missed it");
+        QTest::qWait(retryDueIn - sinceScheduled + host->mTelnet.mFailedConnectionRetryDelay);
         QCOMPARE(mpServer->connectionCount(), connectionsBefore);
     }
 
@@ -347,7 +355,7 @@ private slots:
                          [&]() {
                              return countLines(host, qsl("Socket got disconnected")) > disconnectsBefore;
                          },
-                         20000),
+                         20s),
                  "the failed handshake was not reported by the disconnection path");
         QTest::qWait(1s);
         QVERIFY2(!bufferContains(host, qsl("Unable to connect")), "a failed handshake was reported as a failure to connect as well");
@@ -402,7 +410,7 @@ private:
                 [&]() {
                     return !disconnected.isEmpty();
                 },
-                8000);
+                8s);
     }
 
     // Events are only visible to a script, so one is asked to count every event it hears. Counted
@@ -432,14 +440,14 @@ private:
                 [&]() {
                     return recordedEventCount(host, event) > 0;
                 },
-                8000);
+                8s);
     }
 
     // Case-insensitively, because the message for a connection that was made reads "Open
     // connection made" or "Connection made" depending on whether the build can do TLS.
     bool bufferContains(Host* host, const QString& text)
     {
-        TBuffer& buffer = host->mpConsole->buffer;
+        TBuffer& buffer = host->mainConsoleView()->buffer;
         for (int i = 0; i <= buffer.getLastLineNumber(); ++i) {
             if (buffer.line(i).contains(text, Qt::CaseInsensitive)) {
                 return true;
@@ -451,7 +459,7 @@ private:
     int countLines(Host* host, const QString& text)
     {
         int found = 0;
-        TBuffer& buffer = host->mpConsole->buffer;
+        TBuffer& buffer = host->mainConsoleView()->buffer;
         for (int i = 0; i <= buffer.getLastLineNumber(); ++i) {
             if (buffer.line(i).contains(text, Qt::CaseInsensitive)) {
                 ++found;
@@ -462,7 +470,7 @@ private:
 
     QString lineContaining(Host* host, const QString& text)
     {
-        TBuffer& buffer = host->mpConsole->buffer;
+        TBuffer& buffer = host->mainConsoleView()->buffer;
         for (int i = 0; i <= buffer.getLastLineNumber(); ++i) {
             if (buffer.line(i).contains(text, Qt::CaseInsensitive)) {
                 return buffer.line(i);
@@ -477,7 +485,7 @@ private:
                 [&]() {
                     return bufferContains(host, text);
                 },
-                20000);
+                20s);
     }
 
     // Mirrors the helper the other functional tests use.
@@ -490,17 +498,14 @@ private:
             return nullptr;
         }
         QSignalSpy connected(&(host->mTelnet), &cTelnet::signal_connected);
-        if (!connected.wait(3000)) {
+        if (!connected.wait(3s)) {
             qWarning("could not connect to the stub");
             return nullptr;
         }
         return host;
     }
 
-    void deleteProfileDirectory(const QString& profileName)
-    {
-        TestProfile::removeProfileDirectory(profileName);
-    }
+    void deleteProfileDirectory(const QString& profileName) { TestProfile::removeProfileDirectory(profileName); }
 };
 
 #include "TelnetConnectFailureTest.moc"

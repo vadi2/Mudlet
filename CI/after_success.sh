@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if { [ -n "$GITHUB_REPOSITORY" ] && [ "${GITHUB_REPOSITORY}" != "Mudlet/Mudlet" ]; } then
+if { [ -n "$GITHUB_REPOSITORY" ] && [ "${GITHUB_REPOSITORY}" != "Mudlet/Mudlet" ] && [ "${GITHUB_REPOSITORY}" != "vadi2/Mudlet" ]; } then
   exit 0
 fi
 

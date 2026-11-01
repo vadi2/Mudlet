@@ -26,11 +26,10 @@
 
 #include "ActionUnit.h"
 #include "Host.h"
+#include "TConsoleFrontend.h"
 #include "TConsoleModel.h"
 #include "TDebug.h"
-#include "TEasyButtonBar.h"
 #include "TLuaInterpreter.h"
-#include "TToolBar.h"
 #include "utils.h"
 
 #include <QColor>
@@ -55,25 +54,22 @@ TAction::TAction(const QString& name, Host* pHost)
 
 TAction::~TAction()
 {
+    // Each child's removal redraws the bars, which draw this action as a menu
+    // of its children; ~Tree() would delete them only once this action's own
+    // members and QObject were gone. Done even without a host, as the editor
+    // clears only this action's before deleting it, not its children's.
+    while (!mpMyChildrenList->empty()) {
+        delete mpMyChildrenList->front();
+    }
     if (mpHost) {
         mpHost->getActionUnit()->unregisterAction(this);
 
-        if (isTemporary()) {
-            if (mScript.isEmpty()) {
-                mpHost->mLuaInterpreter.delete_luafunction(this);
-            } else {
-                mpHost->mLuaInterpreter.delete_luafunction(mFuncName);
-            }
+        if (isTemporary() && !mScript.isEmpty()) {
+            mpHost->mLuaInterpreter.delete_luafunction(mFuncName);
         }
     }
 
-    if (mpToolBar) {
-        mpToolBar->hide();
-    }
-
-    if (mpEasyButtonBar) {
-        mpEasyButtonBar->hide();
-    }
+    deleteChildren();
 }
 
 bool TAction::registerAction()
@@ -159,6 +155,11 @@ void TAction::execute()
         }
     }
 
+    runScript();
+}
+
+void TAction::runScript()
+{
     // Recorded before the compile step below, which returns early on failure
     mpHost->mainConsoleModel().mButtonState = (mButtonState ? 2 : 1);
 
@@ -172,7 +173,7 @@ void TAction::execute()
     // Whilst this frame is on the stack ActionUnit::uninstall() must defer
     // deleting this profile's actions: the script run below can uninstall its
     // own package (e.g. a "reload package" button calling uninstallPackage())
-    // and freeing this TAction mid-execute() is a use-after-free - the members
+    // and freeing this TAction mid-runScript() is a use-after-free - the members
     // read after the call would be dangling. The guard defers that delete past
     // the last member access here; see ActionUnit::mProcessingDepth.
     ActionUnit* pUnit = mpHost->getActionUnit();
@@ -191,10 +192,8 @@ void TAction::setName(const QString& name)
     if (name != mName) {
         setDataChanged();
         mName = name;
-        if (mpToolBar) {
-            // Need to revise the objectName and displayed name in the titlebar
-            // if floating and the main window context menu:
-            mpToolBar->setName(name);
+        if (mpHost) {
+            mpHost->consoleFrontend()->renameActionToolBar(this, name);
         }
     }
 }

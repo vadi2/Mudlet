@@ -55,6 +55,8 @@
 
 #include <optional>
 
+using namespace std::chrono_literals;
+
 extern "C" {
 #if defined(INCLUDE_VERSIONED_LUA_HEADERS)
 #include <lua5.1/lauxlib.h>
@@ -316,7 +318,7 @@ private slots:
 
     // Where the fence stops. A member the export drops for any reason other than
     // its value type still rides along, and its siblings with it: the 10,000-item
-    // cap and the one-copy-per-saved-name rule are deliberate size limits, not
+    // cap and the one-copy-per-shared-object rule are deliberate size limits, not
     // "this cannot be saved at all", and turning them into whole-variable
     // fallbacks would lose more data than they save. XMLexportVariablesTest pins
     // the drops themselves.
@@ -325,7 +327,7 @@ private slots:
         QVERIFY2(!mHasImported, "a test that imports a profile was declared before the ones that must run without it");
         VarUnit* vu = mpHost->getLuaInterface()->getVarUnit();
         QCOMPARE(runLua(qsl("qaReferenceKey = {a = 1} qaReferenceKey[{}] = 'reference member value' "
-                            "qaSharedMember = {first = {b = 2}} qaSharedMember.second = qaSharedMember.first")),
+                            "qaSharedMember = {first = setmetatable({b = 2}, {})} qaSharedMember.second = qaSharedMember.first")),
                  QString());
         vu->savedVars.insert(qsl("qaReferenceKey"));
         vu->savedVars.insert(qsl("qaSharedMember"));
@@ -333,7 +335,7 @@ private slots:
         const QString xml = exportProfileXml();
         QVERIFY(!xml.isEmpty());
         QCOMPARE(exportedMemberNames(xml, qsl("qaReferenceKey")), QStringList{qsl("a")});
-        // whichever of the two names for that one table pairs() reaches first is
+        // whichever of the two names for that one object pairs() reaches first is
         // the one written, so only its count is deterministic
         QCOMPARE(exportedMemberNames(xml, qsl("qaSharedMember")).size(), 1);
     }
@@ -472,7 +474,7 @@ private:
         }
 
         QSignalSpy spy2(&(host->mTelnet), &cTelnet::signal_connected);
-        if (!spy2.wait(1000)) {
+        if (!spy2.wait(1s)) {
             QFAIL("Could not connect with the host.");
         }
     }

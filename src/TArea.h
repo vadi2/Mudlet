@@ -55,6 +55,8 @@ public:
     ~TArea();
     int getAreaID();
     void addRoom(int id);
+    // Rebuilds the indexes and extents once at the end, rather than updating them per room
+    void addRooms(const QSet<int>& ids);
     const QSet<int>& getAreaRooms() const { return rooms; }
     const QList<int> getAreaExitRoomIds() const { return mAreaExits.uniqueKeys(); }
     const QMultiMap<int, QPair<QString, int>> getAreaExitRoomData() const;
@@ -121,24 +123,18 @@ public:
     // this area.
     void refreshAreaExitsToRoom(int);
     void removeRoom(int);
-    // List of coordinate triples (x,y,z) where there are multiple rooms
+    // Each (x,y,z) shared by more than one room, once, ordered by z then y then x
     QList<std::tuple<int, int, int>> getCollisionNodes();
     QList<int> getRoomsByPosition(int x, int y, int z);
-    /*
-     * Outer key: z coordinate,
-     * Middle key: y coordinate
-     * Inner key: x coordinate
-     * Inner value: is roomId:
-     */
-    QMap<int, QMap<int, QMultiMap<int, int>>> koordinatenSystem();
     int createLabelId() const;
     void writeJsonArea(QJsonArray&) const;
-    std::pair<int, QString> readJsonArea(const QJsonArray&, const int);
+    std::pair<int, QString> readJsonArea(const QJsonArray&, const int, QStringList& droppedRoomWarnings);
     QList<int> getPermanentLabelIds() const;
     bool hasPermanentLabels() const;
     qreal get2DMapZoom() const { return mLast2DMapZoom; }
     void set2DMapZoom(const qreal zoom);
     void clean();
+    static void dropFileOnlyUserData(QMap<QString, QString>& userData);
 
 
     QSet<int> rooms; // rooms of this area

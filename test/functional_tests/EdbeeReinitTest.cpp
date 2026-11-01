@@ -35,6 +35,7 @@
 #include "PortableModeTestHelper.h"
 #include "ProfileTestHelper.h"
 #include "Host.h"
+#include "HostDialogs.h"
 #include "MudletInstanceCoordinator.h"
 #include "TelnetServerStub.h"
 #include "ctelnet.h"
@@ -89,7 +90,7 @@ private:
         }
 
         QSignalSpy spy2(&(mpHost->mTelnet), &cTelnet::signal_connected);
-        if (!spy2.wait(2000)) {
+        if (!spy2.wait(2s)) {
             QFAIL("Could not connect with the host.");
         }
     }
@@ -147,7 +148,7 @@ private slots:
         QVERIFY2(luaGrammar, "Lua grammar gone after mudlet reconstruction - initEdbee()'s once-guard left edbee unprimed");
         // the editor picks its grammar by filename, so that path must agree
         QCOMPARE(edbee->grammarManager()->detectGrammarWithFilename(qsl("Buck.lua")), luaGrammar);
-        QVERIFY2(edbee->themeManager()->theme(qsl("Mudlet")), "Mudlet editor theme gone after mudlet reconstruction");
+        QVERIFY2(edbee->themeManager()->theme(MudletApp::scmEditorThemeNameLight), "Mudlet editor theme gone after mudlet reconstruction");
 
         startProfile(mProfileName, mLocalhost, mPort);
         if (QTest::currentTestFailed()) {
@@ -156,7 +157,7 @@ private slots:
 
         mudlet::self()->slot_showScriptDialog();
         QTest::qWait(100ms);
-        QVERIFY2(mpHost->mpEditorDialog, "Script editor did not open on the reconstructed mudlet instance");
+        QVERIFY2(HostDialogs::of(mpHost).mpEditorDialog, "Script editor did not open on the reconstructed mudlet instance");
     }
 };
 

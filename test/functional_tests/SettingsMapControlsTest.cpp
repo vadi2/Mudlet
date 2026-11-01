@@ -31,6 +31,7 @@
 #include <QTemporaryDir>
 #include <QtTest/QtTest>
 
+#include <QApplication>
 #include <QPushButton>
 #include <QScopeGuard>
 #include <QSpinBox>
@@ -164,14 +165,60 @@ private slots:
         QVERIFY2(pWhite->styleSheet().contains(QColor(QColorConstants::White).name()), qPrintable(qsl("the reset left the map colour button showing the old colour: '%1'").arg(pWhite->styleSheet())));
     }
 
+    // The map draws environments 257 to 272 from its own copy of the sixteen
+    // ANSI map colours, so a reset that skips that copy leaves the rooms drawn
+    // in the old colours while the buttons show the defaults (#10679).
+    void test_resettingTheMapColoursReachesTheMapEnvironments()
+    {
+        const QColor priorRed = mpHost->mRed_2;
+        const auto restoreColours = qScopeGuard([this, priorRed]() {
+            mpHost->mRed_2 = priorRed;
+            mpHost->mpMap->restore16ColorSet();
+        });
+
+        const QColor pickedRed(10, 20, 30);
+        mpHost->mRed_2 = pickedRed;
+        mpHost->mpMap->restore16ColorSet();
+        QCOMPARE(mpHost->mpMap->mCustomEnvColors.value(257), pickedRed);
+        QVERIFY2(openPreferences(), "the settings dialog never appeared");
+
+        mpPreferences->reset_colors_button_2->click();
+
+        QCOMPARE(mpHost->mRed_2, QColor(QColorConstants::DarkRed));
+        QCOMPARE(mpHost->mpMap->mCustomEnvColors.value(257), QColor(QColorConstants::DarkRed));
+    }
+
+    // macOS's native colour panel hands the activation to the main window as
+    // it closes, cancelled or not, so after every colour dialog the settings
+    // take it back and the well that was clicked takes the keyboard. The
+    // dialog itself is modal and native, so it is the step after it that is
+    // tested here, with the main window holding the activation as the panel
+    // leaves it.
+    void test_theSettingsTakeTheActivationBackAfterAColourDialog()
+    {
+        QVERIFY2(openPreferences(), "the settings dialog never appeared");
+        mpPreferences->setTab(qsl("mapper"));
+        QPushButton* pWell = mpPreferences->pushButton_mapInfoBg;
+        QVERIFY2(pWell->isVisible(), "the map info background well is not on show");
+
+        mudlet::self()->show();
+        mudlet::self()->activateWindow();
+        QTRY_COMPARE(QApplication::activeWindow(), mudlet::self());
+        QVERIFY(QApplication::focusWidget() != pWell);
+
+        mpPreferences->returnFromColourDialog(pWell);
+        QTRY_COMPARE(QApplication::activeWindow(), mpPreferences);
+        QCOMPARE(QApplication::focusWidget(), pWell);
+    }
+
     // The spin box counts in tenths of a room, and the profile and the 2D map
     // have to end up holding the same size - the widget was once handed the
     // spin box's own number, so the map drew rooms ten times too big (#8513).
     void test_theRoomSizeControlGivesTheMapTheSameSizeAsTheProfile()
     {
         mpHost->showHideOrCreateMapper(true);
-        QVERIFY2(mpHost->mpMap && mpHost->mpMap->mpMapper && mpHost->mpMap->mpMapper->mp2dMap, "the mapper left no 2D map for the room size to reach");
-        T2DMap* p2dMap = mpHost->mpMap->mpMapper->mp2dMap;
+        QVERIFY2(mpHost->mpMap && mpHost->mpMap->mapper() && mpHost->mpMap->mapper()->mp2dMap, "the mapper left no 2D map for the room size to reach");
+        T2DMap* p2dMap = mpHost->mpMap->mapper()->mp2dMap;
 
         const double priorSize = p2dMap->rSize;
         // setRoomSize() writes the profile as well, so this puts both back
