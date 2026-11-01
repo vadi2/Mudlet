@@ -83,7 +83,7 @@ private:
         QCoreApplication::processEvents();
         pWidget->setAttribute(Qt::WA_UnderMouse, over);
         if (over) {
-            QEnterEvent entered(QPointF(at), QPointF(at), QPointF(pWidget->mapToGlobal(at)));
+            QEnterEvent entered{QPointF(at), QPointF(at), QPointF(pWidget->mapToGlobal(at))};
             QApplication::sendEvent(pWidget, &entered);
             QHoverEvent hovered(QEvent::HoverEnter, QPointF(at), QPointF(at), QPointF(-1, -1));
             QApplication::sendEvent(pWidget, &hovered);
