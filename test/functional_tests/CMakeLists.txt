@@ -719,6 +719,10 @@ set_tests_properties(DebugConsoleFilterTest PROPERTIES TIMEOUT 300)
 # times per method, so it needs a longer timeout
 set_tests_properties(TelnetReconnectStateTest PROPERTIES TIMEOUT 300)
 
+# These sweep the editor across every width, or repaint whole windows in both appearances,
+# and ran past the default 60s on the macOS arm64 runner while every method still passed
+set_tests_properties(EditorToolBarOverflowTest ReadabilityAuditTest PROPERTIES TIMEOUT 300)
+
 # MsdpMalformedDiagnosticTest creates a fresh profile per test method, so it needs a longer timeout
 set_tests_properties(MsdpMalformedDiagnosticTest PROPERTIES TIMEOUT 300)
 
