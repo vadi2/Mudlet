@@ -106,6 +106,9 @@ jobs:
         ccache --show-compression
 
     - name: (Windows) Run QTest
+      id: win_ctest
+      # FORK ONLY: package and upload the test build even when tests fail; the job still fails below
+      continue-on-error: true
       shell: msys2 {0}
       run: |
         LUA_PATH=$(luarocks --lua-version 5.1 path --lr-path)
@@ -123,6 +126,8 @@ jobs:
         MUDLET_MEDIA_TESTS_REQUIRE_PLAYBACK: 1
 
     - name: (Windows) Run Lua tests
+      id: win_lua
+      continue-on-error: true
       timeout-minutes: 20
       shell: msys2 {0}
       env:
@@ -181,6 +186,8 @@ jobs:
         $GITHUB_WORKSPACE/build-$MSYSTEM/release/mudlet.exe --profile "Mudlet self-test" --offline
 
     - name: Passed Lua tests
+      id: win_lua_result
+      continue-on-error: true
       shell: msys2 {0}
       run: |
         if [ -e $TEMP/busted-tests-failed ]
@@ -384,3 +391,11 @@ jobs:
       # --retry-all-errors: curl 7.81 on ubuntu-22.04 never retries under --fail-with-body without it
       run: curl --fail-with-body --retry 5 --retry-all-errors -X POST "https://make.mudlet.org/snapshots/gha_queue.php?artifact_name=${{env.ARTIFACT_NAME}}&unzip=${{env.ARTIFACT_UNZIP}}"
 
+    - name: Passed tests
+      if: >-
+        steps.win_ctest.outcome == 'failure' || steps.win_lua.outcome == 'failure'
+        || steps.win_lua_result.outcome == 'failure'
+      shell: msys2 {0}
+      run: |
+        echo "Tests failed - see '(Windows) Run QTest' and '(Windows) Run Lua tests' above for detailed output."
+        exit 1
