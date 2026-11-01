@@ -145,7 +145,7 @@ else
 fi
 
 # Check if we're building from the Mudlet/Mudlet repository and not a fork
-if [[ "${GITHUB_REPO_NAME}" != "Mudlet/Mudlet" ]]; then
+if [[ "${GITHUB_REPO_NAME}" != "Mudlet/Mudlet" && "${GITHUB_REPO_NAME}" != "vadi2/Mudlet" ]]; then
   exit 3
 fi
 
