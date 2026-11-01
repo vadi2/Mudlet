@@ -422,7 +422,10 @@ jobs:
         DEPLOY: ${{matrix.deploy}}
 
     - name: (Linux) Run C++ tests
+      id: linux_ctest
       if: runner.os == 'Linux' && matrix.run_tests == 'true'
+      # FORK ONLY: package and upload the test build even when tests fail; the job still fails below
+      continue-on-error: true
       working-directory: '${{runner.workspace}}/b/ninja'
       run: ctest --output-on-failure -j $(nproc)
       env:
@@ -743,7 +746,6 @@ jobs:
       uses: actions/upload-artifact@v7
       if: >-
         !cancelled() && env.UPLOAD_FILENAME
-        && (runner.os != 'macOS' || matrix.run_tests != 'true' || steps.tests.outputs.ctest == '0')
       with:
         name: ${{env.UPLOAD_FILENAME}}
         path: ${{env.FOLDER_TO_UPLOAD}}
@@ -783,6 +785,12 @@ jobs:
         cat "${{runner.temp}}/telnet-fixture.log" 2>/dev/null || true
         echo "--- what it captured ---"
         cat "${{runner.temp}}/mudlet-telnet-fixture/capture.json" 2>/dev/null || true
+
+    - name: Passed C++ tests
+      if: steps.linux_ctest.outcome == 'failure'
+      run: |
+        echo "C++ tests failed - see '(Linux) Run C++ tests' above for detailed output."
+        exit 1
 
     - name: Passed Lua tests
       if: matrix.run_tests == 'true'
