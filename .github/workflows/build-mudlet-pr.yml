@@ -18,7 +18,7 @@ jobs:
   compile-mudlet:
     name: ${{matrix.buildname}}
     runs-on: ${{matrix.os}}
-    if: ${{ github.repository_owner == 'Mudlet' }}
+    if: ${{ (github.repository_owner == 'Mudlet' || github.repository_owner == 'vadi2') }}
     concurrency:
       group: ${{github.workflow}}-${{matrix.buildname}}-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -750,7 +750,8 @@ jobs:
 
     - name: Submit to make.mudlet.org
       if: >-
-        !cancelled() && env.UPLOAD_FILENAME && steps.upload.outcome == 'success'
+        github.repository_owner == 'Mudlet'
+        && !cancelled() && env.UPLOAD_FILENAME && steps.upload.outcome == 'success'
         && (runner.os != 'macOS' || matrix.run_tests != 'true' || steps.tests.outputs.ctest == '0')
       # --fail-with-body: gha_queue.php reports refusals (e.g. a duplicate artifact name after a
       # job re-run) as a 4xx with the reason in the body, which plain curl would exit 0 on

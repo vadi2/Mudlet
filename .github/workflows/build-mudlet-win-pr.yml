@@ -25,7 +25,7 @@ jobs:
   compile-mudlet:
     name: ${{matrix.buildname}}
     runs-on: ${{matrix.os}}
-    if: ${{ github.repository_owner == 'Mudlet' }}
+    if: ${{ (github.repository_owner == 'Mudlet' || github.repository_owner == 'vadi2') }}
     concurrency:
       group: ${{github.workflow}}-${{matrix.buildname}}-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -378,7 +378,7 @@ jobs:
 
     - name: Upload artifact to make.mudlet.org
       shell: msys2 {0}
-      if: env.ARTIFACT_NAME
+      if: github.repository_owner == 'Mudlet' && env.ARTIFACT_NAME
       # --fail-with-body: gha_queue.php reports refusals (e.g. a duplicate artifact name after a
       # job re-run) as a 4xx with the reason in the body, which plain curl would exit 0 on
       # --retry-all-errors: curl 7.81 on ubuntu-22.04 never retries under --fail-with-body without it
