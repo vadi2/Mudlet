@@ -98,7 +98,7 @@ public:
     bool isLinkConcealed(int linkId) const;
     QSet<int> trackedLinkIds() const;
     void removeLinksOnLine(int lineNumber);
-    void adjustLineNumbers(int deletedLineStart, int deletedLineCount);
+    QList<int> adjustLineNumbers(int deletedLineStart, int deletedLineCount);
     void clear();
 
 signals:
@@ -115,6 +115,7 @@ private:
     void performConcealment(TrackedHyperlink& link);
     void performReveal(TrackedHyperlink& link);
     void queueHiddenAnnouncement();
+    void announce(const QString& text);
 
     void processExpireTriggeredLinks(bool input, bool prompt, bool output);
 

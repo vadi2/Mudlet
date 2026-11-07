@@ -54,25 +54,25 @@ TKey::TKey(QString name, Host* pHost)
 
 TKey::~TKey()
 {
-    if (!mpHost) {
-        return;
-    }
-    mpHost->getKeyUnit()->unregisterKey(this);
+    if (mpHost) {
+        mpHost->getKeyUnit()->unregisterKey(this);
 
-    if (isTemporary()) {
-        if (mScript.isEmpty()) {
-            mpHost->mLuaInterpreter.delete_luafunction(this);
-        } else {
-            mpHost->mLuaInterpreter.delete_luafunction(mFuncName);
+        if (isTemporary()) {
+            if (mScript.isEmpty()) {
+                mpHost->mLuaInterpreter.delete_luafunction(mLuaFunctionRef);
+            } else {
+                mpHost->mLuaInterpreter.delete_luafunction(mFuncName);
+            }
         }
     }
+
+    deleteChildren();
 }
 
 void TKey::setName(const QString& name)
 {
-    if (!isTemporary()) {
-        mpHost->getKeyUnit()->mLookupTable.remove(mName, this);
-    }
+    // killKey() trusts this table to hold only current names of live keys
+    mpHost->getKeyUnit()->mLookupTable.remove(mName, this);
     mName = name;
     mpHost->getKeyUnit()->mLookupTable.insert(name, this);
 }
@@ -129,6 +129,26 @@ const TKey* TKey::firstMatch(const Qt::Key key, const Qt::KeyboardModifiers modi
     for (auto* childKeyNode : *mpMyChildrenList) {
         auto* childKey = static_cast<TKey*>(childKeyNode);
         if (const TKey* match = childKey->firstMatch(key, modifier)) {
+            return match;
+        }
+    }
+
+    return nullptr;
+}
+
+const TKey* TKey::firstBinding(const Qt::Key key, const Qt::KeyboardModifiers modifier) const
+{
+    if (!mpMyChildrenList) {
+        return nullptr;
+    }
+
+    if (!isFolder() && (mKeyCode == key) && (mKeyModifier == modifier)) {
+        return this;
+    }
+
+    for (auto* childKeyNode : *mpMyChildrenList) {
+        auto* childKey = static_cast<TKey*>(childKeyNode);
+        if (const TKey* match = childKey->firstBinding(key, modifier)) {
             return match;
         }
     }
@@ -214,7 +234,7 @@ bool TKey::setScript(const QString& script)
     // destructor would take its mScript-based branch and delete the compiled function.
     if (mRegisteredAnonymousLuaFunction) {
         if (mpHost) {
-            mpHost->mLuaInterpreter.delete_luafunction(this);
+            mpHost->mLuaInterpreter.delete_luafunction(mLuaFunctionRef);
         }
         mRegisteredAnonymousLuaFunction = false;
     }
@@ -244,7 +264,7 @@ void TKey::validateKeyBinding()
     if (!isFolder() && (mKeyCode == Qt::Key_unknown || mKeyCode == Qt::Key(0))) {
         mOK_init = false;
         //: Error shown in the editor when a key item has no key binding assigned
-        setError(QObject::tr("No key binding set. Click \"Grab New Key\" to assign one."));
+        setError(QObject::tr("No key binding set. Click the key field and press the keys to assign one."));
     } else {
         mOK_init = true;
     }
@@ -262,7 +282,7 @@ void TKey::execute()
     }
 
     if (mRegisteredAnonymousLuaFunction) {
-        mpHost->mLuaInterpreter.call_luafunction(this, mName);
+        mpHost->mLuaInterpreter.call_luafunction(mLuaFunctionRef, mName);
         return;
     }
 

@@ -29,6 +29,7 @@
 #include "PortableModeTestHelper.h"
 #include "ProfileTestHelper.h"
 #include "Host.h"
+#include "HostDialogs.h"
 #include "MudletInstanceCoordinator.h"
 #include "TLuaInterpreter.h"
 #include "TTrigger.h"
@@ -42,6 +43,8 @@
 
 #include "GroupedTest.h"
 
+using namespace std::chrono_literals;
+
 class StarterUiTriggerCostTest : public QObject
 {
     Q_OBJECT
@@ -54,8 +57,9 @@ private:
     const QString mLocalhost = qsl("localhost");
     quint16 mPort = 0;
 
-    // A full default-package profile measures 3: the starter UI's chat capture
-    // tree and its vitals prefilter, plus one folder from another package.
+    // A full default-package profile measures 4: the starter UI's chat capture
+    // tree, its vitals prefilter and its enemy condition trigger, plus one
+    // folder from another package.
     // Nesting hides growth from this count, so kMaxGatePatterns is what tracks
     // the per-line cost.
     static constexpr int kMaxRootTriggers = 5;
@@ -122,6 +126,7 @@ private slots:
                                     .arg(rootTriggers)));
 
         QVERIFY(luaTrue(host, qsl("#BaseUI.vitalsTriggerIds == 1")));
+        QVERIFY(luaTrue(host, qsl("BaseUI.conditionTriggerId ~= nil")));
         QVERIFY2(luaTrue(host, qsl("BaseUI.chatTriggersArmed()")), "the chat capture tree's gates did not come up armed");
     }
 
@@ -531,7 +536,7 @@ private:
     // same XML export/import as a package, so this covers both.
     QTreeWidget* triggerTreeWidget(Host* host)
     {
-        dlgTriggerEditor* editor = host->mpEditorDialog;
+        dlgTriggerEditor* editor = HostDialogs::of(host).mpEditorDialog;
         if (!editor) {
             return nullptr;
         }
@@ -836,7 +841,7 @@ __starterUi.shapeCount = BaseUI.vitalsShapeCount()
             QFAIL("No active host available for the test.");
         }
         QSignalSpy connected(&(host->mTelnet), &cTelnet::signal_connected);
-        if (!connected.wait(3000)) {
+        if (!connected.wait(3s)) {
             QFAIL("Could not connect to the stub.");
         }
     }

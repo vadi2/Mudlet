@@ -46,7 +46,10 @@
  *                                 as one chunk, which is what decides whether
  *                                 TriggerUnit treats it as a flood
  * Either changes what is being measured, so compare-perf-baseline.py refuses a
- * comparison across two runs that set them differently.
+ * comparison across two runs that set them differently. So does
+ *   MUDLET_BENCH_WRAP_AT=<n>      wrap the main console at n columns instead
+ *                                 of the profile's 100 in every slot, so that
+ *                                 most lines go through TBuffer::wrapLine()
  *
  * Companion for the live-GUI display/echo path is the Stressinator display
  * package; see docs/libmudlet-perf-baseline.md.
@@ -87,6 +90,7 @@
 #include "ProfileTestHelper.h"
 #include "Host.h"
 #include "MudletInstanceCoordinator.h"
+#include "TEncodingHelper.h"
 #include "TLuaInterpreter.h"
 #include "TMainConsole.h"
 #include "TTextEdit.h"
@@ -97,6 +101,8 @@
 #include "ctelnet.h"
 #include "dlgConnectionProfiles.h"
 #include "mudlet.h"
+
+using namespace std::chrono_literals;
 
 extern void qInitResources_mudlet();
 extern void qInitResources_qm();
@@ -122,6 +128,7 @@ private:
     QByteArray mCorpus;
     QByteArrayList mFeedChunks;
     int mWantedTriggers = 0;
+    int mWrapAt = 0;
     int mCorpusLines = 0;
     qint64 mCorpusBytes = 0;
     double mTextBestPassSeconds = 0.0;
@@ -133,7 +140,11 @@ private:
     // line limit sits far above what this corpus produces, so no pass is trimmed
     // away and every pass adds to the buffer.
     static constexpr int kCorpusLines = 25000;
+    // A new profile's main console width: MUDLET_BENCH_WRAP_AT set to it is the
+    // standard workload and has to compare as unset.
+    static constexpr int kProfileWrapAt = 100;
     static constexpr int kFeedPasses = 6;
+    static constexpr int kGmcpRounds = 3000;
     // Bump with any change to generateCorpus(). compare-perf-baseline.py reads
     // this as an invariant, so it refuses a cross-corpus comparison instead of
     // reporting the corpus difference as a code regression.
@@ -633,6 +644,76 @@ private:
         return best;
     }
 
+    static QByteArray gmcpFrame(const QByteArray& package, const QByteArray& json)
+    {
+        QByteArray frame;
+        frame.reserve(package.size() + json.size() + 6);
+        frame.append(TN_IAC).append(TN_SB).append(static_cast<char>(OPT_GMCP));
+        frame.append(package).append(' ').append(json);
+        frame.append(TN_IAC).append(TN_SE);
+        return frame;
+    }
+
+    // One read per prompt, IRE-shaped: vitals and room every prompt, a channel
+    // line every third, and a ~4KB inventory every tenth. Values change every
+    // round so nothing downstream can short-circuit on a repeat.
+    static QByteArrayList generateGmcpCorpus(int rounds, int& outMessages, qint64& outBytes)
+    {
+        static const char* const rooms[] = {"Village Square", "Dark Forest", "Ancient Tower", "Misty Harbour", "Goblin Warren"};
+        static const char* const items[] = {"a rusty sword", "a wooden shield", "a healing potion", "a silver ring", "a torn map", "a café au lait"};
+        QByteArrayList reads;
+        reads.reserve(rounds);
+        outMessages = 0;
+        outBytes = 0;
+        for (int round = 0; round < rounds; ++round) {
+            QByteArray read;
+            read += gmcpFrame("Char.Vitals",
+                              qsl("{\"hp\":\"%1\",\"maxhp\":\"4210\",\"mp\":\"%2\",\"maxmp\":\"3980\",\"ep\":\"16120\",\"maxep\":\"16200\",\"wp\":\"14000\",\"maxwp\":\"14100\",\"nl\":\"%3\",\"bal\":"
+                                  "\"1\",\"eq\":\"%4\",\"string\":\"H:%1/4210 M:%2/3980 E:16120/16200 W:14000/14100 NL:%3/100 \",\"charstats\":[\"Bleed: 0\",\"Rage: %5\"]}")
+                                      .arg(4210 - round % 900)
+                                      .arg(3980 - round % 700)
+                                      .arg(round % 100)
+                                      .arg(round % 2)
+                                      .arg(round % 37)
+                                      .toUtf8());
+            ++outMessages;
+            read += gmcpFrame("Room.Info",
+                              qsl("{\"num\":%1,\"name\":\"%2\",\"area\":\"the Township of "
+                                  "%2\",\"environment\":\"Urban\",\"coords\":\"45,%3,%4,0\",\"map\":\"www.example.com/irex/maps/clientmap.php?map=45&level=0 %3 "
+                                  "%4\",\"exits\":{\"n\":%5,\"e\":%6,\"s\":%7,\"w\":%8},\"details\":[\"shop\",\"bank\"],\"background\":\"#204060\"}")
+                                      .arg(10000 + round % 5000)
+                                      .arg(QLatin1String(rooms[round % 5]))
+                                      .arg(round % 40)
+                                      .arg(round % 30)
+                                      .arg(10001 + round % 5000)
+                                      .arg(10002 + round % 5000)
+                                      .arg(10003 + round % 5000)
+                                      .arg(10004 + round % 5000)
+                                      .toUtf8());
+            ++outMessages;
+            if (round % 3 == 0) {
+                read += gmcpFrame("Comm.Channel.Text",
+                                  qsl("{\"channel\":\"ct\",\"talker\":\"Gandalf\",\"text\":\"\\u001b[0;1;36m(The Township): Gandalf says, \\\"Meet me at the tower, round %1.\\\"\\u001b[0;37m\"}")
+                                          .arg(round)
+                                          .toUtf8());
+                ++outMessages;
+            }
+            if (round % 10 == 0) {
+                QStringList entries;
+                for (int i = 0; i < 60; ++i) {
+                    entries << qsl("{\"id\":\"%1\",\"name\":\"%2\",\"attrib\":\"%3\"}").arg(200000 + round * 61 + i).arg(QString::fromUtf8(items[(round + i) % 6])).arg(i % 4 ? qsl("t") : qsl("wW"));
+                }
+                read += gmcpFrame("Char.Items.List", qsl("{\"location\":\"inv\",\"items\":[%1]}").arg(entries.join(QLatin1Char(','))).toUtf8());
+                ++outMessages;
+            }
+            // The prompt that closes the read, so the text side runs as it does live.
+            read += qsl("H:%1 M:%2 ex-\n").arg(4210 - round % 900).arg(3980 - round % 700).toUtf8();
+            outBytes += read.size();
+            reads << read;
+        }
+        return reads;
+    }
+
     // Breaks only at line ends, so no line straddles two chunks. A non-positive
     // count is the default: the whole corpus as one piece.
     static QByteArrayList splitCorpus(const QByteArray& corpus, int linesPerChunk)
@@ -759,6 +840,10 @@ private slots:
         const int chunkBytes = positiveKnob("MUDLET_BENCH_CHUNK_BYTES");
         const int chunkLines = positiveKnob("MUDLET_BENCH_CHUNK_LINES");
         mWantedTriggers = positiveKnob("MUDLET_BENCH_TRIGGERS");
+        mWrapAt = positiveKnob("MUDLET_BENCH_WRAP_AT");
+        if (mWrapAt == kProfileWrapAt) {
+            mWrapAt = 0;
+        }
         if (QTest::currentTestFailed()) {
             return;
         }
@@ -790,6 +875,7 @@ private slots:
         // The value that took effect: a chunk size past the corpus is one chunk,
         // the same workload as unset, and has to compare as such.
         emitMetric("feed_chunk_lines", static_cast<qint64>(mFeedChunks.size() == 1 ? 0 : chunkLines));
+        emitMetric("bench_wrap_at", static_cast<qint64>(mWrapAt));
         // Invariants, emitted here so they are present regardless of which bench
         // slots run: the compare script rejects an ASan-vs-release comparison,
         // and a comparison across two different corpora or workloads.
@@ -844,7 +930,7 @@ private slots:
         // A silently-disconnected pipeline would report absurdly good numbers, so
         // prove data flowed: the console must hold thousands of lines rather than
         // just a login banner.
-        const int bufferedLines = host->mpConsole->buffer.getLastLineNumber();
+        const int bufferedLines = host->mainConsoleView()->buffer.getLastLineNumber();
         QVERIFY2(bufferedLines > 1000, qPrintable(qsl("console buffer only holds %1 lines - the pipeline did not process the corpus").arg(bufferedLines)));
 
         emitMetric("text_corpus_lines", static_cast<qint64>(mCorpusLines));
@@ -868,12 +954,148 @@ private slots:
         QVERIFY2(result.first, qPrintable(result.second));
 
         const double seconds = feedCorpusBestPass(host, kFeedPasses);
-        const int bufferedLines = host->mpConsole->buffer.getLastLineNumber();
+        const int bufferedLines = host->mainConsoleView()->buffer.getLastLineNumber();
         QVERIFY2(bufferedLines > 1000, qPrintable(qsl("console buffer only holds %1 lines - the pipeline did not process the corpus").arg(bufferedLines)));
 
         emitMetric("latin1_lines_per_sec", mCorpusLines / seconds);
         emitMetric("latin1_mb_per_sec", (mCorpusBytes / 1.0e6) / seconds);
         emitMetric("latin1_best_pass_ms", seconds * 1000.0);
+    }
+
+    // GMCP from the bytes to the gmcp table and its events, with no handler and
+    // then with one gmcp.Char handler: the per-message cost the text pipeline
+    // numbers never see.
+    void benchGmcp_data()
+    {
+        QTest::addColumn<bool>("withHandler");
+        QTest::newRow("bare") << false;
+        QTest::newRow("handler") << true;
+    }
+
+    void benchGmcp()
+    {
+        QFETCH(bool, withHandler);
+        Host* host = startProfile();
+        QVERIFY(host);
+        QVERIFY(noTriggersAreRunningYet(host));
+
+        int messages = 0;
+        qint64 bytes = 0;
+        QByteArrayList reads = generateGmcpCorpus(kGmcpRounds, messages, bytes);
+        TLuaInterpreter* lua = host->getLuaInterpreter();
+        QVERIFY(lua->compileAndExecuteScript(qsl("benchGmcpEvents = 0")));
+        if (withHandler) {
+            QVERIFY(lua->compileAndExecuteScript(qsl("registerAnonymousEventHandler('gmcp.Char', function() benchGmcpEvents = benchGmcpEvents + 1 end)")));
+        }
+
+        double best = std::numeric_limits<double>::max();
+        for (int pass = 0; pass < kFeedPasses; ++pass) {
+            QElapsedTimer timer;
+            timer.start();
+            for (QByteArray& read : reads) {
+                host->mTelnet.loopbackTest(read);
+            }
+            best = std::min(best, timer.nsecsElapsed() / 1.0e9);
+        }
+
+        // Proves the frames reached Lua whole: the last round's values, and the
+        // UTF-8 inside the inventory, must be what the tables hold. The last
+        // inventory is round 2990's, whose 4th item is the cafe.
+        const int lastRound = kGmcpRounds - 1;
+        QVERIFY(lua->compileAndExecuteScript(qsl("benchGmcpOk = (gmcp.Char.Vitals.hp == '%1' and gmcp.Room.Info.num == %2 and gmcp.Char.Items.List.items[60].name == 'a wooden shield' and "
+                                                 "gmcp.Char.Items.List.items[4].name == 'a caf\\195\\169 au lait' and "
+                                                 "gmcp.Comm.Channel.Text.text:find('round %3', 1, true) ~= nil) and 1 or 0")
+                                                     .arg(4210 - lastRound % 900)
+                                                     .arg(10000 + lastRound % 5000)
+                                                     .arg(lastRound - lastRound % 3)));
+        lua_State* L = lua->getLuaGlobalState();
+        lua_getglobal(L, "benchGmcpOk");
+        const int ok = static_cast<int>(lua_tointeger(L, -1));
+        lua_getglobal(L, "benchGmcpEvents");
+        const int events = static_cast<int>(lua_tointeger(L, -1));
+        lua_pop(L, 2);
+        QCOMPARE(ok, 1);
+        if (withHandler) {
+            const int charMessagesPerPass = kGmcpRounds + (kGmcpRounds + 9) / 10;
+            QCOMPARE(events, charMessagesPerPass * kFeedPasses);
+        }
+
+        const char* prefix = withHandler ? "gmcp_handler" : "gmcp";
+        emitMetric(qPrintable(qsl("%1_messages").arg(QLatin1String(prefix))), static_cast<qint64>(messages));
+        emitMetric(qPrintable(qsl("%1_bytes").arg(QLatin1String(prefix))), bytes);
+        emitMetric(qPrintable(qsl("%1_msgs_per_sec").arg(QLatin1String(prefix))), messages / best);
+        emitMetric(qPrintable(qsl("%1_best_pass_ms").arg(QLatin1String(prefix))), best * 1000.0);
+    }
+
+    void benchCjkDecode_data()
+    {
+        QTest::addColumn<QByteArray>("encoding");
+        QTest::addColumn<QString>("metric");
+        QTest::addColumn<QStringList>("phrases");
+        QTest::newRow("GBK") << QByteArray("GBK") << qsl("gbk")
+                             << QStringList{qsl("你看到一只凶猛的老虎向你扑来"), qsl("店小二笑眯眯地递给你一碗热腾腾的面条"), qsl("北边是一条幽静的小路"), qsl("你的内力恢复了一些")};
+        QTest::newRow("BIG5") << QByteArray("BIG5") << qsl("big5")
+                              << QStringList{qsl("你看到一隻兇猛的老虎向你撲來"), qsl("店小二笑瞇瞇地遞給你一碗熱騰騰的麵條"), qsl("北邊是一條幽靜的小路"), qsl("你的內力恢復了一些")};
+        QTest::newRow("EUC-KR") << QByteArray("EUC-KR") << qsl("euckr")
+                                << QStringList{qsl("사나운 호랑이가 당신에게 달려듭니다"),
+                                               qsl("주막 주인이 뜨거운 국수 한 그릇을 건넵니다"),
+                                               qsl("북쪽으로 조용한 오솔길이 있습니다"),
+                                               qsl("내공이 조금 회복되었습니다")};
+        QTest::newRow("SHIFT_JIS") << QByteArray("SHIFT_JIS") << qsl("sjis")
+                                   << QStringList{qsl("獰猛な虎があなたに飛びかかってきた"), qsl("宿屋の主人が熱いうどんを差し出した"), qsl("北には静かな小道が続いている"), qsl("気力が少し回復した")};
+    }
+
+    // Every CJK character goes through decodeMultibyteSequence(), which the
+    // single-byte and UTF-8 benchmarks never reach.
+    void benchCjkDecode()
+    {
+        QFETCH(QByteArray, encoding);
+        QFETCH(QString, metric);
+        QFETCH(QStringList, phrases);
+
+        // TEncodingHelper falls back to Qt5Compat when Qt has no ICU, the decoder fallback this also times
+        if (!TEncodingHelper::isEncodingAvailable(encoding)) {
+            QSKIP(qPrintable(qsl("this Qt cannot encode %1 to build the corpus").arg(QString::fromLatin1(encoding))));
+        }
+        QVERIFY2(TEncodingHelper::canEncode(phrases.join(qsl("，")) + qsl("。[HP 0123456789/1000]"), encoding), "a corpus phrase is not representable in this encoding");
+        std::mt19937 rng(0xC0FFEEu);
+        auto pick = [&rng](int n) {
+            return static_cast<int>(rng() % static_cast<unsigned>(n));
+        };
+        static constexpr int kCjkLines = 10000;
+        QByteArray corpus;
+        QString lastLine;
+        for (int i = 0; i < kCjkLines; ++i) {
+            // One pick per statement: the order arguments are evaluated in differs between compilers
+            const QString& first = phrases.at(pick(phrases.size()));
+            const QString& second = phrases.at(pick(phrases.size()));
+            const int hp = pick(900) + 100;
+            lastLine = qsl("%1，%2。[HP %3/1000]").arg(first, second).arg(hp);
+            corpus += "\x1b[3";
+            corpus += QByteArray::number(pick(7) + 1);
+            corpus += 'm';
+            corpus += TEncodingHelper::encode(lastLine, encoding);
+            corpus += "\x1b[0m\r\n";
+        }
+
+        Host* host = startProfile();
+        QVERIFY(host);
+        QVERIFY(noTriggersAreRunningYet(host));
+        const auto result = host->mTelnet.setEncoding(encoding, false);
+        QVERIFY2(result.first, qPrintable(result.second));
+
+        double best = std::numeric_limits<double>::max();
+        for (int i = 0; i < kFeedPasses; ++i) {
+            QElapsedTimer timer;
+            timer.start();
+            host->mTelnet.loopbackTest(corpus);
+            best = std::min(best, timer.nsecsElapsed() / 1.0e9);
+        }
+        TBuffer& buffer = host->mainConsoleView()->buffer;
+        QCOMPARE(buffer.line(buffer.getLastLineNumber() - 1), lastLine);
+
+        emitMetric(qPrintable(qsl("cjk_%1_lines_per_sec").arg(metric)), kCjkLines / best);
+        emitMetric(qPrintable(qsl("cjk_%1_best_pass_ms").arg(metric)), best * 1000.0);
     }
 
     void benchTriggerEngine()
@@ -895,7 +1117,7 @@ private slots:
         const quint64 prescansBefore = TriggerMatchPool::instance().prescanCount();
         const double seconds = feedCorpusBestPass(host, kFeedPasses);
         const quint64 prescans = TriggerMatchPool::instance().prescanCount() - prescansBefore;
-        const int bufferedLines = host->mpConsole->buffer.getLastLineNumber();
+        const int bufferedLines = host->mainConsoleView()->buffer.getLastLineNumber();
         QVERIFY2(bufferedLines > 1000, qPrintable(qsl("console buffer only holds %1 lines - the pipeline did not process the corpus").arg(bufferedLines)));
 
         // Untimed sentinel proving TriggerUnit consumes what the loopback path
@@ -973,7 +1195,7 @@ private slots:
                  "would describe something else entirely.");
 
         const double seconds = feedCorpusBestPass(host, kFeedPasses);
-        const int bufferedLines = host->mpConsole->buffer.getLastLineNumber();
+        const int bufferedLines = host->mainConsoleView()->buffer.getLastLineNumber();
         QVERIFY2(bufferedLines > 1000, qPrintable(qsl("console buffer only holds %1 lines - the pipeline did not process the corpus").arg(bufferedLines)));
 
         emitMetric("defaults_root_triggers", static_cast<qint64>(rootTriggers));
@@ -991,7 +1213,7 @@ private slots:
     // Qt's paint coalescing.
     //
     // Declared last on purpose: its render target and the paint path's cached
-    // screen pixmap would otherwise land between peak_rss_kb and
+    // screen buffers would otherwise land between peak_rss_kb and
     // defaults_peak_rss_kb, whose difference is what the default packages cost.
     void benchDisplay()
     {
@@ -1001,7 +1223,7 @@ private slots:
 
         // Real coloured, wide-glyph text to draw rather than blank rows.
         host->mTelnet.loopbackTest(mCorpus);
-        const int bufferedLines = host->mpConsole->buffer.getLastLineNumber();
+        const int bufferedLines = host->mainConsoleView()->buffer.getLastLineNumber();
         QVERIFY2(bufferedLines > 1000, qPrintable(qsl("console buffer only holds %1 lines - the pipeline did not process the corpus").arg(bufferedLines)));
 
         // Sized through the main window rather than the pane: TTextEdit takes its
@@ -1010,7 +1232,7 @@ private slots:
         // itself at a flattering speed.
         mudlet::self()->resize(kDisplayWindowWidth, kDisplayWindowHeight);
 
-        TTextEdit* pane = host->mpConsole->mUpperPane;
+        TTextEdit* pane = host->mainConsoleView()->mUpperPane;
         QVERIFY(pane);
         QVERIFY2(pane->visibleRegion().boundingRect().height() >= pane->height(),
                  qPrintable(qsl("the display pane is %1px tall but only %2px of it are unclipped, so this would time a partial redraw")
@@ -1021,7 +1243,7 @@ private slots:
 
         // scrollTo(line) draws the rows ending just ABOVE line, so `rows` is the
         // first argument that fills the pane. Advancing by more than one screenful
-        // per paint keeps drawForeground()'s scroll-blit shortcut from serving any
+        // per paint keeps drawForeground()'s scroll shortcut from serving any
         // part of a frame from the previous one, so every paint is a full redraw.
         const int stride = rows + 1;
         const int span = std::max(1, bufferedLines - rows);
@@ -1033,10 +1255,10 @@ private slots:
         pane->scrollTo(rows);
         pane->render(&target);
         // Proves text really reaches the pixmap, and keeps first-paint costs -
-        // glyph caches, the pane's own screen pixmap - out of the timed passes.
+        // glyph caches, the pane's own cached screen - out of the timed passes.
         QVERIFY2(frameHasContent(target.toImage()), "the rendered frame is a single flat colour - nothing was drawn, so the timings below would describe an empty widget");
 
-        // drawForeground() only skips its scroll-blit shortcut while the scroll
+        // drawForeground() only skips its scroll shortcut while the scroll
         // between two paints exceeds the rows on screen, and imageTopLine() is the
         // very offset it differences to decide that. Prove the stride clears it:
         // otherwise most of each frame is served from the previous one and the
@@ -1091,10 +1313,10 @@ private slots:
         QVERIFY(noTriggersAreRunningYet(host));
 
         host->mTelnet.loopbackTest(mCorpus);
-        const int bufferedLines = host->mpConsole->buffer.getLastLineNumber();
+        const int bufferedLines = host->mainConsoleView()->buffer.getLastLineNumber();
         QVERIFY2(bufferedLines > 1000, qPrintable(qsl("console buffer only holds %1 lines - the pipeline did not process the corpus").arg(bufferedLines)));
 
-        TTextEdit* pane = host->mpConsole->mUpperPane;
+        TTextEdit* pane = host->mainConsoleView()->mUpperPane;
         QVERIFY(pane);
 
         TailResult small;
@@ -1115,6 +1337,8 @@ private slots:
 
         emitMetric("display_tail_small_paint_ms", small.paintMs);
         emitMetric("display_tail_large_paint_ms", large.paintMs);
+        emitMetric("display_tail_small_window_paint_ms", small.windowPaintMs);
+        emitMetric("display_tail_large_window_paint_ms", large.windowPaintMs);
         // Cells drawn at each size: invariants, because two builds that drew
         // differently sized screens did not do the same work.
         emitMetric("display_tail_small_cells", static_cast<qint64>(small.cells));
@@ -1133,8 +1357,8 @@ private slots:
     //
     // Its guard on the cached screen is separate from the scroll shortcut's, and
     // when it rejects the cache the repaint falls through to that shortcut, which
-    // blits and then redraws nothing - so the damaged band is never drawn and the
-    // paint gets FASTER. Issue #10341 was exactly that, and both benchmarks above
+    // reuses the cache and redraws only below the band - so the band is never
+    // drawn and the paint gets FASTER. Issue #10341 was exactly that, and both benchmarks above
     // stayed flat through it - which is why this one exists. Reproducing it now
     // means reverting #10343 and running at a fractional QT_SCALE_FACTOR.
     void benchDisplayOverlay()
@@ -1144,10 +1368,10 @@ private slots:
         QVERIFY(noTriggersAreRunningYet(host));
 
         host->mTelnet.loopbackTest(mCorpus);
-        const int bufferedLines = host->mpConsole->buffer.getLastLineNumber();
+        const int bufferedLines = host->mainConsoleView()->buffer.getLastLineNumber();
         QVERIFY2(bufferedLines > 1000, qPrintable(qsl("console buffer only holds %1 lines - the pipeline did not process the corpus").arg(bufferedLines)));
 
-        TTextEdit* pane = host->mpConsole->mUpperPane;
+        TTextEdit* pane = host->mainConsoleView()->mUpperPane;
         QVERIFY(pane);
 
         OverlayResult small;
@@ -1175,6 +1399,89 @@ private slots:
         emitMetric("display_overlay_cache_reused", static_cast<qint64>((small.cacheReused && large.cacheReused) ? 1 : 0));
     }
 
+    // A real package's triggers - both those in its XML and the temporary ones its
+    // scripts make at load - against a corpus written for it, so the trigger
+    // engine is timed on a system players run rather than on a synthetic set.
+    // Opt-in: MUDLET_BENCH_PACKAGE names the package and
+    // MUDLET_BENCH_PACKAGE_CORPUS the bytes to feed, split into one read per
+    // IAC GA the way a game sends a prompt-terminated packet.
+    void benchPackage()
+    {
+        const QString packagePath = qEnvironmentVariable("MUDLET_BENCH_PACKAGE");
+        const QString corpusPath = qEnvironmentVariable("MUDLET_BENCH_PACKAGE_CORPUS");
+        if (packagePath.isEmpty() || corpusPath.isEmpty()) {
+            QSKIP("set MUDLET_BENCH_PACKAGE and MUDLET_BENCH_PACKAGE_CORPUS to time a package's triggers");
+        }
+        QFile corpusFile(corpusPath);
+        QVERIFY2(corpusFile.open(QIODevice::ReadOnly), qPrintable(qsl("cannot read %1").arg(corpusPath)));
+        const QByteArray corpus = corpusFile.readAll();
+        QVERIFY2(!corpus.isEmpty(), qPrintable(qsl("%1 is empty").arg(corpusPath)));
+        QByteArrayList packets;
+        const QByteArray goAhead("\xff\xf9");
+        qsizetype start = 0;
+        while (start < corpus.size()) {
+            const qsizetype ga = corpus.indexOf(goAhead, start);
+            const qsizetype end = ga < 0 ? corpus.size() : ga + goAhead.size();
+            packets << corpus.mid(start, end - start);
+            start = end;
+        }
+        // One packet would be the flood path, the opposite of what a prompt-driven game sends
+        QVERIFY2(packets.size() > 1, "the corpus has no IAC GA to split it into packets at");
+        const int corpusLines = static_cast<int>(corpus.count('\n'));
+
+        Host* host = startProfile();
+        QVERIFY(host);
+        QVERIFY(noTriggersAreRunningYet(host));
+
+        auto feedBestPass = [&](int passes) {
+            double best = std::numeric_limits<double>::max();
+            for (int i = 0; i < passes; ++i) {
+                QElapsedTimer timer;
+                timer.start();
+                for (QByteArray packet : packets) {
+                    host->mTelnet.loopbackTest(packet);
+                }
+                best = std::min(best, timer.nsecsElapsed() / 1.0e9);
+            }
+            return best;
+        };
+
+        const double textSeconds = feedBestPass(kFeedPasses);
+
+        const auto [installed, message] = host->installPackage(packagePath, enums::PackageModuleType::Package, true);
+        QVERIFY2(installed, qPrintable(message));
+        // sysInstall and sysInstallPackage are queued for a later turn of the event loop, and the
+        // package's handlers for them may make triggers of their own; zero timers run in queue order
+        bool installEventsRaised = false;
+        QTimer::singleShot(0ms, host, [&installEventsRaised] {
+            installEventsRaised = true;
+        });
+        QTRY_VERIFY(installEventsRaised);
+        // The install also queues a profile save, which would otherwise write through the timed passes
+        host->waitForProfileSave();
+        const auto [report, total, patterns, temporary, active, activePatterns] = host->getTriggerUnit()->assembleReport();
+        Q_UNUSED(report)
+        QVERIFY2(temporary > 0, "the package made no temporary triggers - its scripts did not run, so only half of it would be timed");
+        QVERIFY2(activePatterns > 0, "none of the package's triggers is active, so nothing would be matched");
+
+        const double triggerSeconds = feedBestPass(kFeedPasses);
+        TBuffer& buffer = host->mainConsoleView()->buffer;
+        const int bufferedLines = buffer.getLastLineNumber();
+        // A full scrollback drops a batch of its oldest lines, so a longer capture cannot all stay in it
+        const int expectedLines = std::min(corpusLines, buffer.mLinesLimit - buffer.mBatchDeleteSize);
+        QVERIFY2(bufferedLines >= expectedLines, qPrintable(qsl("console buffer only holds %1 lines - the pipeline did not process the corpus").arg(bufferedLines)));
+
+        emitMetric("pkg_corpus_lines", static_cast<qint64>(corpusLines));
+        emitMetric("pkg_corpus_packets", static_cast<qint64>(packets.size()));
+        emitMetric("pkg_triggers_total", static_cast<qint64>(total));
+        emitMetric("pkg_triggers_temporary", static_cast<qint64>(temporary));
+        emitMetric("pkg_triggers_active", static_cast<qint64>(active));
+        emitMetric("pkg_patterns_total", static_cast<qint64>(patterns));
+        emitMetric("pkg_text_best_pass_ms", textSeconds * 1000.0);
+        emitMetric("pkg_trigger_best_pass_ms", triggerSeconds * 1000.0);
+        emitMetric("pkg_trigger_overhead_ms", (triggerSeconds - textSeconds) * 1000.0);
+    }
+
 private:
     enum class DefaultPackages { Skip, Install };
 
@@ -1191,13 +1498,11 @@ private:
     // agreeing with itself long after the guard it was copied from started
     // rejecting the cache.
     //
-    // Blitting the cache is not on its own the answer, because the scroll
-    // shortcut below it blits the same pixmap and is what a build with a broken
-    // guard falls through to. The two are told apart by what they redraw: the
-    // cached-screen blit redraws the damaged band, the scroll shortcut starts
-    // from the bottom row and leaves the band as it found it. So the cache is
-    // marked twice, once outside the band and once inside it, and only the
-    // wanted path arrives with the first mark and without the second.
+    // Reusing the cache is not on its own the answer, because the scroll
+    // shortcut below it reuses the same cached screen and is what a build with
+    // a broken guard falls through to. Only the wanted path paints into
+    // mRenderBuffer, so it alone leaves the mark in the band redrawn there,
+    // while the cache keeps both of its marks.
     bool overlayPaintReusedCache(TTextEdit* pane, QPixmap& target, const QRect& band)
     {
         const QColor outsideMark(0, 255, 0);
@@ -1205,19 +1510,24 @@ private:
         const int insideRow = band.top() / pane->mFontHeight;
         markCacheRow(pane, 0, outsideMark);
         markCacheRow(pane, insideRow, insideMark);
+        // Otherwise a path that never touches it would leave an earlier probe's
+        // answer there to be read back.
+        pane->mRenderBuffer = QImage();
         pane->render(&target, QPoint(), QRegion(band));
 
-        const QImage painted = pane->mRenderBuffer.toImage();
+        const QImage painted = pane->mRenderBuffer.copy();
+        const QImage cached = pane->cachedScreen().copy();
         const int insideTop = qRound(insideRow * pane->mFontHeight * pane->devicePixelRatioF());
         const double insideMarkLeft = markedFraction(painted, insideTop, insideMark);
-        const bool cacheWasBlitted = markedFraction(painted, 0, outsideMark) > 0.9;
+        const bool cacheLeftAlone = markedFraction(cached, 0, outsideMark) > 0.9 && markedFraction(cached, insideTop, insideMark) > 0.9;
         const bool bandWasRedrawn = insideMarkLeft >= 0.0 && insideMarkLeft < 0.1;
-        return cacheWasBlitted && bandWasRedrawn;
+        return cacheLeftAlone && bandWasRedrawn;
     }
 
     static void markCacheRow(TTextEdit* pane, const int row, const QColor& colour)
     {
-        QPainter mark(&pane->mScreenMap);
+        QImage screen = pane->cachedScreen();
+        QPainter mark(&screen);
         mark.setCompositionMode(QPainter::CompositionMode_Source);
         mark.fillRect(QRect(0, row * pane->mFontHeight, pane->width(), pane->mFontHeight), colour);
     }
@@ -1249,6 +1559,7 @@ private:
     struct TailResult
     {
         double paintMs = 0.0;
+        double windowPaintMs = 0.0;
         // Character cells on screen. Proportional to the painted pixel area, and
         // unlike a pixel count it does not move with the platform's font metrics.
         double cells = 0.0;
@@ -1315,6 +1626,22 @@ private:
             best = std::min(best, timer.nsecsElapsed() / 1.0e9);
         }
         result.paintMs = (best / kDisplayTailPaints) * 1000.0;
+
+        // The same paints made the way the application makes them, through the
+        // window, where Qt also repaints whatever lies beneath the pane that the
+        // pane does not cover itself. render() only ever draws the pane.
+        QVERIFY2(pane->isVisible(), "the display pane is not on screen, so repainting it through the window would draw nothing");
+        best = std::numeric_limits<double>::max();
+        for (int pass = 0; pass < kDisplayPasses; ++pass) {
+            QElapsedTimer timer;
+            timer.start();
+            for (int i = 0; i < kDisplayTailPaints; ++i) {
+                pane->scrollTo(firstLine + i);
+                pane->repaint();
+            }
+            best = std::min(best, timer.nsecsElapsed() / 1.0e9);
+        }
+        result.windowPaintMs = (best / kDisplayTailPaints) * 1000.0;
     }
 
     // Fills `result` for the reason measureTailPaints() gives.
@@ -1344,18 +1671,18 @@ private:
         const QRect band(0, (result.rows / 3) * pane->mFontHeight, pane->width(), kDisplayOverlayBandRows * pane->mFontHeight);
         QVERIFY2(band.height() < pane->rect().height(), "the band covers the whole pane, so these would be full repaints rather than the partial ones this measures");
         QVERIFY2(band.top() >= pane->mFontHeight, "the band starts at the top row, leaving no row above it for the probe below to mark");
-        // Any of these makes drawForeground() write the repaint back to the
-        // cache, which swaps the two pixmaps and leaves the probe reading the
-        // pre-render cache rather than what was just painted - reporting 0 for a
+        // Any of these makes drawForeground() paint the cache itself instead of
+        // the scratch buffer, leaving the probe reading whatever the scratch
+        // held rather than what was just painted - reporting 0 for a
         // reason that has nothing to do with the paint path. The first two also
         // widen the redraw to the whole screen below the band, so the timings
         // would stop describing a band at all.
         QVERIFY2(!pane->mMouseTracking && !pane->mForceUpdate && pane->mDirtyFirstLine < 0,
-                 "a drag, a forced redraw or a pending dirty line is in progress, so this would measure a wider repaint than the band and read the wrong pixmap back");
+                 "a drag, a forced redraw or a pending dirty line is in progress, so this would measure a wider repaint than the band and read the wrong buffer back");
         // The probe marks the cache and reads the band back out of the buffer, so
         // a cache too small to carry the marks would report them missing - the
         // same answer as a rejected cache, arrived at for an unrelated reason.
-        QVERIFY2(!pane->mScreenMap.isNull() && pane->mScreenMap.height() >= qRound(band.bottom() * pane->devicePixelRatioF()),
+        QVERIFY2(pane->cachedScreen().height() >= qRound(band.bottom() * pane->devicePixelRatioF()),
                  "the cached screen is too small to mark, so the probe could not tell a rejected cache from an unreadable one");
 
         double best = std::numeric_limits<double>::max();
@@ -1405,8 +1732,18 @@ private:
             return nullptr;
         }
         QSignalSpy connected(&(host->mTelnet), &cTelnet::signal_connected);
-        if (!connected.wait(3000)) {
+        if (!connected.wait(3s)) {
             qWarning("Could not connect to the stub");
+            return nullptr;
+        }
+        if (mWrapAt > 0) {
+            host->getLuaInterpreter()->compileAndExecuteScript(qsl("setWindowWrap(\"main\", %1)").arg(mWrapAt));
+            if (host->mainConsoleView()->buffer.mWrapAt != mWrapAt) {
+                qWarning("MUDLET_BENCH_WRAP_AT did not take effect");
+                return nullptr;
+            }
+        } else if (host->mainConsoleView()->buffer.mWrapAt != kProfileWrapAt) {
+            qWarning("The main console does not wrap at kProfileWrapAt, which MUDLET_BENCH_WRAP_AT relies on");
             return nullptr;
         }
         return host;

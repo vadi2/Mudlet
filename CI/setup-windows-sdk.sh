@@ -101,7 +101,8 @@ echo ""
 echo "=== Installing needed packages ==="
 pacman_attempts=0
 while true; do
-  if /usr/bin/pacman -Su --needed --noconfirm \
+  # zlib 1.4-1 started shipping minizip's include/zip.h, which libzip also owns
+  if /usr/bin/pacman -Su --needed --noconfirm --overwrite "${MSYSTEM_PREFIX}/include/zip.h" \
     "${MINGW_PACKAGE_PREFIX}-qt6-base" \
     "${MINGW_PACKAGE_PREFIX}-qt6-multimedia" \
     "${MINGW_PACKAGE_PREFIX}-qt6-multimedia-wmf" \
@@ -112,6 +113,8 @@ while true; do
     "${MINGW_PACKAGE_PREFIX}-qt6-translations" \
     "${MINGW_PACKAGE_PREFIX}-qt6-tools" \
     "${MINGW_PACKAGE_PREFIX}-qt6-5compat" \
+    "${MINGW_PACKAGE_PREFIX}-qt6-websockets" \
+    "${MINGW_PACKAGE_PREFIX}-qt6-httpserver" \
     "${MINGW_PACKAGE_PREFIX}-angleproject" \
     "${MINGW_PACKAGE_PREFIX}-qtkeychain-qt6" \
     git \
@@ -155,6 +158,13 @@ while true; do
     exit 7
   fi
 done
+
+# Mudlet includes libzip's zip.h, so reinstall libzip last to make sure its copy is the one left
+/usr/bin/pacman -S --noconfirm --overwrite "${MSYSTEM_PREFIX}/include/zip.h" "${MINGW_PACKAGE_PREFIX}-libzip"
+if ! grep -q "zip_open" "${MSYSTEM_PREFIX}/include/zip.h"; then
+  echo "=== ${MSYSTEM_PREFIX}/include/zip.h is not libzip's, giving up ==="
+  exit 7
+fi
 
 echo ""
 echo "    Completed"

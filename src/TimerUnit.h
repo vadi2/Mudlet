@@ -26,6 +26,7 @@
 
 #include "utils.h"
 
+#include <QHash>
 #include <QList>
 #include <QMap>
 #include <QMultiMap>
@@ -63,6 +64,7 @@ public:
     void resetStats();
     void removeAllTempTimers();
     std::list<TTimer*> getTimerRootNodeList() { return mTimerRootNodeList; }
+    QMap<int, TTimer*> getTimerList() { return mTimerMap; }
     TTimer* getTimer(int id);
     TTimer* findFirstTimer(const QString&) const;
     std::vector<int> findItems(const QString& name, const bool exactMatch = true, const bool caseSensitive = true);
@@ -97,6 +99,9 @@ public:
     QList<TTimer*> uninstallList;
     QSet<TTimer*> mCleanupSet;
     bool hasPendingDeletes() const { return !mCleanupSet.isEmpty() || !uninstallList.isEmpty(); }
+    // Killed or uninstalled, itself or through an ancestor, but still in the lookup tables until doCleanup(),
+    // which an idle profile may not run for up to a minute
+    bool pendingDeletion(TTimer* pItem) const;
 
 private:
     TimerUnit() = default;
@@ -106,17 +111,25 @@ private:
     void addTimerRootNode(TTimer* pT, int parentPosition = -1, int childPosition = -1);
     void addTimer(TTimer* pT);
     void _removeTimerRootNode(TTimer* pT);
+    void listRootNode(TTimer* pT, std::list<TTimer*>::iterator before);
+    void unlistRootNode(TTimer* pT);
     void _removeTimer(TTimer*);
 
 
     QPointer<Host> mpHost;
     QMap<int, TTimer*> mTimerMap;
     std::list<TTimer*> mTimerRootNodeList;
+    // Where each root node sits in mTimerRootNodeList: std::list::remove() walks the whole list,
+    // which made freeing a batch of temporary timers quadratic
+    QHash<TTimer*, std::list<TTimer*>::iterator> mRootNodePositions;
     int mMaxID = 0;
     bool mModuleMember = false;
     // > 0 whilst a TTimer::execute() is on the call stack; uninstall() and
     // doCleanup() must not delete timers then - see the note above the class:
     int mProcessingDepth = 0;
+    // Ids of the timers with a script that does not compile whose QTimer the emergency stop stopped;
+    // the resume cannot activate() them, so it re-arms these and no others
+    QSet<int> mBrokenScriptTimersStopped;
     int statsActiveItems = 0;
     int statsItemsTotal = 0;
     int statsTempItems = 0;

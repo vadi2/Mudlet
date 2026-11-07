@@ -9,18 +9,68 @@ endif()
 
 find_package(Qt6 6.8.2 REQUIRED COMPONENTS Test Network Gui Widgets)
 
+# No test calls QFINDTESTDATA, and the checkout paths Qt Test would otherwise
+# define on every test compile keep ccache from sharing objects between worktrees
+set(QT_SKIP_DEFAULT_TESTCASE_DIRS ON)
+
 # On Windows Qt diverts QTest's stdout to OutputDebugString unless it believes
 # stderr has a console attached, which an MSYS2 shell or a CI runner does not give
 # it, so a failing test reports an exit code and nothing else (#9747). Deferred so
 # that tests registered further down the file are covered too; TESTS does not
-# descend into subdirectories, hence the second call in functional_tests.
+# descend into subdirectories, hence the second call in functional_tests. It also
+# puts the bundled lua51.dll's directory first on PATH.
 function(restore_windows_test_output)
     get_property(registeredTests DIRECTORY PROPERTY TESTS)
     foreach(testName ${registeredTests})
         set_property(TEST ${testName} APPEND PROPERTY ENVIRONMENT "QT_ASSUME_STDERR_HAS_CONSOLE=1")
+        # Unless built beside the bundled lua51.dll, a test would load the MSYS2
+        # one from PATH instead
+        if(WIN32 AND TARGET lua51)
+            set_property(TEST ${testName} APPEND PROPERTY ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:lua51>")
+        endif()
     endforeach()
 endfunction()
 cmake_language(DEFER CALL restore_windows_test_output)
+
+# LuaGlobal.lua needs the rocks luarocks installed (yajl first), and on Windows
+# nothing puts them on the embedded interpreter's search path unless whoever runs
+# ctest has exported LUA_PATH and LUA_CPATH themselves (#9749). Appended, so paths
+# already exported still come first, and ";;" keeps Lua's default paths.
+find_program(LUAROCKS_EXECUTABLE luarocks)
+if(LUAROCKS_EXECUTABLE)
+    set(luarocksCommand "${LUAROCKS_EXECUTABLE}")
+    cmake_path(GET LUAROCKS_EXECUTABLE EXTENSION luarocksExtension)
+    if(WIN32 AND NOT luarocksExtension)
+        # MSYS2's luarocks is a Lua script with no extension, which Windows cannot start
+        find_program(LUAROCKS_LUA_INTERPRETER lua)
+        set(luarocksCommand "${LUAROCKS_LUA_INTERPRETER}" "${LUAROCKS_EXECUTABLE}")
+    endif()
+    foreach(pathKind path cpath)
+        execute_process(COMMAND ${luarocksCommand} --lua-version 5.1 path --lr-${pathKind}
+            OUTPUT_VARIABLE luarocksPath
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE luarocksResult
+            ERROR_QUIET)
+        if(luarocksResult EQUAL 0 AND luarocksPath)
+            string(TOUPPER "${pathKind}" pathKindUpper)
+            # Escaped, as a test property is a list and Lua's separator is CMake's
+            string(REPLACE ";" "\\;" "MUDLET_TEST_LUA_${pathKindUpper}" "${luarocksPath}")
+        endif()
+    endforeach()
+endif()
+
+# Deferred, and per directory, for the same reason as restore_windows_test_output().
+function(add_luarocks_paths_to_tests)
+    get_property(registeredTests DIRECTORY PROPERTY TESTS)
+    foreach(testName ${registeredTests})
+        foreach(variable LUA_PATH LUA_CPATH)
+            if(MUDLET_TEST_${variable})
+                set_property(TEST ${testName} APPEND PROPERTY ENVIRONMENT_MODIFICATION "${variable}=string_append:\\;${MUDLET_TEST_${variable}}\\;\\;")
+            endif()
+        endforeach()
+    endforeach()
+endfunction()
+cmake_language(DEFER CALL add_luarocks_paths_to_tests)
 
 # Where a test's config root goes. CredentialManager and SecureStringUtils write
 # per-profile encryption keys and passwords under QStandardPaths::AppConfigLocation
@@ -55,6 +105,8 @@ function(sandbox_test_config_dirs)
     foreach(testName ${registeredTests})
         set(testConfigDir "${CMAKE_CURRENT_BINARY_DIR}/xdg-config/${testName}")
         set_property(TEST ${testName} APPEND PROPERTY ENVIRONMENT "XDG_CONFIG_HOME=${testConfigDir}")
+        # TLuaInterpreter::loadGlobal() writes its bytecode cache under CacheLocation
+        set_property(TEST ${testName} APPEND PROPERTY ENVIRONMENT "XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/xdg-cache/${testName}")
         if(APPLE)
             # CoreFoundation is handed a home directory rather than a config root,
             # and one that has to exist - Qt creates a config root on the way to
@@ -72,6 +124,12 @@ function(sandbox_test_config_dirs)
 endfunction()
 cmake_language(DEFER CALL sandbox_test_config_dirs)
 
+# Every test here that links the Mudlet library shares one executable, the way
+# the functional tests share one per subsystem: each link costs a build tree
+# ~340MB and a link step, and none of that is per-test. A new test goes in this
+# list and writes MUDLET_GROUPED_TEST_MAIN() (or MUDLET_GROUPED_TEST_GUILESS_MAIN())
+# rather than QTEST_MAIN(), with a class named after its file - see
+# functional_tests/GroupedTest.h. Each still runs as its own ctest case and process.
 set(UNIT_TESTS
     TEntityResolverTest
     TEntityHandlerTest
@@ -80,6 +138,7 @@ set(UNIT_TESTS
     TLinkStoreTest
     TMxpTagParserTest
     TMxpSendTagHandlerTest
+    TMxpLinkTagHandlerTest
     TMxpEntityTagHandlerTest
     TMxpFrameDestTagHandlerTest
     TMxpVersionTagTest
@@ -104,15 +163,30 @@ set(UNIT_TESTS
     TEncodingHelperTest
     PasswordMigrationTest
     TMediaPathTraversalTest
+    TAudioMixerMixTest
     ProfileNameValidationTest
+    XmlImportReaderTest
 )
 
+# The MCP server only lands in the Mudlet library when configured with USE_MCPSERVER, so
+# its test is gated the same way. Qt6::HttpServer reaches it through that library.
+if(USE_MCPSERVER)
+    list(APPEND UNIT_TESTS TMCPServerTest)
+    list(APPEND UNIT_TESTS TMCPBridgeTest)
+endif()
+
+mudlet_add_test_pch_provider(mudlet_unit_test_pch)
+
+list(TRANSFORM UNIT_TESTS APPEND .cpp OUTPUT_VARIABLE unitTestSources)
+add_executable(unit_tests ${CMAKE_CURRENT_SOURCE_DIR}/functional_tests/GroupedTestMain.cpp ${unitTestSources})
+target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/functional_tests)
+mudlet_reuse_test_pch(unit_tests mudlet_unit_test_pch)
+add_dependencies(unit_tests ${LIB_MUDLET_APP_TARGET})
+# mudlet_lsan_hooks has to be linked explicitly, see src/CMakeLists.txt
+target_link_libraries(unit_tests PRIVATE Qt6::Test ${LIB_MUDLET_APP_TARGET} mudlet_lsan_hooks)
+
 foreach(test_name ${UNIT_TESTS})
-    add_executable(${test_name} ${test_name}.cpp)
-    add_dependencies(${test_name} ${LIB_MUDLET_TARGET})
-    # mudlet_lsan_hooks has to be linked explicitly, see src/CMakeLists.txt
-    target_link_libraries(${test_name} PRIVATE Qt6::Test ${LIB_MUDLET_TARGET} mudlet_lsan_hooks)
-    add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)
+    add_test(NAME ${test_name} COMMAND $<TARGET_FILE:unit_tests> ${test_name})
     set_tests_properties(${test_name} PROPERTIES
         ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
     )
@@ -123,6 +197,16 @@ endforeach()
 # limit cases in TAreaGridIndexTest, which never return once a viewport scan
 # stops terminating.
 set_tests_properties(EventLoopPumpTest TAreaGridIndexTest PROPERTIES TIMEOUT 60)
+
+if(USE_MCPSERVER)
+    # The end-to-end cases pipe JSON-RPC through a real `mudlet --mcp-bridge` process,
+    # so the test needs the application binary itself, not just the library.
+    # On the one file that reads it, so the rest of the binary's objects stay
+    # free of build-tree paths and ccache can share them between worktrees.
+    set_property(SOURCE TMCPBridgeTest.cpp
+        APPEND PROPERTY COMPILE_DEFINITIONS MUDLET_BINARY_PATH="$<TARGET_FILE:mudlet_executable>")
+    add_dependencies(unit_tests mudlet_executable)
+endif()
 
 # TKeySequenceEditTest's focus traversal cases need an active window, which an X
 # server with no window manager never gives them, so a plain `xvfb-run ctest`
@@ -192,6 +276,23 @@ set_tests_properties(IrcMessageComposerTest PROPERTIES
     TIMEOUT 60
 )
 
+# The application style's kept Fusion title bar icons. Built from the one source it
+# covers, which needs nothing but Qt Widgets, and Qt D-Bus where it detects screen readers.
+add_executable(MudletProxyStyleDockTitleTest
+    MudletProxyStyleDockTitleTest.cpp
+    ${CMAKE_SOURCE_DIR}/src/MudletProxyStyle.cpp
+)
+target_include_directories(MudletProxyStyleDockTitleTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(MudletProxyStyleDockTitleTest PRIVATE Qt6::Test Qt6::Widgets)
+if(UNIX AND NOT APPLE)
+  find_package(Qt6 COMPONENTS DBus REQUIRED)
+  target_link_libraries(MudletProxyStyleDockTitleTest PRIVATE Qt6::DBus)
+endif()
+add_test(NAME MudletProxyStyleDockTitleTest COMMAND $<TARGET_FILE:MudletProxyStyleDockTitleTest>)
+set_tests_properties(MudletProxyStyleDockTitleTest PROPERTIES
+    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0;QT_QPA_PLATFORM=offscreen"
+)
+
 add_executable(CrashReportUploadTest
     CrashReportUploadTest.cpp
     ${CMAKE_SOURCE_DIR}/src/crash_reporter/sendCrashReport.cpp
@@ -205,7 +306,20 @@ set_tests_properties(CrashReportUploadTest PROPERTIES
 )
 
 # DiscordTest checks the Lua API permission gating contract by scanning the source
-target_compile_definitions(DiscordTest PRIVATE MUDLET_SRC_DIR="${CMAKE_SOURCE_DIR}/src")
+set_property(SOURCE DiscordTest.cpp APPEND PROPERTY COMPILE_DEFINITIONS MUDLET_SRC_DIR="${CMAKE_SOURCE_DIR}/src")
+# XmlImportReaderTest reads every package, profile and map XML in the source tree
+set_property(SOURCE XmlImportReaderTest.cpp APPEND PROPERTY COMPILE_DEFINITIONS MUDLET_SRC_DIR="${CMAKE_SOURCE_DIR}/src")
+
+# Which stores move the bundled Lua's write barrier, through the C API and the
+# sites no spec reaches. Links that Lua and nothing of Mudlet's.
+if(TARGET lua51)
+    add_executable(LuaWriteBarrierTest LuaWriteBarrierTest.cpp)
+    target_link_libraries(LuaWriteBarrierTest PRIVATE Qt6::Test lua51)
+    add_test(NAME LuaWriteBarrierTest COMMAND $<TARGET_FILE:LuaWriteBarrierTest>)
+    set_tests_properties(LuaWriteBarrierTest PROPERTIES
+        ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
+    )
+endif()
 
 # Build-file consistency check. Independent of the Mudlet library: it only reads
 # src/CMakeLists.txt and the src/ directory, so it does not link LIB_MUDLET_TARGET.
@@ -226,6 +340,18 @@ target_link_libraries(LuaFunctionListTest PRIVATE Qt6::Test)
 target_compile_definitions(LuaFunctionListTest PRIVATE MUDLET_SRC_DIR="${CMAKE_SOURCE_DIR}/src")
 add_test(NAME LuaFunctionListTest COMMAND $<TARGET_FILE:LuaFunctionListTest>)
 set_tests_properties(LuaFunctionListTest PROPERTIES
+    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
+)
+
+# Colours written out on the surfaces that have adopted the design language.
+# Reads those sources the same way, so it links nothing either.
+add_executable(DesignColourLiteralTest DesignColourLiteralTest.cpp)
+# Qt6::Gui for QColor::colorNames(), which is where the colour names it looks
+# for come from rather than a list kept by hand in the test
+target_link_libraries(DesignColourLiteralTest PRIVATE Qt6::Test Qt6::Gui)
+target_compile_definitions(DesignColourLiteralTest PRIVATE MUDLET_SRC_DIR="${CMAKE_SOURCE_DIR}/src")
+add_test(NAME DesignColourLiteralTest COMMAND $<TARGET_FILE:DesignColourLiteralTest>)
+set_tests_properties(DesignColourLiteralTest PROPERTIES
     ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
 )
 
@@ -325,6 +451,14 @@ endif()
 if(NOT WIN32)
     add_test(NAME ReleaseTagVersionTest
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/ci/release-tag-version-test.sh
+    )
+endif()
+
+# GitHub refuses release notes over its size limit, and a refused release publishes
+# nothing at all
+if(NOT WIN32)
+    add_test(NAME ReleaseNotesFitTest
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/ci/release-notes-fit-test.sh
     )
 endif()
 

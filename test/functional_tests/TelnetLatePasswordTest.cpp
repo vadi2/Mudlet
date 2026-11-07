@@ -33,6 +33,7 @@
 
 #include <QPointer>
 #include <QTemporaryDir>
+#include <QScopeGuard>
 #include <QtTest/QtTest>
 #include <QtNetwork/QTcpServer>
 #include <QtNetwork/QTcpSocket>
@@ -51,6 +52,7 @@
 #include "Host.h"
 #include "MudletInstanceCoordinator.h"
 #include "MudletApp.h"
+#include "TMainConsole.h"
 #include "ctelnet.h"
 #include "mudlet.h"
 
@@ -199,9 +201,9 @@ private:
     QString mPort; // assigned the stub's actual loopback port in init()
 
     // Long enough that the login is set on the loaded profile before the username timer reads it,
-    // short enough that four cases do not dominate the group's run time.
+    // and that a prompt sent after the login line arrives before the password step runs.
     static constexpr int csUsernameDelayMs = 800;
-    static constexpr int csPasswordDelayMs = 1200;
+    static constexpr int csPasswordDelayMs = 1000;
 
 private slots:
     void initTestCase()
@@ -284,11 +286,27 @@ private slots:
         host->send(qsl("look"));
         // Nothing to wait for, so give a send that should not happen the same margin as one that
         // should before concluding it did not:
-        QTest::qWait(500);
+        QTest::qWait(500ms);
         QCOMPARE(mpServer->receivedText(), csLoginLine);
 
         deliverLatePassword(host);
         QVERIFY2(waitForReceivedText(csLoginLine + csPasswordLine), "a command the game never saw disarmed the late password");
+    }
+
+    // The password goes out with no sysDataSendRequest, so no handler can mean to deny it
+    void testADenyOutsideASendRequestDoesNotDropThePassword()
+    {
+        const ScopedAutoLoginDelays delays(csUsernameDelayMs, csPasswordDelayMs);
+        Host* host = connectWithLoginAndNoPassword();
+        QVERIFY(host);
+
+        mpServer->sendRaw(csPasswordPrompt + csMaskOn);
+        QVERIFY2(waitForMasking(host, true), "the client never entered password-masking mode");
+        QVERIFY2(waitForThePasswordStep(host), "the auto-login never reached its password step");
+
+        QVERIFY(host->mLuaInterpreter.compileAndExecuteScript(qsl("denyCurrentSend()")));
+        deliverLatePassword(host);
+        QVERIFY2(waitForReceivedText(csLoginLine + csPasswordLine), "a denyCurrentSend() made outside a handler dropped the password");
     }
 
     // P3: a line-mode game that masks its login prompt as well as its password prompt has ECHO
@@ -309,9 +327,11 @@ private slots:
         QVERIFY2(waitForThePasswordStep(host), "the auto-login never reached its password step");
         QCOMPARE(mpServer->receivedText(), csLoginLine);
 
+        QVERIFY2(!host->mTelnet.mTimerCharacterModeDetect || !host->mTelnet.mTimerCharacterModeDetect->isActive(), "the login line started the character-at-a-time detection");
         // Past the detection window (CHARACTER_MODE_DETECT, 3 s), so a verdict the login line had
-        // started would have latched by now and refused the password below
-        QTest::qWait(3500);
+        // started some other way would have latched by now and refused the password below
+        QTest::qWait(3500ms);
+        QVERIFY(!host->mTelnet.mCharacterModeDetected);
 
         deliverLatePassword(host);
         QVERIFY2(waitForReceivedText(csLoginLine + csPasswordLine), "the late password was not sent to the still-masked password prompt");
@@ -402,7 +422,7 @@ private slots:
         deliverLatePassword(host);
         // Nothing to wait for, so give a send that should not happen the same margin as one that
         // should before concluding it did not:
-        QTest::qWait(500);
+        QTest::qWait(500ms);
         QCOMPARE(mpServer->receivedText(), csLoginLine + csCommandLine);
     }
 
@@ -422,7 +442,7 @@ private slots:
         host->mTelnet.cancelLoginTimers();
 
         deliverLatePassword(host);
-        QTest::qWait(500);
+        QTest::qWait(500ms);
         QCOMPARE(mpServer->receivedText(), csLoginLine);
         QVERIFY2(!consoleContains(host, qsl("too late for the automatic login")), "a login Mudlet is not driving was told about a password it never owed");
     }
@@ -441,7 +461,7 @@ private slots:
         QCOMPARE(mpServer->receivedText(), csLoginLine);
 
         deliverLatePassword(host);
-        QTest::qWait(500);
+        QTest::qWait(500ms);
         QCOMPARE(mpServer->receivedText(), csLoginLine);
         QVERIFY2(!consoleContains(host, qsl("too late for the automatic login")), "a profile that never had a password waiting was told one arrived too late");
     }
@@ -461,7 +481,7 @@ private slots:
         QCOMPARE(mpServer->receivedText(), csLoginLine);
 
         deliverLatePassword(host);
-        QTest::qWait(500);
+        QTest::qWait(500ms);
         QCOMPARE(mpServer->receivedText(), csLoginLine);
     }
 
@@ -471,6 +491,92 @@ private slots:
     // keychain that answers only when the test says so. A password is on its way - so the login
     // step arms the password step - while the lookup is out and after its deadline, until the
     // keychain answers; a refusal then is final.
+    // Every other test of the storage preference with a main window stands in for it with the testing
+    // override, so this is the one that reads it where the running application keeps it: Preferences ->
+    // Store passwords in.
+    void testTheCredentialManagerFollowsThePlayersStoragePreference()
+    {
+        CredentialManager::profileStorageOverrideForTesting().reset();
+
+        mudlet::self()->setStorePasswordsSecurely(false);
+        QCOMPARE(CredentialManager::profileStoragePreferred(), true);
+
+        mudlet::self()->setStorePasswordsSecurely(true);
+        QCOMPARE(CredentialManager::profileStoragePreferred(), false);
+    }
+
+    // A saved password the store will not hand over leaves auto-login sending nothing, which the player
+    // can only make sense of if told. The connection dialog hands over a typed password only after the
+    // profile's own lookup has answered, so it is decided at the password step.
+    void testAPasswordTheStoreWontReadIsReported_data()
+    {
+        QTest::addColumn<bool>("refused");
+        QTest::addColumn<QString>("login");
+        QTest::addColumn<QString>("typedPassword");
+        QTest::addColumn<bool>("reported");
+
+        QTest::newRow("nothing saved") << false << qsl("player") << QString() << false;
+        QTest::newRow("the store refused it") << true << qsl("player") << QString() << true;
+        QTest::newRow("refused, but typed in the connection dialog") << true << qsl("player") << qsl("typed-in-the-dialog") << false;
+        QTest::newRow("refused, with no login to send it after") << true << QString() << QString() << false;
+    }
+
+    void testAPasswordTheStoreWontReadIsReported()
+    {
+        QFETCH(bool, refused);
+        QFETCH(QString, login);
+        QFETCH(QString, typedPassword);
+        QFETCH(bool, reported);
+
+        const ScopedAutoLoginDelays delays(csUsernameDelayMs, csPasswordDelayMs);
+        Host* host = TestProfile::create(mHostname, qsl("localhost"), mPort, 20s);
+        QVERIFY(host);
+        host->setLogin(login);
+        host->setPass(QString());
+        const QString passwordFile = CredentialManager::generateFilePath(mHostname, qsl("character"));
+        const auto unblock = qScopeGuard([&passwordFile] {
+            QDir(passwordFile).removeRecursively();
+        });
+        if (refused) {
+            QVERIFY(QDir().mkpath(passwordFile));
+        }
+        host->lookUpSecuredPassword(new CredentialManager(host));
+        QVERIFY2(QTest::qWaitFor(
+                         [host]() {
+                             return !host->mSecuredPasswordPending;
+                         },
+                         2s),
+                 "the profile's lookup never answered");
+        QCOMPARE(host->mSecuredPasswordUnreadable, refused);
+        host->setPass(typedPassword);
+
+        const QString warning = qsl("Could not check for a saved password");
+        if (reported) {
+            QVERIFY2(waitForConsoleContains(host, warning), "a saved password the store would not hand over was not reported");
+        } else {
+            QVERIFY2(!waitForConsoleContains(host, warning, csUsernameDelayMs + 1000), "the player was told no password would be sent when that was not why");
+        }
+    }
+
+    // A lookup still out at the login step arms the password step for its password, so a refusal that
+    // comes back before that step is reported there
+    void testARefusalAfterTheLoginStepIsReportedAtThePasswordStep()
+    {
+        const ScopedAutoLoginDelays delays(csUsernameDelayMs, csPasswordDelayMs);
+        Host* host = TestProfile::create(mHostname, qsl("localhost"), mPort, 20s);
+        QVERIFY(host);
+        host->setLogin(qsl("player"));
+        host->setPass(QString());
+        host->mSecuredPasswordPending = true;
+        QVERIFY2(waitForReceivedText(csLoginLine, 15000), "the auto-login never sent the login line");
+
+        const QString warning = qsl("Could not check for a saved password");
+        QVERIFY2(!consoleContains(host, warning), "a password still on its way was reported as unreadable");
+        host->mSecuredPasswordPending = false;
+        host->mSecuredPasswordUnreadable = true;
+        QVERIFY2(waitForConsoleContains(host, warning, csPasswordDelayMs + 2000), "a refusal that came back after the login step was never reported");
+    }
+
     void testTheProfilesLookupKeepsAPasswordOnItsWayUntilTheKeychainAnswers()
     {
         Host* host = TestProfile::create(mHostname, qsl("localhost"), mPort, 20s);
@@ -486,10 +592,16 @@ private slots:
             reads->append(job);
             return false;
         };
-        // The keychain path is the one under test, and MUDLET_TEST_MODE puts CredentialManager on
-        // file storage - it is read as the lookup starts, so it can go straight back
+        // The keychain path is the one under test, and two things route CredentialManager away from
+        // it: MUDLET_TEST_MODE, and - since saved sign-ins began following the "Store passwords in"
+        // preference (#11029) - the preference this class turns off in init() so that no case can
+        // reach the real keychain by accident. Both are read as the lookup starts, so both go back
+        // immediately afterwards; the job hook above is what actually keeps the reads away from the
+        // machine's own store.
         qunsetenv("MUDLET_TEST_MODE");
+        mudlet::self()->setStorePasswordsSecurely(true);
         host->lookUpSecuredPassword(manager);
+        mudlet::self()->setStorePasswordsSecurely(false);
         qputenv("MUDLET_TEST_MODE", "1");
 
         QVERIFY2(!reads->isEmpty(), "the lookup never read the keychain, so this test cannot cover it");
@@ -500,9 +612,10 @@ private slots:
                          [&manager]() {
                              return manager.isNull();
                          },
-                         5000),
+                         5s),
                  "the lookup never answered at its deadline");
         QVERIFY2(host->hasAutoLoginCredentials(), "a lookup that timed out stopped the password step waiting for the answer it still owes");
+        QVERIFY2(!waitForConsoleContains(host, qsl("Could not check for a saved password"), 500), "a lookup still waiting on the keychain told the player it could not check");
 
         QPointer<QKeychain::Job> read = reads->constFirst();
         QVERIFY2(read, "the read the lookup gave up on was deleted before the keychain answered it");
@@ -563,7 +676,7 @@ private:
                 [host]() {
                     return host->mTelnet.mAutoLoginPasswordOutstanding;
                 },
-                8000);
+                8s);
     }
 
     // A password step that was never armed leaves no mark to wait for, so the cases about one wait
@@ -598,10 +711,10 @@ private:
     // it sits on happened to be broken part way through it.
     static bool consoleContains(Host* host, const QString& substring)
     {
-        if (!host || !host->mpConsole) {
+        if (!host || !host->mainConsoleView()) {
             return false;
         }
-        auto& buffer = host->mpConsole->buffer;
+        auto& buffer = host->mainConsoleView()->buffer;
         QString all;
         for (int i = 0; i <= buffer.getLastLineNumber(); ++i) {
             all.append(buffer.line(i));
@@ -619,10 +732,7 @@ private:
                 timeoutMs);
     }
 
-    void deleteProfileDirectory(const QString& profileName)
-    {
-        TestProfile::removeProfileDirectory(profileName);
-    }
+    void deleteProfileDirectory(const QString& profileName) { TestProfile::removeProfileDirectory(profileName); }
 };
 
 #include "TelnetLatePasswordTest.moc"

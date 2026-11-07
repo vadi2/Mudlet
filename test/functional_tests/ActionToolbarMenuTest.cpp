@@ -17,6 +17,8 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
+#include <algorithm>
+
 #include <QMenu>
 #include <QPushButton>
 #include <QTemporaryDir>
@@ -30,12 +32,15 @@
 #include "TAction.h"
 #include "TEasyButtonBar.h"
 #include "TFlipButton.h"
+#include "TMainConsole.h"
 #include "TToolBar.h"
 #include "TelnetServerStub.h"
 #include "ctelnet.h"
 #include "mudlet.h"
 
 #include "GroupedTest.h"
+
+using namespace std::chrono_literals;
 
 // A button group nested inside another button group is the only thing that
 // reaches TEasyButtonBar::fillMenu() and TToolBar::addActionToMenu(), and no
@@ -100,6 +105,17 @@ private:
         return group;
     }
 
+    // In the profile's default echo mode Host::send() echoes a command onto the
+    // main console, even if it skips the aliases. The echo can land on the end of
+    // a partial line such as a prompt, so any line containing the text counts.
+    static bool mainConsoleShows(Host* host, const QString& text)
+    {
+        const QStringList& lines = host->mainConsoleModel().buffer.lineBuffer;
+        return std::any_of(lines.cbegin(), lines.cend(), [&text](const QString& line) {
+            return line.contains(text);
+        });
+    }
+
     // Searched from the main window rather than the console, because a
     // location-4 toolbar is a dock on the window while a location-0 bar sits in
     // the console. TFlipButton has no Q_OBJECT, so findChildren<> it as its
@@ -131,15 +147,12 @@ private:
             QFAIL("No active host available for the test.");
         }
         QSignalSpy connected(&(host->mTelnet), &cTelnet::signal_connected);
-        if (!connected.wait(2000)) {
+        if (!connected.wait(2s)) {
             QFAIL("Could not connect with the host.");
         }
     }
 
-    static void deleteProfileDirectory(const QString& profileName)
-    {
-        TestProfile::removeProfileDirectory(profileName);
-    }
+    static void deleteProfileDirectory(const QString& profileName) { TestProfile::removeProfileDirectory(profileName); }
 
     static QStringList entryNames(const QMenu* menu)
     {
@@ -315,11 +328,249 @@ private slots:
         QCOMPARE(entryNames(inner), QStringList({qsl("menuTestEntry"), qsl("menuTestSubGroup")}));
     }
 
+    // A group drawn as a menu is recorded against the bar it is drawn on, so
+    // what is done to the group's bar by action is done to that whole bar.
+    void test_aButtonBarMenuGroupIsRecordedAgainstItsBar()
+    {
+        startProfile(mpHostname, mpLocalhost, mpPort);
+        auto* host = mudlet::self()->getActiveHost();
+        QVERIFY2(host, "No active host available for the test.");
+
+        auto* group = buildNestedGroup(host, 0);
+        host->getActionUnit()->updateAllToolbars();
+
+        auto* console = host->mainConsoleView();
+        auto* bar = console->actionEasyButtonBar(actionNamed(host, qsl("menuTestToolbar")));
+        QVERIFY(bar);
+        QCOMPARE(console->actionEasyButtonBar(group), bar);
+        QCOMPARE(console->actionEasyButtonBar(actionNamed(host, qsl("menuTestSubGroup"))), bar);
+    }
+
+    // The floating toolbar records every entry of its menus, not only groups.
+    void test_aFloatingToolbarMenuEntryIsRecordedAgainstItsToolbar()
+    {
+        startProfile(mpHostname, mpLocalhost, mpPort);
+        auto* host = mudlet::self()->getActiveHost();
+        QVERIFY2(host, "No active host available for the test.");
+
+        auto* group = buildNestedGroup(host, 4);
+        host->getActionUnit()->updateAllToolbars();
+
+        auto* console = host->mainConsoleView();
+        auto* toolBar = console->actionToolBar(actionNamed(host, qsl("menuTestToolbar")));
+        QVERIFY(toolBar);
+        QCOMPARE(console->actionToolBar(group), toolBar);
+        QCOMPARE(console->actionToolBar(actionNamed(host, qsl("menuTestSubEntry"))), toolBar);
+    }
+
+    // setButtonState() reaches both the button a floating toolbar draws a group
+    // as and the menu entry the group gets on it, including after the toolbar
+    // has been rebuilt with new ones.
+    void test_setButtonStateChecksAFloatingToolbarsButtonAndMenuEntry()
+    {
+        startProfile(mpHostname, mpLocalhost, mpPort);
+        auto* host = mudlet::self()->getActiveHost();
+        QVERIFY2(host, "No active host available for the test.");
+
+        auto* group = buildNestedGroup(host, 4);
+        group->setIsPushDownButton(true);
+        host->getActionUnit()->updateAllToolbars();
+        QPointer<TFlipButton> firstButton = findButtonWidget(group);
+        QVERIFY(firstButton);
+
+        group->setDataChanged();
+        host->getActionUnit()->updateAllToolbars();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        QVERIFY2(!firstButton, "rebuilding the toolbar should have replaced the group's button");
+
+        auto* button = findButtonWidget(group);
+        QVERIFY(button);
+        QVERIFY(button->menu());
+        QPointer<QAction> entry = entryNamed(button->menu(), qsl("menuTestGroup"));
+        QVERIFY(entry);
+        QVERIFY2(!button->isChecked() && !entry->isChecked(), "both have to start unchecked, or checking them proves nothing");
+
+        QVERIFY(host->mLuaInterpreter.compileAndExecuteScript(qsl("setButtonState(%1, true)").arg(group->getID())));
+        QVERIFY(button->isChecked());
+        QVERIFY(entry->isChecked());
+
+        QVERIFY(host->mLuaInterpreter.compileAndExecuteScript(qsl("setButtonState(%1, false)").arg(group->getID())));
+        QVERIFY(!button->isChecked());
+        QVERIFY(!entry->isChecked());
+    }
+
+    // The docked button bar: the group is a button, its children menu entries.
+    void test_setButtonStateChecksAButtonBarsButtonAndMenuEntry()
+    {
+        startProfile(mpHostname, mpLocalhost, mpPort);
+        auto* host = mudlet::self()->getActiveHost();
+        QVERIFY2(host, "No active host available for the test.");
+
+        auto* group = buildNestedGroup(host, 0);
+        group->setIsPushDownButton(true);
+        auto* entryAction = actionNamed(host, qsl("menuTestEntry"));
+        QVERIFY(entryAction);
+        entryAction->setIsPushDownButton(true);
+        host->getActionUnit()->updateAllToolbars();
+
+        auto* button = findButtonWidget(group);
+        QVERIFY(button);
+        QVERIFY(button->menu());
+        QPointer<QAction> entry = entryNamed(button->menu(), qsl("menuTestEntry"));
+        QVERIFY(entry);
+        QVERIFY2(!button->isChecked() && !entry->isChecked(), "both have to start unchecked, or checking them proves nothing");
+
+        QVERIFY(host->mLuaInterpreter.compileAndExecuteScript(qsl("setButtonState(%1, true)").arg(group->getID())));
+        QVERIFY(button->isChecked());
+        QVERIFY(!entry->isChecked());
+
+        QVERIFY(host->mLuaInterpreter.compileAndExecuteScript(qsl("setButtonState(%1, true)").arg(entryAction->getID())));
+        QVERIFY(entry->isChecked());
+    }
+
+    // A push-down button saved down is restored while the profile loads: its
+    // script runs, but its command belongs to a click and must not be sent or
+    // echoed.
+    void test_aPushDownButtonRestoredDownOnLoadRunsItsScriptWithoutSendingItsCommand()
+    {
+        startProfile(mpHostname, mpLocalhost, mpPort);
+        auto* host = mudlet::self()->getActiveHost();
+        QVERIFY2(host, "No active host available for the test.");
+
+        auto* master = makeAction(host, nullptr, qsl("pushDownTestPackage"), true);
+        master->mPackageName = qsl("pushDownTestPackage");
+        master->mModuleMasterFolder = true;
+        master->mLocation = 0;
+        auto* toolbar = makeAction(host, master, qsl("pushDownTestToolbar"), true);
+        toolbar->mLocation = 0;
+        auto* button = makeAction(host, toolbar, qsl("pushDownTestButton"), false);
+        button->setIsPushDownButton(true);
+        button->mButtonState = true;
+        button->setCommandButtonDown(qsl("QA_BUTTON_DOWN_COMMAND"));
+        QVERIFY(button->setScript(qsl("qaPushDownRan = (qaPushDownRan or 0) + 1")));
+        host->mInstalledPackages << qsl("pushDownTestPackage");
+
+        // Sending runs the command through the aliases, so one matching it sees any send
+        QVERIFY(host->mLuaInterpreter.compileAndExecuteScript(qsl("qaPushDownRan = nil; qaCommandSent = 0; "
+                                                                  "tempAlias([[^QA_BUTTON_DOWN_COMMAND$]], [[qaCommandSent = qaCommandSent + 1]])")));
+
+        host->mIsProfileLoadingSequence = true;
+        host->getActionUnit()->updateAllToolbars();
+        host->mIsProfileLoadingSequence = false;
+
+        QVERIFY2(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaPushDownRan == 1)")), "restoring the button on load did not run its script once");
+        QVERIFY2(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaCommandSent == 0)")), "restoring the button on load sent its command");
+        QVERIFY2(!mainConsoleShows(host, qsl("QA_BUTTON_DOWN_COMMAND")), "restoring the button on load echoed its command");
+    }
+
+    // A push-down button saved up is restored the same way: its script runs,
+    // seeing the button up, and its up command is not sent either
+    void test_aPushDownButtonRestoredUpOnLoadRunsItsScriptWithoutSendingItsCommand()
+    {
+        startProfile(mpHostname, mpLocalhost, mpPort);
+        auto* host = mudlet::self()->getActiveHost();
+        QVERIFY2(host, "No active host available for the test.");
+
+        auto* master = makeAction(host, nullptr, qsl("pushUpTestPackage"), true);
+        master->mPackageName = qsl("pushUpTestPackage");
+        master->mModuleMasterFolder = true;
+        master->mLocation = 0;
+        auto* toolbar = makeAction(host, master, qsl("pushUpTestToolbar"), true);
+        toolbar->mLocation = 0;
+        auto* button = makeAction(host, toolbar, qsl("pushUpTestButton"), false);
+        button->setIsPushDownButton(true);
+        button->mButtonState = false;
+        button->setCommandButtonDown(qsl("QA_UNUSED_DOWN_COMMAND"));
+        button->setCommandButtonUp(qsl("QA_BUTTON_UP_COMMAND"));
+        QVERIFY(button->setScript(qsl("qaPushUpRan = (qaPushUpRan or 0) + 1; qaPushUpState = getButtonState()")));
+        host->mInstalledPackages << qsl("pushUpTestPackage");
+
+        QVERIFY(host->mLuaInterpreter.compileAndExecuteScript(qsl("qaPushUpRan = nil; qaPushUpState = nil; qaUpCommandSent = 0; "
+                                                                  "tempAlias([[^QA_\\w+_COMMAND$]], [[qaUpCommandSent = qaUpCommandSent + 1]])")));
+        // getButtonState() starts at 1 (up), so start it down: only the restore can put it back up
+        host->mainConsoleModel().mButtonState = 2;
+
+        host->mIsProfileLoadingSequence = true;
+        host->getActionUnit()->updateAllToolbars();
+        host->mIsProfileLoadingSequence = false;
+
+        QVERIFY2(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaPushUpRan == 1)")), "restoring the button on load did not run its script once");
+        QVERIFY2(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaPushUpState == 1)")), "the button's script did not see it up");
+        QVERIFY2(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaUpCommandSent == 0)")), "restoring the button on load sent a command");
+        QVERIFY2(!mainConsoleShows(host, qsl("QA_BUTTON_UP_COMMAND")), "restoring the button on load echoed its up command");
+    }
+
+    // Outside the loading sequence a click is what sends the command, and it
+    // still runs the script after it
+    void test_clickingAPushDownButtonSendsItsCommandAndRunsItsScript()
+    {
+        startProfile(mpHostname, mpLocalhost, mpPort);
+        auto* host = mudlet::self()->getActiveHost();
+        QVERIFY2(host, "No active host available for the test.");
+
+        auto* master = makeAction(host, nullptr, qsl("pushClickTestPackage"), true);
+        master->mPackageName = qsl("pushClickTestPackage");
+        master->mModuleMasterFolder = true;
+        master->mLocation = 0;
+        auto* toolbar = makeAction(host, master, qsl("pushClickTestToolbar"), true);
+        toolbar->mLocation = 0;
+        auto* button = makeAction(host, toolbar, qsl("pushClickTestButton"), false);
+        button->setIsPushDownButton(true);
+        button->mButtonState = false;
+        button->setCommandButtonDown(qsl("QA_CLICK_DOWN_COMMAND"));
+        QVERIFY(button->setScript(qsl("qaClickRan = (qaClickRan or 0) + 1; qaClickSentFirst = qaClickSent")));
+        host->mInstalledPackages << qsl("pushClickTestPackage");
+
+        QVERIFY(host->mLuaInterpreter.compileAndExecuteScript(qsl("qaClickRan = nil; qaClickSentFirst = nil; qaClickSent = 0; "
+                                                                  "tempAlias([[^QA_CLICK_DOWN_COMMAND$]], [[qaClickSent = qaClickSent + 1]])")));
+
+        host->getActionUnit()->updateAllToolbars();
+        auto* pB = findButtonWidget(button);
+        QVERIFY2(pB, "the button bar did not build the button");
+        QVERIFY(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaClickRan == nil)")));
+
+        pB->click();
+
+        QVERIFY(button->mButtonState);
+        QVERIFY2(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaClickSent == 1)")), "clicking the button did not send its command once");
+        QVERIFY2(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaClickRan == 1)")), "clicking the button did not run its script once");
+        QVERIFY2(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaClickSentFirst == 1)")), "the script ran before the command was sent");
+        QVERIFY2(mainConsoleShows(host, qsl("QA_CLICK_DOWN_COMMAND")), "clicking the button did not echo its command");
+    }
+
+    // The same for a push-down entry in a button's menu, which the button bar
+    // restores separately while it fills the menu
+    void test_aPushDownMenuEntryRestoredDownOnLoadRunsItsScriptWithoutSendingItsCommand()
+    {
+        startProfile(mpHostname, mpLocalhost, mpPort);
+        auto* host = mudlet::self()->getActiveHost();
+        QVERIFY2(host, "No active host available for the test.");
+
+        buildNestedGroup(host, 0);
+        auto* entry = actionNamed(host, qsl("menuTestEntry"));
+        QVERIFY(entry);
+        entry->setIsPushDownButton(true);
+        entry->mButtonState = true;
+        entry->setCommandButtonDown(qsl("QA_MENU_ENTRY_DOWN_COMMAND"));
+        QVERIFY(entry->setScript(qsl("qaMenuEntryRan = (qaMenuEntryRan or 0) + 1")));
+
+        QVERIFY(host->mLuaInterpreter.compileAndExecuteScript(qsl("qaMenuEntryRan = nil; qaMenuCommandSent = 0; "
+                                                                  "tempAlias([[^QA_MENU_ENTRY_DOWN_COMMAND$]], [[qaMenuCommandSent = qaMenuCommandSent + 1]])")));
+
+        host->mIsProfileLoadingSequence = true;
+        host->getActionUnit()->updateAllToolbars();
+        host->mIsProfileLoadingSequence = false;
+
+        QVERIFY2(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaMenuEntryRan == 1)")), "restoring the menu entry on load did not run its script once");
+        QVERIFY2(host->mLuaInterpreter.compileAndExecuteScript(qsl("assert(qaMenuCommandSent == 0)")), "restoring the menu entry on load sent its command");
+        QVERIFY2(!mainConsoleShows(host, qsl("QA_MENU_ENTRY_DOWN_COMMAND")), "restoring the menu entry on load echoed its command");
+    }
+
     void cleanup()
     {
         if (auto* self = mudlet::self()) {
             if (auto* host = self->getActiveHost()) {
-                QTest::qWait(50);
+                QTest::qWait(50ms);
                 host->waitForProfileSave();
             }
         }

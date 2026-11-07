@@ -27,14 +27,13 @@
 #include "Host.h"
 #include "TScript.h"
 #include "Tree.h"
-#include "dlgTriggerEditor.h"
 #include "utils.h"
 
 #include <QLatin1String>
-#include <QMapIterator>
 #include <QSet>
 #include <QStringList>
 
+#include <algorithm>
 #include <functional>
 #include <utility>
 
@@ -122,7 +121,6 @@ void ScriptUnit::doCleanup()
         return;
     }
 
-    // Runs per unit on every line of game text and next to never has work queued.
     if (!hasPendingDeletes()) {
         return;
     }
@@ -142,6 +140,13 @@ void ScriptUnit::stopAllTriggers()
     for (auto script : mScriptRootNodeList) {
         script->setIsActive(false);
     }
+}
+
+void ScriptUnit::moveRootNodesToEnd(const std::vector<int>& ids)
+{
+    std::stable_partition(mScriptRootNodeList.begin(), mScriptRootNodeList.end(), [&ids](TScript* pScript) {
+        return std::ranges::find(ids, pScript->getID()) == ids.end();
+    });
 }
 
 void ScriptUnit::addScriptRootNode(TScript* pT, int parentPosition, int childPosition)
@@ -273,10 +278,8 @@ void ScriptUnit::removeScript(TScript* pT)
     if (!pT) {
         return;
     }
-    QMapIterator<QString, QList<TScript*>> it(mpHost->mEventHandlerMap);
-    while (it.hasNext()) {
-        it.next();
-        mpHost->mEventHandlerMap[it.key()].removeAll(pT);
+    for (auto& handlers : mpHost->mEventHandlerMap) {
+        handlers.removeAll(pT);
     }
     mScriptMap.remove(pT->getID());
 }
@@ -294,9 +297,7 @@ bool ScriptUnit::enableScript(const QString& name)
         if (script->getName() == name) {
             script->setIsActive(true);
             found = true;
-            if (mpHost->mpEditorDialog) {
-                mpHost->mpEditorDialog->refreshScriptIcon(script->getID());
-            }
+            emit mpHost->signal_scriptToggled(script->getID());
         }
     }
     return found;
@@ -309,9 +310,7 @@ bool ScriptUnit::disableScript(const QString& name)
         if (script->getName() == name) {
             script->setIsActive(false);
             found = true;
-            if (mpHost->mpEditorDialog) {
-                mpHost->mpEditorDialog->refreshScriptIcon(script->getID());
-            }
+            emit mpHost->signal_scriptToggled(script->getID());
         }
     }
     return found;
@@ -335,9 +334,7 @@ void ScriptUnit::compileAll(bool saveLoadingError)
     // before returning to the event loop, where the 0ms save Host::uninstallPackage()
     // queues would otherwise serialize the still-live "uninstalled" scripts back in:
     doCleanup();
-    if (mpHost->mpEditorDialog) {
-        mpHost->mpEditorDialog->doCleanReset();
-    }
+    emit mpHost->signal_editorCleanResetRequested();
 }
 
 std::vector<int> ScriptUnit::findItems(const QString& name, const bool exactMatch, const bool caseSensitive)
@@ -358,6 +355,19 @@ std::vector<int> ScriptUnit::findItems(const QString& name, const bool exactMatc
         }
     }
     return ids;
+}
+
+bool ScriptUnit::pendingDeletion(TScript* pItem) const
+{
+    if (!hasPendingDeletes()) {
+        return false;
+    }
+    for (auto* pAncestor = pItem; pAncestor; pAncestor = pAncestor->getParent()) {
+        if (uninstallList.contains(pAncestor)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void ScriptUnit::assembleReport(TScript* pItem)

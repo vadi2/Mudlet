@@ -26,6 +26,7 @@
 
 #include "utils.h"
 
+#include <QHash>
 #include <QList>
 #include <QMap>
 #include <QMultiMap>
@@ -53,6 +54,7 @@ public:
     ~KeyUnit();
 
     std::list<TKey*> getKeyRootNodeList() { return mKeyRootNodeList; }
+    QMap<int, TKey*> getKeyList() { return mKeyMap; }
 
     TKey* getKey(int id);
     void removeAllTempKeys();
@@ -75,14 +77,10 @@ public:
     bool processDataStream(const Qt::Key, const Qt::KeyboardModifiers);
     // Query-only counterpart to processDataStream(), which executes what it matches
     bool wouldMatch(const Qt::Key, const Qt::KeyboardModifiers) const;
-    // The binding wouldMatch() found, for naming it in a clash report
+    // The binding wouldMatch() found
     const TKey* firstMatch(const Qt::Key, const Qt::KeyboardModifiers) const;
-    // Qt matches Mudlet's own shortcuts and add-on menu shortcuts before the command line sees the
-    // key, so a binding on one of their keys never fires. It is still accepted, only warned about.
-    // Empty when the binding will fire.
-    QString takenKeyWarning(const TKey* pKey) const;
-    // For a binding a script made
-    void warnIfKeyIsTaken(const TKey* pKey) const;
+    // As firstMatch(), but switched off bindings count too, as enableKey() can make them fire
+    const TKey* firstBinding(const Qt::Key, const Qt::KeyboardModifiers) const;
     void markCleanup(TKey* pT);
     void doCleanup();
     int processingDepth() const { return mProcessingDepth; }
@@ -94,6 +92,9 @@ public:
     QSet<TKey*> mCleanupSet;
     QList<TKey*> uninstallList;
     bool hasPendingDeletes() const { return !mCleanupSet.isEmpty() || !uninstallList.isEmpty(); }
+    // Killed or uninstalled, itself or through an ancestor, but still in the lookup tables until doCleanup(),
+    // which an idle profile may not run for up to a minute
+    bool pendingDeletion(TKey* pItem) const;
     // Past behaviour is to only process the first key binding that matches,
     // ignoring any duplicates - but changing that behaviour unconditionally
     // could break things - so only do it if this flag is set:
@@ -109,12 +110,17 @@ private:
     void addKeyRootNode(TKey* pT, int parentPosition = -1, int childPosition = -1, bool moveKey = false);
     void addKey(TKey* pT);
     void removeKeyRootNode(TKey* pT);
+    void listRootNode(TKey* pT, std::list<TKey*>::iterator before);
+    void unlistRootNode(TKey* pT);
     void removeKey(TKey*);
 
 
     QPointer<Host> mpHost;
     QMap<int, TKey*> mKeyMap;
     std::list<TKey*> mKeyRootNodeList;
+    // Where each root node sits in mKeyRootNodeList: std::list::remove() walks the whole list,
+    // which made freeing a batch of temporary keys quadratic
+    QHash<TKey*, std::list<TKey*>::iterator> mRootNodePositions;
     int mMaxID;
     bool mModuleMember;
     QMap<int, QString> mKeys;

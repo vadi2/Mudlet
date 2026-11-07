@@ -23,7 +23,9 @@
 #include "SpeechRecognizer.h"
 #include "utils.h"
 
+#if defined(INCLUDE_SPEECH_ENGINES)
 #include <QLibrary>
+#endif
 #include <QString>
 
 class SpeechAudioCapture;
@@ -111,6 +113,9 @@ public:
 
     // Static method to check if the sherpa-onnx library is available on this system
     static bool sherpaAvailable();
+    // As sherpaAvailable(), but before the first probe only looks for the file
+    // on librarySearchPaths() instead of loading it
+    static bool libraryPresent();
 
     // Reset library load state to allow re-checking (e.g., after installation)
     static bool resetLibraryLoadState();
@@ -257,7 +262,9 @@ private:
     SpeechAudioCapture* mpCapture = nullptr;
 
     // sherpa-onnx library and function pointers (for dynamic loading)
+#if defined(INCLUDE_SPEECH_ENGINES)
     static QLibrary sSherpaLibrary;
+#endif
     static bool sLibraryLoaded;
     static bool sLibraryLoadAttempted;
     static QString sLibraryLoadError;

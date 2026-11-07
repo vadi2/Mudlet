@@ -25,6 +25,7 @@
  */
 
 #include <QComboBox>
+#include <QLineEdit>
 #include <QTemporaryDir>
 #include <QTreeWidget>
 #include <QScopeGuard>
@@ -32,6 +33,7 @@
 #include <chrono>
 
 #include "Host.h"
+#include "HostDialogs.h"
 #include "MudletInstanceCoordinator.h"
 #include "MudletApp.h"
 #include "PortableModeTestHelper.h"
@@ -40,6 +42,7 @@
 #include "AliasUnit.h"
 #include "KeyUnit.h"
 #include "ScriptUnit.h"
+#include "SearchResultDelegate.h"
 #include "TAction.h"
 #include "TAlias.h"
 #include "TKey.h"
@@ -93,20 +96,24 @@ private:
         mpEditor->slot_searchMudletItems(0);
     }
 
-    // The result tree is two deep: the first field matched in an item becomes
-    // that item's top-level row, the rest hang off it
+    // Each matched item is a heading row with every match, the first included, as a
+    // child; SearchResultDelegate paints the rows from the roles below, not from columns
+    static QString typeOf(const QTreeWidgetItem* row) { return row->data(0, uiDesign::SearchResultDelegate::TypeLabelRole).toString(); }
+    static QString titleOf(const QTreeWidgetItem* row) { return row->data(0, uiDesign::SearchResultDelegate::TitleRole).toString(); }
+    static QString whereOf(const QTreeWidgetItem* row) { return row->data(0, uiDesign::SearchResultDelegate::WhereRole).toString(); }
+    static bool isNotice(const QTreeWidgetItem* row) { return row->data(0, uiDesign::SearchResultDelegate::RowKindRole).toInt() == uiDesign::SearchResultDelegate::NoticeRow; }
+
     QStringList resultsFor(const QString& itemType) const
     {
         QStringList found;
         auto* results = mpEditor->treeWidget_searchResults;
         for (int i = 0, total = results->topLevelItemCount(); i < total; ++i) {
             QTreeWidgetItem* top = results->topLevelItem(i);
-            if (top->text(0) != itemType) {
+            if (isNotice(top) || typeOf(top) != itemType) {
                 continue;
             }
-            found << top->text(2);
             for (int j = 0, children = top->childCount(); j < children; ++j) {
-                found << top->child(j)->text(2);
+                found << whereOf(top->child(j));
             }
         }
         return found;
@@ -127,19 +134,25 @@ private:
     {
         auto* results = mpEditor->treeWidget_searchResults;
         for (int i = 0, total = results->topLevelItemCount(); i < total; ++i) {
-            if (results->topLevelItem(i)->text(0) == itemType) {
-                return results->topLevelItem(i);
+            QTreeWidgetItem* top = results->topLevelItem(i);
+            if (!isNotice(top) && typeOf(top) == itemType) {
+                return top;
             }
         }
         return nullptr;
     }
 
+    // A search that finds nothing still leaves one notice row saying so, which is not a result
     int totalResultRows() const
     {
         auto* results = mpEditor->treeWidget_searchResults;
         int total = 0;
         for (int i = 0, tops = results->topLevelItemCount(); i < tops; ++i) {
-            total += 1 + results->topLevelItem(i)->childCount();
+            QTreeWidgetItem* top = results->topLevelItem(i);
+            if (isNotice(top)) {
+                continue;
+            }
+            total += 1 + top->childCount();
         }
         return total;
     }
@@ -171,6 +184,10 @@ private:
         pScript->setEventHandlerList({qsl("%1Event").arg(mNeedle)});
         pScript->setScript(qsl("-- %1 lives here too\n").arg(mNeedle));
         mpHost->getScriptUnit()->registerScript(pScript);
+
+        auto* pLongScript = new TScript(qsl("qaMultiLineScript"), mpHost);
+        pLongScript->setScript(qsl("local a = 1\n-- qaLater qaLaterWord\nlocal b = qaLater\n"));
+        mpHost->getScriptUnit()->registerScript(pLongScript);
 
         auto* pTimer = new TTimer(qsl("qaSearchTimer"), QTime(0, 0, 30), mpHost);
         pTimer->setCommand(qsl("%1 command").arg(mNeedle));
@@ -215,11 +232,11 @@ private slots:
         mpHost = TestProfile::create(mProfileName, mLocalhost, QString::number(mpServer->serverPort()));
         QVERIFY2(mpHost, "No active host available for the test.");
         QSignalSpy connectedSpy(&(mpHost->mTelnet), &cTelnet::signal_connected);
-        QVERIFY2(connectedSpy.wait(1000), "Could not connect with the host.");
+        QVERIFY2(connectedSpy.wait(1s), "Could not connect with the host.");
 
         mudlet::self()->slot_showScriptDialog();
         QTest::qWait(100ms);
-        mpEditor = mpHost->mpEditorDialog;
+        mpEditor = HostDialogs::of(mpHost).mpEditorDialog;
         QVERIFY2(mpEditor, "the editor dialog was not created");
 
         populateProfile();
@@ -236,8 +253,8 @@ private slots:
         // ~Host would do this, but only if the host is ever destroyed - deleting
         // the editor here keeps the leak checker satisfied either way
         if (mpHost) {
-            if (auto* pEditor = mpHost->mpEditorDialog.data()) {
-                mpHost->mpEditorDialog = nullptr;
+            if (auto* pEditor = HostDialogs::of(mpHost).mpEditorDialog.data()) {
+                HostDialogs::of(mpHost).mpEditorDialog = nullptr;
                 delete pEditor;
             }
         }
@@ -263,12 +280,12 @@ private slots:
     {
         search(mNeedle);
 
-        QCOMPARE(resultsFor(qsl("Trigger")), QStringList({qsl("Command"), qsl("Pattern {1}"), qsl("Lua code (1:4)"), qsl("Pattern {1}")}));
+        QCOMPARE(resultsFor(qsl("Trigger")), QStringList({qsl("Command"), qsl("Pattern 1"), qsl("Lua 1:4"), qsl("Pattern 1")}));
         QCOMPARE(resultsFor(qsl("Alias")), QStringList({qsl("Command"), qsl("Pattern")}));
-        QCOMPARE(resultsFor(qsl("Script")), QStringList({qsl("Event Handler"), qsl("Lua code (1:4)")}));
+        QCOMPARE(resultsFor(qsl("Script")), QStringList({qsl("Event"), qsl("Lua 1:4")}));
         QCOMPARE(resultsFor(qsl("Timer")), QStringList({qsl("Command")}));
         QCOMPARE(resultsFor(qsl("Key")), QStringList({qsl("Command")}));
-        QCOMPARE(resultsFor(qsl("Button")), QStringList({qsl("Command {Down}"), qsl("Command {Up}"), qsl("Stylesheet {L: 2 C: 21}")}));
+        QCOMPARE(resultsFor(qsl("Button")), QStringList({qsl("Command (down)"), qsl("Command (up)"), qsl("Style 2:21")}));
     }
 
     // A match inside a folder is only found by the recursive walk, not by the
@@ -279,8 +296,9 @@ private slots:
 
         auto* result = topLevelResultFor(qsl("Trigger"));
         QVERIFY2(result, "the nested trigger was not found at all");
-        QCOMPARE(result->text(1), qsl("qaNestedTrigger"));
-        QCOMPARE(result->text(2), qsl("Pattern {1}"));
+        QCOMPARE(titleOf(result), qsl("qaNestedTrigger"));
+        QCOMPARE(result->childCount(), 1);
+        QCOMPARE(whereOf(result->child(0)), qsl("Pattern 1"));
     }
 
     // Every row carries the item type, its id and which field matched, so that
@@ -291,7 +309,9 @@ private slots:
 
         auto* result = topLevelResultFor(qsl("Button"));
         QVERIFY(result);
-        QCOMPARE(result->text(2), qsl("Name"));
+        // Clicking the heading has to go where the first match under it goes
+        QVERIFY(result->childCount() > 0);
+        QCOMPARE(whereOf(result->child(0)), qsl("Name"));
         QCOMPARE(static_cast<EditorViewType>(result->data(0, dlgTriggerEditor::ItemRole).toInt()), EditorViewType::cmActionView);
         QCOMPARE(result->data(0, dlgTriggerEditor::TypeRole).toInt(), static_cast<int>(dlgTriggerEditor::SearchResultIsName));
         QCOMPARE(result->data(0, dlgTriggerEditor::NameRole).toString(), qsl("qaSearchButton"));
@@ -328,6 +348,29 @@ private slots:
         QVERIFY2(totalResultRows() > 0, "a whole word was not matched in whole-word mode");
     }
 
+    // One search after another, with the needle or the case option changed in
+    // between, must each match on their own terms
+    void test_wholeWordSearchFollowsTheNeedleAndCaseOption()
+    {
+        mpEditor->setSearchOptions(enums::EditorSearchOptionWholeWord);
+        search(qsl("qalater"));
+        QCOMPARE(resultsFor(qsl("Script")), QStringList({qsl("Lua 2:4"), qsl("Lua 3:11")}));
+
+        search(qsl("QALATERWORD"));
+        QCOMPARE(resultsFor(qsl("Script")), QStringList({qsl("Lua 2:12")}));
+
+        mpEditor->setSearchOptions(enums::EditorSearchOptionWholeWord | enums::EditorSearchOptionCaseSensitive);
+        search(qsl("QALATERWORD"));
+        QCOMPARE(resultsFor(qsl("Script")), QStringList());
+
+        search(qsl("qaLater"));
+        QCOMPARE(resultsFor(qsl("Script")), QStringList({qsl("Lua 2:4"), qsl("Lua 3:11")}));
+
+        mpEditor->setSearchOptions(enums::EditorSearchOptionWholeWord);
+        search(qsl("QALATER"));
+        QCOMPARE(resultsFor(qsl("Script")), QStringList({qsl("Lua 2:4"), qsl("Lua 3:11")}));
+    }
+
     // Variables live in the Lua state rather than in a unit, so they are only
     // walked when the option asks for it
     void test_variablesAreOnlySearchedWhenAskedFor()
@@ -339,7 +382,7 @@ private slots:
         search(qsl("qaSearchVariable"));
         auto* result = topLevelResultFor(qsl("Variable"));
         QVERIFY2(result, "the variable was not found with the option set");
-        QCOMPARE(result->text(1), qsl("qaSearchVariable"));
+        QCOMPARE(titleOf(result), qsl("qaSearchVariable"));
         QCOMPARE(result->data(0, dlgTriggerEditor::TypeRole).toInt(), static_cast<int>(dlgTriggerEditor::SearchResultIsName));
     }
 
@@ -394,6 +437,46 @@ private slots:
         QCOMPARE(selected->text(0), qsl("qaNestedTrigger"));
     }
 
+    // A script that adds an item marks every tree stale; showing the result's
+    // view then rebuilds them, which must not free the item about to be selected
+    void test_selectingAResultAfterAScriptAddedAnItemSelectsIt()
+    {
+        mpEditor->slot_showScripts();
+        search(qsl("qaNestedTrigger"));
+        QTreeWidgetItem* result = mpEditor->treeWidget_searchResults->topLevelItem(0);
+        QVERIFY(result);
+
+        QVERIFY(mpHost->getLuaInterpreter()->compileAndExecuteScript(qsl("permAlias('qaStaleAlias', '', '^qaStale$', '')")));
+        QVERIFY2(mpEditor->mNeedUpdateData, "the script did not mark the editor's trees as stale");
+
+        mpEditor->slot_itemSelectedInSearchResults(result);
+
+        QCOMPARE(mpEditor->mCurrentView, EditorViewType::cmTriggerView);
+        QTreeWidgetItem* selected = mpEditor->treeWidget_triggers->currentItem();
+        QVERIFY2(selected, "no trigger became current after its search result was chosen");
+        QCOMPARE(selected->text(0), qsl("qaNestedTrigger"));
+        QVERIFY(!mpEditor->treeWidget_aliases->findItems(qsl("qaStaleAlias"), Qt::MatchExactly | Qt::MatchRecursive).isEmpty());
+    }
+
+    void test_selectingAVariableResultAfterAScriptAddedAnItemSelectsIt()
+    {
+        mpEditor->setSearchOptions(enums::EditorSearchOptionIncludeVariables);
+        mpEditor->slot_showScripts();
+        search(qsl("qaSearchVariable"));
+        QTreeWidgetItem* result = topLevelResultFor(qsl("Variable"));
+        QVERIFY(result);
+
+        QVERIFY(mpHost->getLuaInterpreter()->compileAndExecuteScript(qsl("permAlias('qaStaleVarAlias', '', '^qaStaleVar$', '')")));
+        QVERIFY2(mpEditor->mNeedUpdateData, "the script did not mark the editor's trees as stale");
+
+        mpEditor->slot_itemSelectedInSearchResults(result);
+
+        QCOMPARE(mpEditor->mCurrentView, EditorViewType::cmVarsView);
+        QTreeWidgetItem* selected = mpEditor->treeWidget_variables->currentItem();
+        QVERIFY2(selected, "no variable became current after its search result was chosen");
+        QCOMPARE(selected->text(0), qsl("qaSearchVariable"));
+    }
+
     // The find box inside the script pane marks every match as the term is
     // typed, so it waits until enough has been typed to be worth a pass over
     // the document - one or two characters match most of a script (#3847).
@@ -428,15 +511,22 @@ private slots:
         search(mNeedle);
         QVERIFY(totalResultRows() > 0);
 
-        // An empty combo entry leaves the previous results alone rather than
-        // clearing them, which is what makes the guard worth having
-        mpEditor->comboBox_searchTerms->clear();
-        mpEditor->comboBox_searchTerms->addItem(QString());
-        mpEditor->slot_searchMudletItems(0);
-        QVERIFY(totalResultRows() > 0);
+        // Emptying the field puts the panel back to the profile's own items, so the results go with it
+        mpEditor->comboBox_searchTerms->lineEdit()->clear();
+        QCOMPARE(totalResultRows(), 0);
+
+        // Unlike clearing the field, the slot itself ignores an empty or missing entry
+        search(mNeedle);
+        const int found = totalResultRows();
+        QVERIFY(found > 0);
+
+        auto* box = mpEditor->comboBox_searchTerms;
+        box->addItem(QString());
+        mpEditor->slot_searchMudletItems(box->count() - 1);
+        QCOMPARE(totalResultRows(), found);
 
         mpEditor->slot_searchMudletItems(-1);
-        QVERIFY(totalResultRows() > 0);
+        QCOMPARE(totalResultRows(), found);
     }
 };
 

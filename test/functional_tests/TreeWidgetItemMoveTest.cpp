@@ -26,16 +26,16 @@
 
 #include <QDragEnterEvent>
 #include <QDropEvent>
-#include <QIcon>
 #include <QMimeData>
-#include <QPixmap>
 #include <QTemporaryDir>
 #include <QTreeWidget>
 #include <QtTest/QtTest>
 #include <chrono>
 
 #include "AliasUnit.h"
+#include "EditorTreeDelegate.h"
 #include "Host.h"
+#include "HostDialogs.h"
 #include "MudletInstanceCoordinator.h"
 #include "MudletApp.h"
 #include "PortableModeTestHelper.h"
@@ -74,6 +74,36 @@ private:
         if (dir.exists()) {
             dir.removeRecursively();
         }
+    }
+
+    // dotHitRect() is non-null only for a row the delegate resolved to an item in
+    // its unit, so a moved row that has one still maps to its item
+    static bool rowStillDrawsItsSwitch(TTreeWidget* tree, QTreeWidgetItem* item)
+    {
+        auto* pDelegate = qobject_cast<uiDesign::EditorTreeDelegate*>(tree->itemDelegateForIndex(QModelIndex()));
+        if (!pDelegate) {
+            return false;
+        }
+        // The rectangle is measured off the laid-out row, so the folder must be open and layout must have run
+        if (item->parent()) {
+            item->parent()->setExpanded(true);
+        }
+        tree->show();
+        QCoreApplication::processEvents();
+        const QModelIndex index = tree->indexFromItem(item);
+        return !pDelegate->dotHitRect(pDelegate->rowOption(index), index).isNull();
+    }
+
+    static uiDesign::EditorTreeDelegate::DotState dotStateOf(TTreeWidget* tree, QTreeWidgetItem* item)
+    {
+        auto* pDelegate = qobject_cast<uiDesign::EditorTreeDelegate*>(tree->itemDelegateForIndex(QModelIndex()));
+        return pDelegate ? pDelegate->stateOf(tree->indexFromItem(item)).dot : uiDesign::EditorTreeDelegate::DotState::Off;
+    }
+
+    static uiDesign::EditorTreeDelegate::RowMark markOf(TTreeWidget* tree, QTreeWidgetItem* item)
+    {
+        auto* pDelegate = qobject_cast<uiDesign::EditorTreeDelegate*>(tree->itemDelegateForIndex(QModelIndex()));
+        return pDelegate ? pDelegate->stateOf(tree->indexFromItem(item)).mark : uiDesign::EditorTreeDelegate::RowMark::None;
     }
 
     QTreeWidgetItem* itemNamed(QTreeWidget* tree, const QString& name) const
@@ -139,6 +169,13 @@ private:
         auto* pTimer = new TTimer(qsl("qaMoveTimer"), QTime(0, 0, 30), mpHost);
         QVERIFY(mpHost->getTimerUnit()->registerTimer(pTimer));
 
+        auto* pInactiveTimerFolder = new TTimer(qsl("qaMoveInactiveTimerFolder"), QTime(0, 0, 1), mpHost);
+        pInactiveTimerFolder->setIsFolder(true);
+        QVERIFY(mpHost->getTimerUnit()->registerTimer(pInactiveTimerFolder));
+
+        auto* pInactiveTimer = new TTimer(qsl("qaMoveInactiveTimer"), QTime(0, 0, 30), mpHost);
+        QVERIFY(mpHost->getTimerUnit()->registerTimer(pInactiveTimer));
+
         auto* pTimerSubFolder = new TTimer(qsl("qaMoveTimerSubFolder"), QTime(0, 0, 1), mpHost);
         pTimerSubFolder->setIsFolder(true);
         QVERIFY(mpHost->getTimerUnit()->registerTimer(pTimerSubFolder));
@@ -169,11 +206,11 @@ private slots:
         mpHost = TestProfile::create(mProfileName, mLocalhost, QString::number(mpServer->serverPort()));
         QVERIFY2(mpHost, "No active host available for the test.");
         QSignalSpy connectedSpy(&(mpHost->mTelnet), &cTelnet::signal_connected);
-        QVERIFY2(connectedSpy.wait(1000), "Could not connect with the host.");
+        QVERIFY2(connectedSpy.wait(1s), "Could not connect with the host.");
 
         mudlet::self()->slot_showScriptDialog();
         QTest::qWait(100ms);
-        mpEditor = mpHost->mpEditorDialog;
+        mpEditor = HostDialogs::of(mpHost).mpEditorDialog;
         QVERIFY2(mpEditor, "the editor dialog was not created");
 
         populateProfile();
@@ -187,8 +224,8 @@ private slots:
     void cleanupTestCase()
     {
         if (mpHost) {
-            if (auto* pEditor = mpHost->mpEditorDialog.data()) {
-                mpHost->mpEditorDialog = nullptr;
+            if (auto* pEditor = HostDialogs::of(mpHost).mpEditorDialog.data()) {
+                HostDialogs::of(mpHost).mpEditorDialog = nullptr;
                 delete pEditor;
             }
         }
@@ -228,7 +265,8 @@ private slots:
 
         QCOMPARE(folderItem->childCount(), 1);
         QCOMPARE(folderItem->child(0), triggerItem);
-        QVERIFY2(!triggerItem->icon(0).isNull(), "the moved trigger was left with no icon");
+
+        QVERIFY2(rowStillDrawsItsSwitch(tree, triggerItem), "the moved trigger's row no longer resolves to the trigger it stands for");
     }
 
     void test_droppingAnAliasOnAFolderReparentsItInTheUnit()
@@ -263,17 +301,46 @@ private slots:
         TTimer* pTimer = mpHost->getTimerUnit()->getTimer(timerItem->data(0, Qt::UserRole).toInt());
         QVERIFY(pFolder && pTimer);
         QVERIFY2(!pTimer->getParent(), "the timer was already inside something before the move");
-        // Only the active-timer icons are exercised here: the inactive one is
-        // painted from an icon path that does not exist (#10401)
-        pFolder->setShouldBeActive(true);
+        // registerTimer() clears both the user state and isActive(), and the
+        // row's dot goes by ancestorsActive(), which reads isActive()
+        pFolder->setIsActive(true);
         pTimer->setShouldBeActive(true);
+        QVERIFY2(pFolder->isActive(), "the folder being dropped into is inactive, so the dot asserted below is not the one that would be drawn");
+        QVERIFY2(pTimer->shouldBeActive(), "the timer being dropped is not set to be active, so the dot asserted below is not the one that would be drawn");
 
         QSignalSpy movedSpy(tree, &TTreeWidget::itemMoved);
         moveOntoFolder(tree, timerItem, folderItem);
 
         QCOMPARE(pTimer->getParent(), pFolder);
         QCOMPARE(movedSpy.count(), 1);
-        QVERIFY2(!folderItem->child(0)->icon(0).isNull(), "the moved timer was left with no icon");
+        QVERIFY2(pTimer->ancestorsActive(), "the moved timer's folder is inactive, so the dot asserted below is not the one that would be drawn");
+        QVERIFY2(rowStillDrawsItsSwitch(tree, timerItem), "the moved timer's row no longer resolves to the timer it stands for");
+        QVERIFY2(dotStateOf(tree, timerItem) != uiDesign::EditorTreeDelegate::DotState::Off, "the moved timer, switched on inside a running folder, reads as switched off");
+    }
+
+    void test_droppingAnInactiveTimerOnAnInactiveFolderRepaintsIt()
+    {
+        mpEditor->slot_showTimers();
+        auto* tree = mpEditor->treeWidget_timers;
+        QTreeWidgetItem* folderItem = itemNamed(tree, qsl("qaMoveInactiveTimerFolder"));
+        QTreeWidgetItem* timerItem = itemNamed(tree, qsl("qaMoveInactiveTimer"));
+        QVERIFY(folderItem && timerItem);
+
+        TTimer* pFolder = mpHost->getTimerUnit()->getTimer(folderItem->data(0, Qt::UserRole).toInt());
+        TTimer* pTimer = mpHost->getTimerUnit()->getTimer(timerItem->data(0, Qt::UserRole).toInt());
+        QVERIFY(pFolder && pTimer);
+        QVERIFY2(!pTimer->getParent(), "the timer was already inside something before the move");
+        pFolder->setIsActive(false);
+        pTimer->setShouldBeActive(false);
+        QVERIFY2(!pFolder->isActive(), "the folder being dropped into is active, so the dot asserted below is not the one that would be drawn");
+        QVERIFY2(!pTimer->shouldBeActive(), "the timer being dropped is set to be active, so the dot asserted below is not the one that would be drawn");
+
+        moveOntoFolder(tree, timerItem, folderItem);
+
+        QCOMPARE(pTimer->getParent(), pFolder);
+        QVERIFY2(!pTimer->ancestorsActive(), "the moved timer's folder is active, so the dot asserted below is not the one that would be drawn");
+        QVERIFY2(rowStillDrawsItsSwitch(tree, timerItem), "the moved timer's row no longer resolves to the timer it stands for");
+        QCOMPARE(dotStateOf(tree, timerItem), uiDesign::EditorTreeDelegate::DotState::Off);
     }
 
     // Outside a drag the tree is a plain view, so rearranging it must not write
@@ -328,7 +395,7 @@ private slots:
 
     // A timer folder dragged into another folder is still a folder, and used to
     // be repainted with a plain timer's icon on the way there (#8802)
-    void test_droppingATimerFolderKeepsTheFolderIcon()
+    void test_droppingATimerFolderKeepsTheFolderMark()
     {
         mpEditor->slot_showTimers();
         auto* tree = mpEditor->treeWidget_timers;
@@ -339,38 +406,18 @@ private slots:
         TTimer* pFolder = mpHost->getTimerUnit()->getTimer(folderItem->data(0, Qt::UserRole).toInt());
         TTimer* pMoved = mpHost->getTimerUnit()->getTimer(movedItem->data(0, Qt::UserRole).toInt());
         QVERIFY2(pFolder && pMoved, "a row of the timers tree has no timer behind it");
-        QVERIFY2(pMoved->isFolder(), "the timer being dropped is not a folder, so this case cannot tell a folder icon from a timer's");
-        // rowsInserted() paints the plain folder icon only when the moved folder
-        // wants to be active and every ancestor of it is active
+        QVERIFY2(pMoved->isFolder(), "the timer being dropped is not a folder, so this case cannot tell a folder's mark from a timer's");
         pFolder->setIsActive(true);
         pMoved->setShouldBeActive(true);
-        QVERIFY2(pFolder->isActive(), "the folder being dropped into is inactive, so the icon asserted below is not the one that would be painted");
-        QVERIFY2(pMoved->shouldBeActive(), "the folder being dropped is not set to be active, so the icon asserted below is not the one that would be painted");
-
-        // Clear what the tree painted when it built the row, so the comparison
-        // below sees only what the drop itself painted
-        movedItem->setIcon(0, QIcon());
+        QVERIFY2(pFolder->isActive(), "the folder being dropped into is inactive, so the dot asserted below is not the one that would be drawn");
+        QVERIFY2(pMoved->shouldBeActive(), "the folder being dropped is not set to be active, so the dot asserted below is not the one that would be drawn");
 
         moveOntoFolder(tree, movedItem, folderItem);
 
         QCOMPARE(pMoved->getParent(), pFolder);
-        QIcon folderIcon;
-        folderIcon.addPixmap(QPixmap(qsl(":/icons/folder-green.png")), QIcon::Normal, QIcon::Off);
-        QVERIFY2(!folderIcon.isNull(), "the folder icon this compares against is not in the resources");
-        const QSize iconSize = tree->iconSize();
-        // QIcon::pixmap() answers an invalid size with a null pixmap, and two null images compare equal
-        QVERIFY2(!iconSize.isEmpty(), "the tree has no icon size, so the comparison below would hold against any icon");
-
-        const QImage painted = movedItem->icon(0).pixmap(iconSize).toImage();
-        QIcon plainTimerIcon;
-        plainTimerIcon.addPixmap(QPixmap(qsl(":/icons/tag_checkbox_checked.png")), QIcon::Normal, QIcon::Off);
-        QString whatWasPainted = qsl("some other icon");
-        if (painted.isNull()) {
-            whatWasPainted = qsl("nothing at all");
-        } else if (painted == plainTimerIcon.pixmap(iconSize).toImage()) {
-            whatWasPainted = qsl("a plain timer's icon");
-        }
-        QVERIFY2(painted == folderIcon.pixmap(iconSize).toImage(), qPrintable(qsl("the dropped timer folder was repainted with %1, not a folder icon").arg(whatWasPainted)));
+        QVERIFY2(rowStillDrawsItsSwitch(tree, movedItem), "the dropped timer folder's row no longer resolves to the folder it stands for");
+        QCOMPARE(markOf(tree, movedItem), uiDesign::EditorTreeDelegate::RowMark::Folder);
+        QVERIFY2(dotStateOf(tree, movedItem) != uiDesign::EditorTreeDelegate::DotState::Off, "the dropped timer folder, switched on inside a running folder, reads as switched off");
     }
 
     // A drop landing on the tree's top row used to be refused only when the drop

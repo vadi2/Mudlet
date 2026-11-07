@@ -24,17 +24,55 @@
  ***************************************************************************/
 
 #include "ui_connection_profiles.h"
+#include <functional>
 #include <optional>
+#include <QColor>
+#include <QHash>
+#include <QPointer>
 #include <QRegularExpression>
+#include <QStyledItemDelegate>
 #include <QTimer>
 #include <QKeyEvent>
 
 class QDir;
+class QListView;
 class QTabBar;
 
 namespace pugi {
 class xml_document;
 }
+
+namespace uiDesign {
+struct ThemeTokens;
+}
+
+// Paints the chip itself: QStyledItemDelegate::paint() draws the platform's selection underline,
+// and `::item:hover` / `::item:selected` rules would hand the whole list to Qt's stylesheet style.
+class ProfileChipDelegate : public QStyledItemDelegate
+{
+    Q_OBJECT
+
+public:
+    // The list's surface showing through the gap keeps the ring legible on a bright banner
+    static constexpr int scmChipHaloGap = 2;
+    static constexpr int scmChipHaloWidth = 2;
+
+    explicit ProfileChipDelegate(QObject* parent = nullptr);
+
+    void restyle(const uiDesign::ThemeTokens& tokens);
+    QColor haloInk() const;
+
+    // Public so the window's test reads where the halo is drawn rather than guessing
+    QRect chipRect(const QListView* pView, const QModelIndex& index) const;
+
+    void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+    // Holds the halo inside the item: a view repaints only the item's rectangle on hover
+    // changes, leaving fragments of anything drawn outside it
+    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+
+private:
+    QColor mHaloInk;
+};
 
 class dlgConnectionProfiles : public QDialog, public Ui::connection_profiles
 {
@@ -43,6 +81,7 @@ class dlgConnectionProfiles : public QDialog, public Ui::connection_profiles
     friend class ConnectionDialogKeychainWaitTest;
     friend class ConnectionDialogOfflineProfileTest;
     friend class SelfTestProfileIconTest;
+    friend class ProfileDeletionSafetyTest;
 
 public:
     Q_DISABLE_COPY(dlgConnectionProfiles)
@@ -56,11 +95,10 @@ public:
     QList<QListWidgetItem*> findData(const QListWidget& listWidget, const QVariant& what, const int role = Qt::UserRole) const;
     QList<int> findProfilesBeginningWith(const QString&) const;
     static const int csmNameRole{Qt::UserRole};
-    static QChar firstInvalidProfileNameChar(const QString& name);
-    static bool profileNameUsableAsIs(const QString& name);
+    // Whether a removed profile's saved sign-in is still being deleted under this name; see
+    // namesWithSignInBeingRemoved(). For anything that creates a profile outside this dialog, such as a telnet:// link.
+    static bool signInRemovalPending(const QString& name);
     static QString profileFolderPath(const QString& profilesPath, const QString& profile);
-    static const QString scmAllowedProfileNameChars;
-    static const QRegularExpression scmUnusableProfileNameChars;
     // files whose presence alone does not warrant confirming a profile's removal
     static const QStringList scmConnectionDetailFiles;
     // a testing aid rather than a game, and the one list entry that is offered
@@ -102,6 +140,7 @@ public slots:
 
 protected:
     bool eventFilter(QObject*, QEvent*) override;
+    bool event(QEvent*) override;
     void showEvent(QShowEvent*) override;
     void loadPasswordFromSettings(const QString& profile_name);
     void ensurePasswordLoadedThenConnect(bool alsoConnect);
@@ -130,6 +169,7 @@ private:
     };
     CopiedProfileData captureProfileData() const;
     void saveDefaultProfileCopy(const QString& profileName, const CopiedProfileData& data, const QString& oldPassword);
+    void writeCatalogDetailsTheFolderLacks(const QString& profileName, const QString& catalogName);
     bool hasCustomIcon(const QString&) const;
     void setProfileIcon() const;
     void loadCustomProfile(const QString&) const;
@@ -142,17 +182,34 @@ private:
     void deleteSecurePassword(const QString& profile);
     void setupMudProfile(QListWidgetItem*, const QString& mudServer, const QString& serverDescription, const QString& iconFileName);
     void reallyDeleteProfile(const QString& profile);
+    // A removed profile's name is refused until the removal of its saved sign-in has answered, since a
+    // profile made or connected under it meanwhile would read it. Process-wide: the removal outlives the
+    // dialog. Held as removalKey()s, because a case-insensitive disk files a variant in the same place, and
+    // counted, because the same name can be removed again before the first removal answers.
+    static QHash<QString, int>& namesWithSignInBeingRemoved();
+    static QString removalKey(const QString& name);
+    // passwordsRemoved: whether the profile's saved passwords were deleted; the player is told if they or the sign-in were not
+    static void forgetSignInOfRemovedProfile(const QString& profile, QPointer<dlgConnectionProfiles> dialog, bool passwordsRemoved);
+    // Test-only: when set, it is handed each removal of a removed profile's sign-in to start, so a test
+    // can hold one back the way a slow keychain does
+    static std::function<void(std::function<void()> startRemoval)>& signInRemovalStarterForTesting();
     bool profileRemovable(const QString& profile) const;
     void updateRemoveButtonState(const QString& profile);
     void showRemovalProblem(const QString& message);
     void showRemovalNotice(const QString& message);
     void showNotification(const QString& message, QLabel* pIcon);
+    // writeProfileData() less its folder check, as a login or password typed for a game never played makes the folder
+    QPair<bool, QString> saveProfileDetail(const QString& profile, const QString& item, const QString& what);
+    void showUnsavedChange(const QString& message, const QString& profile, const QString& item);
     void fitWelcomeMessageToContents();
     void continueProfileSave(QListWidgetItem* pItem, const QString& newProfileName, const QString& newProfileHost, const QString& newProfilePort, const int newProfileSslTsl);
     void setItemName(QListWidgetItem*, const QString&) const;
     void setItemTooltip(QListWidgetItem*, const QString& description, const bool iconLoaded) const;
     QIcon customIcon(const QString&, const std::optional<QColor>&) const;
     void addLetterToProfileSearch(const int);
+    void applyConnectionShellStyle();
+    void resolveTabFonts();
+    void setFieldState(QLineEdit* pField, const QString& state);
     void clearNotificationArea();
     void loadPasswordAsync(const QString& profileName);
     // While a keychain read is outstanding the dialog stays up and says so, rather than hiding
@@ -167,7 +224,7 @@ private:
     // What a keychain read answers with
     void passwordRetrieved(const QString& profileName, bool success, const QString& password, const QString& errorMessage);
     // What a read that had timed out answers with afterwards, while the dialog is still open - a
-    // load that ran closed it - so all it may do is fill a password field left empty.
+    // load that ran closed it - so all it may do is fill a password field the user has not typed in.
     void passwordArrivedLate(const QString& profileName, bool success, const QString& password, const QString& errorMessage);
     void revealConnectionDetails();
     bool showingOnlyMyProfiles() const;
@@ -183,13 +240,10 @@ private:
     bool validPort = false;
 
     QStringList mProfileList;
-    QPalette mRegularPalette;
-    QPalette mOKPalette;
-    QPalette mErrorPalette;
-    QPalette mReadOnlyPalette;
     QAction* mpCopyProfile = nullptr;
     // switches the profiles list between the user's own games and the full catalog
     QTabBar* mpTabBar = nullptr;
+    ProfileChipDelegate* mpProfileChipDelegate = nullptr;
     QPushButton* offline_button = nullptr;
     QPushButton* connect_button = nullptr;
     QString mDiscordApplicationId;
@@ -200,6 +254,9 @@ private:
     // true while a profile is selected or refreshed programmatically, so that
     // it is not mistaken for the user picking a game from the list
     bool mProgrammaticProfileSelection = false;
+    // the selected profile's ssl_tsl as this dialog last read or wrote it; Preferences and the
+    // server can change that file while the dialog stays open
+    QString mSslTslSeen;
     // dialog height before it was shrunk to fit the welcome message
     int mDialogHeightBeforeShrink = 0;
     QString mDateTimeFormat;
@@ -217,9 +274,12 @@ private:
     bool mPendingConnect = false;      // Whether to connect (true) or just load (false)
     QString mKeychainOperationProfile; // Whose password a keychain read is fetching, if any
     bool mKeychainWaitShown = false;   // Whether the dialog is showing the keychain wait
+    // The profile and item a shown notice says could not be saved, so saving that one later clears it
+    QPair<QString, QString> mUnsavedChange;
 
 
 private slots:
+    void slot_applyAppearance();
     void slot_activeTabChanged(const int index);
     void slot_skipToGamesList();
     void slot_profileContextMenu(QPoint pos);

@@ -38,6 +38,7 @@
 #include <QToolButton>
 
 #include "MudletInstanceCoordinator.h"
+#include "HostDialogs.h"
 #include "MudletApp.h"
 #include "PortableModeTestHelper.h"
 #include "ProfileTestHelper.h"
@@ -125,10 +126,10 @@ private slots:
     mpHost = TestProfile::create(mHostname, mLocalhost, mPort);
     QVERIFY2(mpHost, "No active host after profile creation");
     QSignalSpy connected(&(mpHost->mTelnet), &cTelnet::signal_connected);
-    QVERIFY2(connected.wait(1000), "Could not connect with the host.");
+    QVERIFY2(connected.wait(1s), "Could not connect with the host.");
 
     mudlet::self()->slot_showScriptDialog();
-    mpEditor = mpHost->mpEditorDialog;
+    mpEditor = HostDialogs::of(mpHost).mpEditorDialog;
     QVERIFY2(mpEditor, "Editor dialog should be created");
     // wide enough that the main area lays out at its natural size rather than
     // squeezed, which is what the geometry assertions below measure
@@ -170,9 +171,7 @@ private slots:
              "appears on hover is one nobody discovers");
   }
 
-  // It shares the Command row rather than taking a row of its own, and the ID
-  // number keeps the far right of that row
-  void test_toggleSitsBetweenTheCommandFieldAndTheId() {
+  void test_toggleClosesTheCommandRowAfterTheId() {
     auto *area = mpEditor->mpTriggersMainArea;
     auto *command = area->lineEdit_trigger_command;
 
@@ -202,8 +201,8 @@ private slots:
     QVERIFY2(toggleRect.left() >= commandRect.right(),
              "the toggle follows the command field, so the command label and "
              "field stay adjacent");
-    QVERIFY2(toggleRect.right() <= idRect.left(),
-             "the ID number keeps the far right of the row");
+    QVERIFY2(toggleRect.left() >= idRect.right(),
+             "the toggle closes the row, so the ID number sits before it");
   }
 
   void test_tabFromCommandFieldReachesTheToggle() {

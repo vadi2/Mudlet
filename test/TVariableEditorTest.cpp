@@ -17,6 +17,7 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
+#include "GroupedTest.h"
 #include <LuaInterface.h>
 #include <TTreeWidget.h>
 #include <TVar.h>
@@ -753,6 +754,17 @@ private slots:
         TVar* var = findChild(interface->getVarUnit()->getBase(), QStringLiteral("testVar"));
         QVERIFY(var);
         QCOMPARE(interface->getValue(var), QStringLiteral("42"));
+    }
+
+    // The editor writes its text back into Lua when it differs from the walk's value
+    void testGetValueNumberMatchesWalk()
+    {
+        execLua(qsl("testVar = 1/3"));
+        interface->getVars(false);
+        TVar* var = findChild(interface->getVarUnit()->getBase(), qsl("testVar"));
+        QVERIFY(var);
+        QCOMPARE(interface->getValue(var), qsl("0.3333333333333333"));
+        QCOMPARE(interface->getValue(var), var->getValue());
     }
 
     void testGetValueBoolean()
@@ -1512,8 +1524,8 @@ private slots:
         keptItem->setCheckState(0, Qt::Checked);
         QVERIFY2(bigItem->checkState(0) == Qt::Checked, "Qt hands the tick to the untickable child all the same");
 
-        // the sweep TTreeWidget::mouseReleaseEvent() runs over each ticked row
-        // and everything under it
+        // the sweep dlgTriggerEditor::slot_toggleVariableKept() runs over each
+        // ticked row and everything under it
         QList<QTreeWidgetItem*> sweep;
         tree.getAllChildren(holderItem, sweep);
         tree.getAllChildren(keptItem, sweep);
@@ -1564,9 +1576,8 @@ private slots:
         QVERIFY2(!childItemNamed(rootItem, qsl("dotHolderTable")), "while the table the walk hid stays hidden");
     }
 
-    // ...and that row is greyed out and untickable, with the reason on it: the
-    // save keys variables by the dotted path, so this one cannot be saved.
-    void testTheRowOfAGlobalWithADotInItsNameIsGreyedWithAReason()
+    // The save keys variables by the dotted path
+    void testTheRowOfAGlobalWithADotInItsNameIsRefusedWithAReason()
     {
         execLua(qsl("_G['greyed.global'] = 'value' plainSaveable = 'value'"));
         interface->getVars(false);
@@ -1579,7 +1590,7 @@ private slots:
         QTreeWidgetItem* dottedItem = childItemNamed(rootItem, qsl("greyed.global"));
         QVERIFY(dottedItem);
         QVERIFY2(!(dottedItem->flags() & Qt::ItemIsUserCheckable), "the row must not offer a tick that cannot be honoured");
-        QCOMPARE(dottedItem->foreground(0).color(), QColor("grey"));
+        QVERIFY2(!dottedItem->data(0, Qt::ForegroundRole).isValid(), "the row must carry no colour of its own: a brush is a colour rather than a role, and no theme change would ever re-derive it");
         QVERIFY2(!dottedItem->toolTip(0).isEmpty(), "the row has to say why it cannot be saved");
 
         QTreeWidgetItem* plainItem = childItemNamed(rootItem, qsl("plainSaveable"));
@@ -1612,8 +1623,7 @@ private slots:
         // a row of the other kind: one holding a variable being added, which
         // saveVar() reads back to turn into a real one
         auto* pendingItem = new QTreeWidgetItem(rootItem, QStringList() << qsl("pendingName"));
-        auto* pendingVar = new TVar(vu->getBase());
-        tree.setNewVariableForRow(vu, pendingItem, pendingVar);
+        tree.setNewVariableForRow(vu, pendingItem, std::make_unique<TVar>(vu->getBase()));
         QVERIFY2(tree.newVariableForRow(vu, pendingItem), "the pending row has to resolve before the rebuild");
 
         interface->getVars(false); // frees every TVar the rows were built from
@@ -1670,8 +1680,9 @@ private slots:
         VarUnit* replacement = interface->getVarUnit();
 
         auto* addedItem = new QTreeWidgetItem(rootItem, QStringList() << qsl("addedName"));
-        auto* addedVar = new TVar(replacement->getBase());
-        tree.setNewVariableForRow(replacement, addedItem, addedVar);
+        auto added = std::make_unique<TVar>(replacement->getBase());
+        TVar* addedVar = added.get();
+        tree.setNewVariableForRow(replacement, addedItem, std::move(added));
 
         QCOMPARE(tree.newVariableForRow(replacement, addedItem), addedVar);
         QVERIFY2(!tree.variableForRow(replacement, strandedItem), "while the row the reset stranded still stands for nothing");
@@ -2120,4 +2131,4 @@ private slots:
 };
 
 #include "TVariableEditorTest.moc"
-QTEST_MAIN(TVariableEditorTest)
+MUDLET_GROUPED_TEST_MAIN(TVariableEditorTest)

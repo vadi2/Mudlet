@@ -39,6 +39,7 @@
 #include "PortableModeTestHelper.h"
 #include "ProfileTestHelper.h"
 #include "Host.h"
+#include "HostDialogs.h"
 #include "HostManager.h"
 #include "MudletInstanceCoordinator.h"
 #include "TDetachedWindow.h"
@@ -88,7 +89,7 @@ private:
         }
 
         QSignalSpy spy(&(pHost->mTelnet), &cTelnet::signal_connected);
-        if (!spy.wait(2000)) {
+        if (!spy.wait(2s)) {
             QTest::qFail(qPrintable(qsl("Could not connect with the host for '%1'.").arg(profileName)), __FILE__, __LINE__);
             return nullptr;
         }
@@ -110,12 +111,16 @@ private:
 
     // The property a rescued window has to end up with, stated in terms of what
     // the user gets rather than of the test the rescue itself applies
-    static bool fullyOnAScreen(const QWidget* widget)
+    // On an 800x800 offscreen desktop the editor opens at the desktop's size (EditorDefaultSizeTest),
+    // so even a window as far inside as it fits has its frame hanging over an edge
+    static bool asFarInsideTheDesktopAsItFits(const QWidget* widget)
     {
         const QRect frame = widget->frameGeometry();
         const QList<QScreen*> screens = QApplication::screens();
         return std::any_of(screens.cbegin(), screens.cend(), [&frame](const QScreen* screen) {
-            return screen->availableGeometry().contains(frame);
+            const QRect available = screen->availableGeometry();
+            const QRect onIt = available.intersected(frame);
+            return onIt.width() >= qMin(frame.width(), available.width()) && onIt.height() >= qMin(frame.height(), available.height());
         });
     }
 
@@ -140,7 +145,7 @@ private:
         // reposition that happens after the window is shown, and a QTRY_ would
         // stop looking the moment the position was still right
         QTest::qWait(50ms);
-        return mpHost->mpEditorDialog;
+        return HostDialogs::of(mpHost).mpEditorDialog;
     }
 
 private slots:
@@ -173,7 +178,7 @@ private slots:
             return;
         }
 
-        mpEditor = mpHost->mpEditorDialog;
+        mpEditor = HostDialogs::of(mpHost).mpEditorDialog;
         QVERIFY2(mpEditor != nullptr, "Editor dialog should be created");
     }
 
@@ -223,7 +228,7 @@ private slots:
         // stop looking the moment the position was still right
         QTest::qWait(50ms);
 
-        QCOMPARE(mpHost->mpEditorDialog.data(), mpEditor);
+        QCOMPARE(HostDialogs::of(mpHost).mpEditorDialog.data(), mpEditor);
         QCOMPARE(mpEditor->pos(), left);
     }
 
@@ -235,7 +240,7 @@ private slots:
         QVERIFY2(!touchesAnyScreen(mpEditor), "setup: the editor has to really be off every screen before it is reopened");
 
         QCOMPARE(reopenEditor(), mpEditor);
-        QVERIFY2(fullyOnAScreen(mpEditor), "An editor left where no screen covers it should be brought back into view");
+        QVERIFY2(asFarInsideTheDesktopAsItFits(mpEditor), "An editor left where no screen covers it should be brought back into view");
     }
 
     // Dragged off the top edge of a monitor mounted above the main one: still
@@ -249,7 +254,7 @@ private slots:
         QVERIFY2(mpEditor->frameGeometry().top() < screen.top(), "setup: the title bar has to be above the top of the screen");
 
         QCOMPARE(reopenEditor(), mpEditor);
-        QVERIFY2(fullyOnAScreen(mpEditor), "An editor whose title bar cannot be reached should be brought back into view");
+        QVERIFY2(asFarInsideTheDesktopAsItFits(mpEditor), "An editor whose title bar cannot be reached should be brought back into view");
     }
 
     // Pushed off the side until only a few pixels of title bar are left: still
@@ -261,7 +266,7 @@ private slots:
         QVERIFY2(touchesAnyScreen(mpEditor), "setup: this case is about a window that does still overlap a screen");
 
         QCOMPARE(reopenEditor(), mpEditor);
-        QVERIFY2(fullyOnAScreen(mpEditor), "An editor left as a sliver at the screen edge should be brought back into view");
+        QVERIFY2(asFarInsideTheDesktopAsItFits(mpEditor), "An editor left as a sliver at the screen edge should be brought back into view");
     }
 
     // The other side of that: hanging off an edge is a position people choose on
@@ -271,7 +276,7 @@ private slots:
         const QRect screen = QApplication::primaryScreen()->availableGeometry();
         const QPoint hangingOff(screen.right() - 200, screen.top() + 40);
         placeEditorAtAndClose(mpEditor, hangingOff);
-        QVERIFY2(!fullyOnAScreen(mpEditor), "setup: most of the window has to be off the screen for this to discriminate");
+        QVERIFY2(!asFarInsideTheDesktopAsItFits(mpEditor), "setup: most of the window has to be off the screen for this to discriminate");
 
         QCOMPARE(reopenEditor(), mpEditor);
         QCOMPARE(mpEditor->pos(), hangingOff);
@@ -282,14 +287,17 @@ private slots:
     void testTheFirstEverEditorIsCentred()
     {
         MudletApp::getQSettings()->remove("script_editor_pos");
-        delete mpHost->mpEditorDialog.data();
+        delete HostDialogs::of(mpHost).mpEditorDialog.data();
 
         mpEditor = reopenEditor();
         QVERIFY2(mpEditor != nullptr, "The editor should have been built again");
 
         const QRect screen = QApplication::primaryScreen()->availableGeometry();
         const QSize editorSize = mpEditor->size();
-        QCOMPARE(mpEditor->pos(), QPoint(screen.center().x() - editorSize.width() / 2, screen.center().y() - editorSize.height() / 2));
+        const QPoint centred(screen.center().x() - editorSize.width() / 2, screen.center().y() - editorSize.height() / 2);
+        // Centring an editor as wide or tall as the desktop would hang its title bar off the
+        // leading edge, so it is pushed flush against that edge instead
+        QCOMPARE(mpEditor->pos(), QPoint(std::max(screen.left(), centred.x()), std::max(screen.top(), centred.y())));
     }
 
     // The position is written on close and has to be read back when the editor
@@ -301,8 +309,8 @@ private slots:
         const QSize leftSize = mpEditor->size();
         QCOMPARE(MudletApp::getQSettings()->value("script_editor_pos").toPoint(), left);
 
-        delete mpHost->mpEditorDialog.data();
-        QVERIFY(mpHost->mpEditorDialog.isNull());
+        delete HostDialogs::of(mpHost).mpEditorDialog.data();
+        QVERIFY(HostDialogs::of(mpHost).mpEditorDialog.isNull());
 
         mpEditor = reopenEditor();
         QVERIFY2(mpEditor != nullptr, "The editor should have been built again");
@@ -320,7 +328,7 @@ private slots:
         if (QTest::currentTestFailed()) {
             return;
         }
-        dlgTriggerEditor* pSecondEditor = pSecondHost->mpEditorDialog;
+        dlgTriggerEditor* pSecondEditor = HostDialogs::of(pSecondHost).mpEditorDialog;
         QVERIFY2(pSecondEditor != nullptr, "The second profile should have built an editor of its own");
         QVERIFY2(pSecondEditor != mpEditor, "The two profiles should not be sharing one editor");
 
@@ -359,7 +367,7 @@ private slots:
         TDetachedWindow* pDetachedWindow = mudlet::self()->getDetachedWindows().value(mDetachedProfileName);
         QVERIFY2(pDetachedWindow != nullptr, qPrintable(qsl("detaching tab %1 produced no window for '%2'").arg(QString::number(tabIndex), mDetachedProfileName)));
 
-        dlgTriggerEditor* pDetachedEditor = pDetachedHost->mpEditorDialog;
+        dlgTriggerEditor* pDetachedEditor = HostDialogs::of(pDetachedHost).mpEditorDialog;
         QVERIFY2(pDetachedEditor != nullptr, "The detached profile should have built an editor of its own");
         const QPoint left = offCentrePoint() + QPoint(51, 53);
         placeEditorAtAndClose(pDetachedEditor, left);
@@ -367,7 +375,7 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(pDetachedWindow, "slot_showTriggerDialog", Qt::DirectConnection));
         QTest::qWait(50ms);
 
-        QCOMPARE(pDetachedHost->mpEditorDialog.data(), pDetachedEditor);
+        QCOMPARE(HostDialogs::of(pDetachedHost).mpEditorDialog.data(), pDetachedEditor);
         QCOMPARE(pDetachedEditor->pos(), left);
 
         mudlet::self()->slot_tabReattachRequested(mDetachedProfileName);

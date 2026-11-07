@@ -20,11 +20,14 @@
 #ifndef MUDLET_CREDENTIALMANAGER_H
 #define MUDLET_CREDENTIALMANAGER_H
 
+#include <QElapsedTimer>
+#include <QHash>
 #include <QObject>
 #include <QString>
 #include <QPointer>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 class QTimer;
@@ -64,6 +67,10 @@ class CredentialManager : public QObject
     friend class CredentialManagerKeychainTest;
     // Stalls the keychain behind a profile's own password lookup
     friend class TelnetLatePasswordTest;
+    // Reads the storage preference with no main window
+    friend class HeadlessHostSmokeTest;
+    // Answers the keychain for the managers a profile with no main window makes itself
+    friend class HeadlessSessionTest;
 
 public:
     explicit CredentialManager(QObject* parent = nullptr);
@@ -72,9 +79,26 @@ public:
     // Callback types for asynchronous operations
     using CredentialCallback = std::function<void(bool success, const QString& errorMessage)>;
     using CredentialRetrievalCallback = std::function<void(bool success, QString password, const QString& errorMessage)>;
-    // timedOut: it was the lookup's deadline that answered, not the keychain
-    using TimedRetrievalCallback = std::function<void(bool success, QString password, const QString& errorMessage, bool timedOut)>;
+    // Why a read came back without a password; success is always outcome == Found. After NothingStored the
+    // store has answered, so a caller may remove or replace what it holds, which it cannot after Unreadable,
+    // Unavailable or TimedOut, the lookup's deadline answering. Unreadable is a store saying no - the keychain
+    // refusing the read, or a file that is there but will not read; Unavailable is a store that could not be
+    // asked at all - no keychain service, a name no file can be made for, or a read refused before it started.
+    enum class ReadOutcome { Found, NothingStored, Unreadable, Unavailable, TimedOut };
+    using TimedRetrievalCallback = std::function<void(bool success, QString password, const QString& errorMessage, ReadOutcome outcome)>;
     using AvailabilityCallback = std::function<void(bool available, const QString& message)>;
+
+    // How far a removal or an existence check reaches when the storage preference puts credentials
+    // in the profile: an entry stored before the player made that choice is still in the keychain.
+    enum class StoreScope {
+        // Only where the preference files the credential. For removals the client makes on its own -
+        // a rejected token discarded, say - which the game can trigger as often as it likes, so they
+        // must not cost the player a keychain prompt each time.
+        PreferredStore,
+        // The keychain as well, for what the player asks for by name: forgetting a saved sign-in has
+        // to forget every copy of it.
+        EveryStore
+    };
 
     // Hybrid password management methods (preferred public API)
     // These methods intelligently choose between keychain and SecureStringUtils based on availability and portable mode
@@ -82,23 +106,39 @@ public:
     void retrievePassword(const QString& profileName, const QString& key, CredentialRetrievalCallback callback);
     // For a caller that can still use a password the keychain hands over after the lookup gave up
     // on it, as it does when the user answers an access or unlock prompt late. callback is answered
-    // exactly once, as above. When that answer is the deadline's, lateCallback is answered once
-    // more with what the read the lookup was left waiting on finds, as long as lateContext still
-    // exists by then. That read only: the places the lookup had not reached yet stay unread.
-    void retrievePassword(const QString& profileName, const QString& key, TimedRetrievalCallback callback, QObject* lateContext, CredentialRetrievalCallback lateCallback);
-    void removePassword(const QString& profileName, const QString& key, CredentialCallback callback);
+    // exactly once, as above. When that answer is the deadline's - a timeout, or the encrypted
+    // file's copy read then - lateCallback is answered once more with what the read the lookup was
+    // left waiting on finds, as long as lateContext still exists by then. That read only: the places the lookup had not reached yet stay unread.
+    // scope EveryStore reads the keychain even when the preference files the credential in the
+    // profile, for a copy stored there before the player chose it.
+    void retrievePassword(const QString& profileName,
+                          const QString& key,
+                          TimedRetrievalCallback callback,
+                          QObject* lateContext,
+                          CredentialRetrievalCallback lateCallback,
+                          StoreScope scope = StoreScope::PreferredStore);
+    void removePassword(const QString& profileName, const QString& key, CredentialCallback callback, StoreScope scope = StoreScope::EveryStore);
     // Existence check that never hands the stored secret to the caller. QtKeychain has no metadata-only
     // lookup, so this reads the credential internally but forwards only whether one exists (scrubbing the
     // retrieved value), so callers such as UI code need not materialize the secret just to test presence.
-    void credentialExists(const QString& profileName, const QString& key, std::function<void(bool exists)> callback);
+    void credentialExists(const QString& profileName, const QString& key, std::function<void(bool exists)> callback, StoreScope scope = StoreScope::PreferredStore);
+
+    // A failed retrieval's errorMessage when an encrypted file is there but cannot be opened or decrypted,
+    // so a caller can ask for the password again rather than say none is saved. Callers compare against it.
+    static QString unreadableFileError(const QString& profileName);
 
     // What this manager's last store left readable by other accounts, or empty. Kept per manager, not
     // process-wide, so the report is about this store and not a failure elsewhere in the meantime.
     QString unprotectedSecretPath() const { return mUnprotectedSecretPath; }
 
+    // Why the keychain refused this manager's last store when it was then saved to the encrypted file
+    // in the profile instead and reported as a success; empty otherwise.
+    QString keychainRefusal() const { return mKeychainRefusal; }
+
     // Static fallback methods (for migration and test cleanup - uses encrypted file storage)
     static bool storeCredential(const QString& profileName, const QString& key, const QString& credential);
-    static QString retrieveCredential(const QString& profileName, const QString& key);
+    // failure, when given, says why nothing came back, as for retrieveCredentialFromFile()
+    static QString retrieveCredential(const QString& profileName, const QString& key, ReadOutcome* failure = nullptr);
     static bool removeCredential(const QString& profileName, const QString& key);
 
 private:
@@ -112,8 +152,6 @@ private:
     // Check if QtKeychain is available and working (asynchronous)
     void isKeychainAvailable(AvailabilityCallback callback);
 
-    // Password migration method - migrates plaintext passwords to encrypted storage
-    void migratePassword(const QString& profileName, const QString& key, const QString& plaintextPassword, CredentialCallback callback);
     static constexpr int OPERATION_TIMEOUT_MS = 30000; // 30 seconds
 
     // Portable mode detection
@@ -134,7 +172,8 @@ private:
     // Static utility methods for fallback storage
     static QString generateFilePath(const QString& profileName, const QString& key);
     static QString generateLegacyFilePath(const QString& profileName, const QString& key);
-    static QString readLegacyFileCredential(const QString& profileName, const QString& key);
+    // unreadable, when given, is set when the older-named file is there but cannot be opened
+    static QString readLegacyFileCredential(const QString& profileName, const QString& key, bool* unreadable = nullptr, bool* usedDerivableKey = nullptr);
     static QString ourLegacyFilePath(const QString& profileName, const QString& key);
     static void refreshLegacyFileCredential(const QString& profileName, const QString& key, const QString& credential);
     static void removeLegacyFileCredential(const QString& profileName, const QString& key);
@@ -143,7 +182,9 @@ private:
     static bool isValidKeyName(const QString& key);
     static bool storeCredentialToFile(const QString& profileName, const QString& key, const QString& credential);
     bool storeCredentialToFileForThisOperation(const QString& profileName, const QString& key, const QString& credential);
-    static QString retrieveCredentialFromFile(const QString& profileName, const QString& key);
+    // failure, when given, says why nothing came back: NothingStored, Unreadable for a file there that
+    // cannot be opened or decrypted, or Unavailable when no valid path can be made
+    static QString retrieveCredentialFromFile(const QString& profileName, const QString& key, ReadOutcome* failure = nullptr);
     static bool removeCredentialFromFile(const QString& profileName, const QString& key);
 
     // One place a lookup may find the password: a keychain entry, or the encrypted file. recover
@@ -175,13 +216,65 @@ private:
         bool answered = false;
         std::size_t currentStage = 0;
         // The first read that failed for a reason other than there being no such entry, reported in
-        // place of "not found" if nothing turns up.
+        // place of "not found" if nothing turns up and the file was readable.
         QString keychainError;
+        // Whether any read has reached the store, answering either with a password or with "no such
+        // entry". Until one has, a refusal is the store itself saying no - locked, or a prompt the
+        // player dismissed - and the layouts behind it cannot be read either. Once one has, every
+        // refusal after it is that entry's own, however many of them there are, and the chain runs
+        // to the end: the password may be in a layout behind them.
+        bool storeHasAnswered = false;
+        // Why the encrypted file gave nothing; anything but NothingStored means it is not proof of absence
+        ReadOutcome fileOutcome = ReadOutcome::NothingStored;
+        // Whether the keychain refused any read, now or within the refusal window, as opposed to
+        // failing for want of a service to ask
+        bool keychainRefused = false;
+        // Set when the store has refused scmRefusalsBeforeGivingUpOnTheStore reads in a row without
+        // answering any: every remaining keychain read would ask it the same question, and be
+        // refused the same way, at the cost of another prompt. Only the file is read from then on.
+        bool storeRefused = false;
+        // Refusals since the last read the store answered. One can be an entry of its own that the
+        // player - or a per-item ACL - has locked away while the rest of the store is readable, so
+        // one is not enough to give up on the layouts behind it.
+        int consecutiveRefusals = 0;
     };
     using LookupPtr = std::shared_ptr<Lookup>;
 
-    void finishLookup(const LookupPtr& lookup, bool success, QString password, const QString& errorMessage, bool timedOut = false);
+    void finishLookup(const LookupPtr& lookup, QString password, const QString& errorMessage, ReadOutcome outcome);
     void runLookupStage(const LookupPtr& lookup, std::size_t index);
+    // When the store last refused a profile's reads before answering any of them. Kept per profile
+    // and across managers, because a caller asking about two keys - the profile preferences ask
+    // about "reconnect" and then "reconnect-token" - builds a CredentialManager for each, and the
+    // point is to spare the player a second prompt for the answer the first one already gave. Not
+    // wider than the profile: another profile's entries may be readable, and a lookup for one of
+    // those must not be answered out of the file because of a refusal that was nothing to do with
+    // it. It runs out rather than latching, so a player who unlocks their keychain is not left
+    // without it until they restart: while it is open no read reaches the store, so the window's
+    // own expiry - or a lookup that began before it opened, whose reads the store then answers - is
+    // what ends it. A write is deliberately not enough, for the reason storeCredential() gives.
+    static QHash<QString, QElapsedTimer>& storeRefusals();
+    static bool storeRefusedRecently(const QString& profileName);
+    static void noteStoreRefusal(const QString& profileName);
+    // Forgets every refusal window. The state outlives one test, and a case that had a read refused
+    // would otherwise decide what the cases after it are allowed to ask the store.
+    static void forgetStoreRefusal();
+
+    // Whether the player asked for passwords to be kept in the profile rather than in secure
+    // storage.
+    static bool profileStoragePreferred();
+    // Test-only: stands in for that preference.
+    static std::optional<bool>& profileStorageOverrideForTesting();
+    // Whether the preference alone is what keeps this manager off the keychain, so a copy stored
+    // there before the player chose the profile may remain. Never for a portable install or a test
+    // run, which have never written to the keychain through here.
+    bool keychainMayHoldAnEarlierCopy() const;
+    static constexpr int scmStoreRefusalCooldownMs = 30000;
+    // How many reads the store may refuse, without answering any of them, before a lookup stops
+    // asking it. Two rather than one: a single refusal can be one entry's own, and an older layout
+    // behind it may still hold the password, so the second read is what tells a locked or dismissed
+    // store apart from an entry that is simply not readable. Fewer when the chain runs out of keychain
+    // reads first; see runLookupStage().
+    static constexpr int scmRefusalsBeforeGivingUpOnTheStore = 2;
     // Hands the answer of the read the deadline cut short to the lookup's lateCallback, whenever
     // the keychain gets round to giving it
     static void awaitLateAnswer(const LookupPtr& lookup);
@@ -204,12 +297,15 @@ private:
     // What mCurrentJob is doing, for the log line if it is abandoned before it answers.
     QString mCurrentOperationDescription;
     QString mUnprotectedSecretPath;
+    QString mKeychainRefusal;
 
     int mOperationTimeoutMs = OPERATION_TIMEOUT_MS;
     // Called with each keychain job just before it starts, so a test can make one stall or fail.
     // Returning false leaves the job unstarted for the hook to answer. A job that has reached the store
     // can't be cancelled and the store keeps a pointer to it, so only the store may answer that one.
     std::function<bool(QKeychain::Job*)> mJobStartHook;
+    // Test-only: the hook every manager made from then on starts with, for one the code under test makes itself
+    static std::function<bool(QKeychain::Job*)>& jobStartHookForTesting();
 
     // Destruction flag to prevent operations during cleanup
     bool mShuttingDown = false;

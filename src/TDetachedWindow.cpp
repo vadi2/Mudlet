@@ -23,19 +23,24 @@
 #include "TTabBar.h"
 #include "TDebug.h"
 #include "Host.h"
+#include "HostDialogs.h"
 #include "HostManager.h"
 #include "mudlet.h"
 #include "MudletApp.h"
+#include "MudletMedia.h"
 #include "widgetutils.h"
 #include "utils.h"
 #include "dlgMapper.h"
 #include "TRoomDB.h"
 #include "TMap.h"
+#include "ToolBarOverflow.h"
 #include "dlgProfilePreferences.h"
 #include "dlgNotepad.h"
 #include "dlgPackageManager.h"
 #include "dlgModuleManager.h"
 #include "dlgTriggerEditor.h"
+#include <QResizeEvent>
+#include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QMenuBar>
 #include <QAction>
@@ -66,6 +71,14 @@
 
 using namespace std::chrono_literals;
 
+namespace {
+// Qt reads a "&" in a menu item's text as a mnemonic, and a profile name or window title may hold one
+QString menuItemSafe(const QString& text)
+{
+    return QString(text).replace(QLatin1Char('&'), QLatin1String("&&"));
+}
+} // namespace
+
 // Deliberately parentless: a QWidget parent on a top-level window gives it a
 // QWindow transient parent, and Windows implements that as native window
 // ownership - an owned window is pinned above its owner forever, so clicking the
@@ -85,10 +98,13 @@ TDetachedWindow::TDetachedWindow(const QString& profileName, TMainConsole* conso
     createMenus();
     restoreWindowGeometry();
 
-    // Set initial toolbar visibility based on main window state
-    if (mpToolBar) {
-        mpToolBar->setVisible(toolbarVisible);
+    if (auto* media = MudletMedia::self()) {
+        showMuteState();
+        connect(media, &MudletMedia::signal_muteSet, this, &TDetachedWindow::showMuteState);
     }
+
+    // Set initial toolbar visibility based on main window state
+    setToolBarVisibility(toolbarVisible);
 
     // Set window properties
     //: This is the title of a Mudlet window which was detached from the main Mudlet window, and %1 is the name of the profile.
@@ -205,7 +221,12 @@ void TDetachedWindow::setupUI()
         mpTabBar->setTabData(0, mCurrentProfileName);
     }
 
-    mpMainLayout->addWidget(mpTabBar);
+    // QTabBar lays its first tab out at x = 0 and ignores its own contents margins
+    auto pTabStrip = new QHBoxLayout;
+    pTabStrip->setContentsMargins(uiDesign::scmTabStripInset, 0, 0, 0);
+    pTabStrip->setSpacing(0);
+    pTabStrip->addWidget(mpTabBar);
+    mpMainLayout->addLayout(pTabStrip);
 
     // Create a stacked widget to hold multiple consoles
     mpConsoleContainer = new QStackedWidget(centralWidget);
@@ -308,14 +329,14 @@ void TDetachedWindow::createMenus()
     connect(mpMenuScriptEditorAction, &QAction::triggered, this, &TDetachedWindow::slot_showTriggerDialog);
     toolboxMenu->addAction(mpMenuScriptEditorAction);
 
-    //: This is an item in the "Toolbox" menu in the menubar of a detached Mudlet window.
+    //: This is an item in the "Toolbox" menu in the menubar of a detached Mudlet window. Its "&" letter must differ from the other items in that menu, "Package exporter" among them.
     auto showErrorsAction = new QAction(tr("Show &errors"), this);
     //: This explains the "Show errors" item in the "Toolbox" menu in the menubar of a detached Mudlet window.
     showErrorsAction->setStatusTip(tr("Show errors from scripts that you have running"));
     connect(showErrorsAction, &QAction::triggered, this, &TDetachedWindow::slot_showEditorDialog);
     toolboxMenu->addAction(showErrorsAction);
 
-    //: This is an item in the "Toolbox" menu in the menubar of a detached Mudlet window.
+    //: This is an item in the "Toolbox" menu in the menubar of a detached Mudlet window. Its "&" letter must differ from the other items in that menu, "Module manager" among them.
     mpMenuShowMapAction = new QAction(tr("Show &map"), this);
     //: This explains the "Show map" item in the "Toolbox" menu in the menubar of a detached Mudlet window.
     mpMenuShowMapAction->setStatusTip(tr("Show or hide the game map."));
@@ -352,15 +373,15 @@ void TDetachedWindow::createMenus()
     connect(replayAction, &QAction::triggered, this, &TDetachedWindow::slot_showReplayDialog);
     toolboxMenu->addAction(replayAction);
 
-    //: This is an item in the "Toolbox" menu in the menubar of a detached Mudlet window.
-    mpMenuModuleManagerAction = new QAction(tr("&Module manager"), this);
+    //: This is an item in the "Toolbox" menu in the menubar of a detached Mudlet window. Its "&" letter must differ from the other items in that menu, "Show map" among them.
+    mpMenuModuleManagerAction = new QAction(tr("M&odule manager"), this);
     //: This explains the "Module manager" item in the "Toolbox" menu in the menubar of a detached Mudlet window.
     mpMenuModuleManagerAction->setStatusTip(tr("Install and remove (share- & sync-able) collections of Mudlet lua items (modules)."));
     connect(mpMenuModuleManagerAction, &QAction::triggered, this, &TDetachedWindow::slot_showModuleManagerDialog);
     toolboxMenu->addAction(mpMenuModuleManagerAction);
 
-    //: This is an item in the "Toolbox" menu in the menubar of a detached Mudlet window.
-    auto packageExporterAction = new QAction(tr("Package &exporter"), this);
+    //: This is an item in the "Toolbox" menu in the menubar of a detached Mudlet window. Its "&" letter must differ from the other items in that menu, "Show errors" among them.
+    auto packageExporterAction = new QAction(tr("Package e&xporter"), this);
     //: This explains the "Package exporter" item in the "Toolbox" menu in the menubar of a detached Mudlet window.
     packageExporterAction->setStatusTip(tr("Gather and bundle up collections of Mudlet Lua items and other reasources into a module."));
     connect(packageExporterAction, &QAction::triggered, this, &TDetachedWindow::slot_showPackageExporterDialog);
@@ -413,24 +434,27 @@ void TDetachedWindow::createMenus()
     //: This explains the "Mute all media" item in the "Options" menu in the menubar of a detached Mudlet window.
     mpMenuMuteMediaAction->setStatusTip(tr("Mutes all media played."));
     mpMenuMuteMediaAction->setCheckable(true);
+    mpMenuMuteMediaAction->setObjectName(qsl("menuMuteMedia"));
     connect(mpMenuMuteMediaAction, &QAction::triggered, this, &TDetachedWindow::slot_muteMedia);
     optionsMenu->addAction(mpMenuMuteMediaAction);
 
     //: This is an item in the "Options" menu in the menubar of a detached Mudlet window.
-    auto muteAPIAction = new QAction(tr("Mute sounds from Mudlet (triggers, scripts, etc.)"), this);
+    mpMenuMuteAPIAction = new QAction(tr("Mute sounds from Mudlet (triggers, scripts, etc.)"), this);
     //: This explains the "Mute sounds from Mudlet (triggers, scripts, etc.)" item in the "Options" menu in the menubar of a detached Mudlet window.
-    muteAPIAction->setStatusTip(tr("Mutes media played by the Lua API and scripts."));
-    muteAPIAction->setCheckable(true);
-    connect(muteAPIAction, &QAction::triggered, this, &TDetachedWindow::slot_muteAPI);
-    optionsMenu->addAction(muteAPIAction);
+    mpMenuMuteAPIAction->setStatusTip(tr("Mutes media played by the Lua API and scripts."));
+    mpMenuMuteAPIAction->setCheckable(true);
+    mpMenuMuteAPIAction->setObjectName(qsl("menuMuteAPI"));
+    connect(mpMenuMuteAPIAction, &QAction::triggered, this, &TDetachedWindow::slot_muteAPI);
+    optionsMenu->addAction(mpMenuMuteAPIAction);
 
     //: This is an item in the "Options" menu in the menubar of a detached Mudlet window.
-    auto muteGameAction = new QAction(tr("Mute sounds from the game (MCMP, MSP)"), this);
+    mpMenuMuteGameAction = new QAction(tr("Mute sounds from the game (MCMP, MSP)"), this);
     //: This explains the "Mute sounds from the game (MCMP, MSP)" item in the "Options" menu in the menubar of a detached Mudlet window.
-    muteGameAction->setStatusTip(tr("Mutes media played by the game (MCMP, MSP)."));
-    muteGameAction->setCheckable(true);
-    connect(muteGameAction, &QAction::triggered, this, &TDetachedWindow::slot_muteGame);
-    optionsMenu->addAction(muteGameAction);
+    mpMenuMuteGameAction->setStatusTip(tr("Mutes media played by the game (MCMP, MSP)."));
+    mpMenuMuteGameAction->setCheckable(true);
+    mpMenuMuteGameAction->setObjectName(qsl("menuMuteGame"));
+    connect(mpMenuMuteGameAction, &QAction::triggered, this, &TDetachedWindow::slot_muteGame);
+    optionsMenu->addAction(mpMenuMuteGameAction);
 
     // Window menu - matches main window order (except reattach vs detach)
     //: This is the name of a menu in the menubar of a detached Mudlet window. Please do not add an "&" to the translation: it would become a keyboard shortcut for the whole window and stop one of the window's other shortcuts from working.
@@ -444,7 +468,7 @@ void TDetachedWindow::createMenus()
     connect(fullScreenAction, &QAction::triggered, this, &TDetachedWindow::slot_toggleFullScreen);
     mpWindowMenu->addAction(fullScreenAction);
 
-    //: This is an item in the "Window" menu in the menubar of a detached Mudlet window.
+    //: This is an item in the "Window" menu in the menubar of a detached Mudlet window. Its "&" letter must differ from the other items in that menu, "Minimize" among them.
     mpMenuMultiViewAction = new QAction(tr("&Multiview"), this);
     //: This explains the "Multiview" item in the "Window" menu in the menubar of a detached Mudlet window.
     mpMenuMultiViewAction->setStatusTip(tr("Splits the Mudlet screen to show multiple profiles at once; disabled when less than two are loaded."));
@@ -471,8 +495,8 @@ void TDetachedWindow::createMenus()
     connect(alwaysOnTopAction, &QAction::triggered, this, &TDetachedWindow::slot_toggleAlwaysOnTop);
     mpWindowMenu->addAction(alwaysOnTopAction);
 
-    //: This is an item in the "Window" menu in the menubar of a detached Mudlet window.
-    auto minimizeAction = new QAction(tr("&Minimize"), this);
+    //: This is an item in the "Window" menu in the menubar of a detached Mudlet window. Its "&" letter must differ from the other items in that menu, "Multiview" among them.
+    auto minimizeAction = new QAction(tr("Mi&nimize"), this);
     //: This explains the "Minimize" item in the "Window" menu in the menubar of a detached Mudlet window.
     minimizeAction->setStatusTip(tr("Minimize this window"));
     connect(minimizeAction, &QAction::triggered, this, &QWidget::showMinimized);
@@ -536,14 +560,14 @@ void TDetachedWindow::createMenus()
     aboutMenu->addAction(aboutAction);
 
 #if defined(INCLUDE_UPDATER)
-    //: This is an item in the "About" menu in the menubar of a detached Mudlet window.
-    auto updateAction = new QAction(tr("&Check for updates..."), this);
+    //: This is an item in the "About" menu in the menubar of a detached Mudlet window. Its "&" letter must differ from the other items in that menu, "Show changelog" among them.
+    auto updateAction = new QAction(tr("Check for &updates..."), this);
     //: This explains the "Check for updates..." item in the "About" menu in the menubar of a detached Mudlet window.
     updateAction->setStatusTip(tr("Check for newer versions of Mudlet"));
     connect(updateAction, &QAction::triggered, pMudlet, &mudlet::slot_manualUpdateCheck);
     aboutMenu->addAction(updateAction);
 
-    //: This is an item in the "About" menu in the menubar of a detached Mudlet window.
+    //: This is an item in the "About" menu in the menubar of a detached Mudlet window. Its "&" letter must differ from the other items in that menu, "Check for updates..." among them.
     auto changelogAction = new QAction(tr("Show &changelog"), this);
     //: This explains the "Show changelog" item in the "About" menu in the menubar of a detached Mudlet window.
     changelogAction->setStatusTip(tr("Show the changelog for this version"));
@@ -558,18 +582,44 @@ void TDetachedWindow::createMenus()
     connect(reportIssueAction, &QAction::triggered, this, &TDetachedWindow::slot_reportIssue);
     aboutMenu->addAction(reportIssueAction);
 
-    // Toolbar visibility toggle
-    //: This is an item for the toolbar visibility toggle in a detached Mudlet window.
-    mpActionToggleToolBar = new QAction(tr("Show &Toolbar"), this);
+    // Toolbar visibility toggle; the constructor checks it, once the toolbar has its state
+    //: This is an item in the "Window" menu in the menubar of a detached Mudlet window. Its "&" letter must differ from the other items in that menu, "Always on Top" among them.
+    mpActionToggleToolBar = new QAction(tr("Show Tool&bar"), this);
     mpActionToggleToolBar->setObjectName(qsl("toggle_toolbar_action"));
     mpActionToggleToolBar->setCheckable(true);
-    mpActionToggleToolBar->setChecked(mpToolBar ? mpToolBar->isVisible() : true);
-    //: This explains the "Show Toolbar" action for toolbar visibility in a detached Mudlet window.
+    //: This explains the "Show Toolbar" item in the "Window" menu in the menubar of a detached Mudlet window.
     mpActionToggleToolBar->setStatusTip(tr("Show or hide the toolbar"));
     connect(mpActionToggleToolBar, &QAction::triggered, this, &TDetachedWindow::slot_toggleToolBarVisibility);
+    mpWindowMenu->insertAction(minimizeAction, mpActionToggleToolBar);
 
     // Connect the Window menu's aboutToShow signal to update the window list
     connect(mpWindowMenu, &QMenu::aboutToShow, this, &TDetachedWindow::updateWindowMenu);
+}
+
+// Qt names each dock and toolbar in this menu by its title, which stays unescaped
+// because it is also the caption of the floating window. Escaped from the title
+// rather than the action's text, which keeps what the last popup set
+QMenu* TDetachedWindow::createPopupMenu()
+{
+    QMenu* pMenu = QMainWindow::createPopupMenu();
+    if (!pMenu) {
+        return nullptr;
+    }
+    const auto listed = pMenu->actions();
+    const auto escape = [&listed](QAction* pToggle, const QString& title) {
+        if (listed.contains(pToggle)) {
+            pToggle->setText(menuItemSafe(title));
+        }
+    };
+    const auto docks = findChildren<QDockWidget*>();
+    for (QDockWidget* pDock : docks) {
+        escape(pDock->toggleViewAction(), pDock->windowTitle());
+    }
+    const auto toolBars = findChildren<QToolBar*>();
+    for (QToolBar* pToolBar : toolBars) {
+        escape(pToolBar->toggleViewAction(), pToolBar->windowTitle());
+    }
+    return pMenu;
 }
 
 void TDetachedWindow::closeEvent(QCloseEvent* event)
@@ -740,7 +790,7 @@ void TDetachedWindow::showTabContextMenu(const QPoint& position)
 
     auto reattachAction = contextMenu.addAction(QIcon(qsl(":/icons/view-restore.png")),
                                                 //: This is an item in the context menu when clicked on a detached tab, and %1 is the name of the profile.
-                                                tr("Reattach '%1' to Main Window").arg(profileName));
+                                                tr("Reattach '%1' to Main Window").arg(menuItemSafe(profileName)));
     connect(reattachAction, &QAction::triggered, [this, profileName] {
         // Switch to this profile first, then reattach
         switchToProfile(profileName);
@@ -751,7 +801,7 @@ void TDetachedWindow::showTabContextMenu(const QPoint& position)
 
     auto closeTabAction = contextMenu.addAction(QIcon(qsl(":/icons/profile-close.png")),
                                                 //: This is an item in the context menu when clicked on a detached tab, and %1 is the name of the profile.
-                                                tr("Close Profile '%1'").arg(profileName));
+                                                tr("Close Profile '%1'").arg(menuItemSafe(profileName)));
     connect(closeTabAction, &QAction::triggered, [this, tabIndex] {
         closeProfileByIndex(tabIndex);
     });
@@ -877,7 +927,6 @@ void TDetachedWindow::createToolBar()
 
     //: This is a sub-item of the "Connect" item in the toolbar of a detached Mudlet window.
     mpActionConnect = new QAction(tr("Connect"), this);
-    mpActionConnect->setIcon(QIcon(qsl(":/icons/preferences-web-browser-cache.png")));
     mpActionConnect->setIconText(tr("Connect"));
     mpActionConnect->setObjectName(qsl("connect"));
 
@@ -904,44 +953,45 @@ void TDetachedWindow::createToolBar()
     mpButtonConnect->setDefaultAction(mpActionConnect);
 
     // Script Editor Actions
-    mpActionTriggers = new QAction(QIcon(qsl(":/icons/tools-wizard.png")), tr("Triggers"), this);
+    mpActionTriggers = new QAction(tr("Triggers"), this);
     mpActionTriggers->setToolTip(utils::richText(tr("Show and edit triggers")));
     mpToolBar->addAction(mpActionTriggers);
     mpActionTriggers->setObjectName(qsl("triggers_action"));
 
-    mpActionAliases = new QAction(QIcon(qsl(":/icons/system-users.png")), tr("Aliases"), this);
+    mpActionAliases = new QAction(tr("Aliases"), this);
     mpActionAliases->setToolTip(utils::richText(tr("Show and edit aliases")));
     mpToolBar->addAction(mpActionAliases);
     mpActionAliases->setObjectName(qsl("aliases_action"));
 
-    mpActionTimers = new QAction(QIcon(qsl(":/icons/chronometer.png")), tr("Timers"), this);
+    mpActionTimers = new QAction(tr("Timers"), this);
     mpActionTimers->setToolTip(utils::richText(tr("Show and edit timers")));
     mpToolBar->addAction(mpActionTimers);
     mpActionTimers->setObjectName(qsl("timers_action"));
 
-    mpActionButtons = new QAction(QIcon(qsl(":/icons/bookmarks.png")), tr("Buttons"), this);
+    mpActionButtons = new QAction(tr("Buttons"), this);
     mpActionButtons->setToolTip(utils::richText(tr("Show and edit easy buttons")));
     mpToolBar->addAction(mpActionButtons);
     mpActionButtons->setObjectName(qsl("buttons_action"));
 
-    mpActionScripts = new QAction(QIcon(qsl(":/icons/document-properties.png")), tr("Scripts"), this);
+    mpActionScripts = new QAction(tr("Scripts"), this);
     mpActionScripts->setToolTip(utils::richText(tr("Show and edit scripts")));
     mpToolBar->addAction(mpActionScripts);
     mpActionScripts->setObjectName(qsl("scripts_action"));
 
-    mpActionKeys = new QAction(QIcon(qsl(":/icons/preferences-desktop-keyboard.png")), tr("Keys"), this);
+    mpActionKeys = new QAction(tr("Keys"), this);
     mpActionKeys->setToolTip(utils::richText(tr("Show and edit keys")));
     mpToolBar->addAction(mpActionKeys);
     mpActionKeys->setObjectName(qsl("keys_action"));
 
-    mpActionVariables = new QAction(QIcon(qsl(":/icons/variables.png")), tr("Variables"), this);
+    mpActionVariables = new QAction(tr("Variables"), this);
     mpActionVariables->setToolTip(utils::richText(tr("Show and edit Lua variables")));
     mpToolBar->addAction(mpActionVariables);
     mpActionVariables->setObjectName(qsl("variables_action"));
 
     // Mute button with dropdown
     mpButtonMute = new QToolButton(this);
-    mpButtonMute->setText(tr("Mute"));
+    //: Label under the toolbar button of a detached Mudlet window that mutes and unmutes all media; the button's icon shows the current state
+    mpButtonMute->setText(tr("Sound"));
     mpButtonMute->setObjectName(qsl("mute"));
     mpButtonMute->setContextMenuPolicy(Qt::ActionsContextMenu);
     mpButtonMute->setPopupMode(QToolButton::MenuButtonPopup);
@@ -949,19 +999,17 @@ void TDetachedWindow::createToolBar()
     mpToolBar->addWidget(mpButtonMute);
 
     mpActionMuteMedia = new QAction(tr("Mute all media"), this);
-    mpActionMuteMedia->setIcon(QIcon(qsl(":/icons/mute.png")));
-    mpActionMuteMedia->setIconText(tr("Mute all media"));
+    //: Label under the toolbar button of a detached Mudlet window that mutes and unmutes all media; the button's icon shows the current state
+    mpActionMuteMedia->setIconText(tr("Sound"));
     mpActionMuteMedia->setObjectName(qsl("muteMedia"));
     mpActionMuteMedia->setCheckable(true);
 
     mpActionMuteAPI = new QAction(tr("Mute sounds from Mudlet (triggers, scripts, etc.)"), this);
-    mpActionMuteAPI->setIcon(QIcon(qsl(":/icons/mute.png")));
     mpActionMuteAPI->setIconText(tr("Mute sounds from Mudlet (triggers, scripts, etc.)"));
     mpActionMuteAPI->setObjectName(qsl("muteAPI"));
     mpActionMuteAPI->setCheckable(true);
 
     mpActionMuteGame = new QAction(tr("Mute sounds from the game (MCMP, MSP)"), this);
-    mpActionMuteGame->setIcon(QIcon(qsl(":/icons/mute.png")));
     mpActionMuteGame->setIconText(tr("Mute sounds from the game (MCMP, MSP)"));
     mpActionMuteGame->setObjectName(qsl("muteGame"));
     mpActionMuteGame->setCheckable(true);
@@ -980,11 +1028,10 @@ void TDetachedWindow::createToolBar()
     mpToolBar->addWidget(mpButtonDiscord);
 
     mpActionDiscord = new QAction(tr("Open Discord"), this);
-    mpActionDiscord->setIcon(QIcon(qsl(":/icons/Discord-Logo-Color.png")));
     mpActionDiscord->setIconText(qsl("Discord"));
     mpActionDiscord->setObjectName(qsl("openDiscord"));
 
-    mpActionMudletDiscord = new QAction(QIcon(qsl(":/icons/mudlet_discord.png")), tr("Mudlet chat"), this);
+    mpActionMudletDiscord = new QAction(tr("Mudlet chat"), this);
     mpActionMudletDiscord->setToolTip(utils::richText(tr("Open a link to the Mudlet server on Discord")));
     mpToolBar->addAction(mpActionMudletDiscord);
     mpActionMudletDiscord->setObjectName(qsl("mudlet_discord"));
@@ -996,22 +1043,22 @@ void TDetachedWindow::createToolBar()
     mpButtonDiscord->setDefaultAction(mpActionDiscord);
 
     // Map and other tools
-    mpActionMapper = new QAction(QIcon(qsl(":/icons/applications-internet.png")), tr("Map"), this);
+    mpActionMapper = new QAction(tr("Map"), this);
     mpActionMapper->setToolTip(utils::richText(tr("Show/hide the map")));
     mpToolBar->addAction(mpActionMapper);
     mpActionMapper->setObjectName(qsl("map_action"));
 
-    mpActionHelp = new QAction(QIcon(qsl(":/icons/help-hint.png")), tr("Manual"), this);
+    mpActionHelp = new QAction(tr("Manual"), this);
     mpActionHelp->setToolTip(utils::richText(tr("Browse reference material and documentation")));
     mpToolBar->addAction(mpActionHelp);
     mpActionHelp->setObjectName(qsl("manual_action"));
 
-    mpActionOptions = new QAction(QIcon(qsl(":/icons/configure.png")), tr("Settings"), this);
+    mpActionOptions = new QAction(tr("Settings"), this);
     mpActionOptions->setToolTip(utils::richText(tr("See and edit profile preferences")));
     mpToolBar->addAction(mpActionOptions);
     mpActionOptions->setObjectName(qsl("settings_action"));
 
-    mpActionNotes = new QAction(QIcon(qsl(":/icons/applications-accessories.png")), tr("Notepad"), this);
+    mpActionNotes = new QAction(tr("Notepad"), this);
     mpActionNotes->setToolTip(utils::richText(tr("Open a notepad that you can store your notes in")));
     mpToolBar->addAction(mpActionNotes);
     mpActionNotes->setObjectName(qsl("notepad_action"));
@@ -1026,16 +1073,13 @@ void TDetachedWindow::createToolBar()
     mpToolBar->addWidget(mpButtonPackageManagers);
 
     mpActionPackageManager = new QAction(tr("Package Manager"), this);
-    mpActionPackageManager->setIcon(QIcon(qsl(":/icons/package-manager.png")));
     mpActionPackageManager->setIconText(tr("Packages"));
     mpActionPackageManager->setObjectName(qsl("package_manager"));
 
     mpActionModuleManager = new QAction(tr("Module Manager"), this);
-    mpActionModuleManager->setIcon(QIcon(qsl(":/icons/module-manager.png")));
     mpActionModuleManager->setObjectName(qsl("module_manager"));
 
     mpActionPackageExporter = new QAction(tr("Package Exporter"), this);
-    mpActionPackageExporter->setIcon(QIcon(qsl(":/icons/package-exporter.png")));
     mpActionPackageExporter->setObjectName(qsl("package_exporter"));
 
     mpButtonPackageManagers->addAction(mpActionPackageManager);
@@ -1043,32 +1087,55 @@ void TDetachedWindow::createToolBar()
     mpButtonPackageManagers->addAction(mpActionPackageExporter);
     mpButtonPackageManagers->setDefaultAction(mpActionPackageManager);
 
-    mpActionReplay = new QAction(QIcon(qsl(":/icons/media-optical.png")), tr("Replay"), this);
+    mpActionReplay = new QAction(tr("Replay"), this);
     mpActionReplay->setObjectName(qsl("replay_action"));
     mpToolBar->addAction(mpActionReplay);
 
     // Standalone Reconnect action (like main window)
-    mpActionReconnectStandalone = new QAction(QIcon(qsl(":/icons/system-restart.png")), tr("Reconnect"), this);
+    mpActionReconnectStandalone = new QAction(tr("Reconnect"), this);
     mpActionReconnectStandalone->setToolTip(utils::richText(tr("Disconnects you from the game and connects once again")));
     mpActionReconnectStandalone->setObjectName(qsl("reconnect_standalone"));
     mpToolBar->addAction(mpActionReconnectStandalone);
 
     // About action (like main window)
-    mpActionAbout = new QAction(QIcon(qsl(":/icons/mudlet_information.png")), tr("About"), this);
+    mpActionAbout = new QAction(tr("About"), this);
     //: Tooltip for About Mudlet toolbar button (Used in multiple places - please ensure all have the same translation).
     mpActionAbout->setToolTip(utils::richText(tr("About Mudlet version, creators, and license.")));
     mpActionAbout->setObjectName(qsl("about_action"));
     mpToolBar->addAction(mpActionAbout);
 
     // Full screen toggle
-    QIcon fullScreenIcon;
-    fullScreenIcon.addPixmap(qsl(":/icons/view-fullscreen.png"), QIcon::Normal, QIcon::Off);
-    fullScreenIcon.addPixmap(qsl(":/icons/view-restore.png"), QIcon::Normal, QIcon::On);
-    mpActionFullScreenView = new QAction(fullScreenIcon, tr("Full Screen"), this);
+    mpActionFullScreenView = new QAction(tr("Full Screen"), this);
     mpActionFullScreenView->setToolTip(utils::richText(tr("Toggle Full Screen View")));
     mpActionFullScreenView->setCheckable(true);
     mpActionFullScreenView->setObjectName(qsl("fullscreen_action"));
     mpToolBar->addAction(mpActionFullScreenView);
+
+    mToolBarGlyphs = {{mpActionConnect, qsl(":/icons/toolbar-connect.svg"), QString()},
+                      {mpActionTriggers, qsl(":/icons/editor-triggers.svg"), QString()},
+                      {mpActionAliases, qsl(":/icons/editor-aliases.svg"), QString()},
+                      {mpActionTimers, qsl(":/icons/editor-timers.svg"), QString()},
+                      {mpActionButtons, qsl(":/icons/editor-buttons.svg"), QString()},
+                      {mpActionScripts, qsl(":/icons/editor-scripts.svg"), QString()},
+                      {mpActionKeys, qsl(":/icons/editor-keys.svg"), QString()},
+                      {mpActionVariables, qsl(":/icons/editor-variables.svg"), QString()},
+                      {mpActionMuteMedia, qsl(":/icons/toolbar-sound-on.svg"), qsl(":/icons/toolbar-sound-off.svg")},
+                      {mpActionMuteAPI, qsl(":/icons/toolbar-sound-on.svg"), qsl(":/icons/toolbar-sound-off.svg")},
+                      {mpActionMuteGame, qsl(":/icons/toolbar-sound-on.svg"), qsl(":/icons/toolbar-sound-off.svg")},
+                      {mpActionDiscord, qsl(":/icons/toolbar-discord.png"), QString()},
+                      {mpActionMudletDiscord, qsl(":/icons/toolbar-discord.png"), QString()},
+                      {mpActionMapper, qsl(":/icons/toolbar-map.svg"), QString()},
+                      {mpActionHelp, qsl(":/icons/toolbar-manual.svg"), QString()},
+                      {mpActionOptions, qsl(":/icons/toolbar-settings.svg"), QString()},
+                      {mpActionNotes, qsl(":/icons/toolbar-notepad.svg"), QString()},
+                      {mpActionPackageManager, qsl(":/icons/toolbar-packages.svg"), QString()},
+                      {mpActionModuleManager, qsl(":/icons/editor-module.svg"), QString()},
+                      {mpActionPackageExporter, qsl(":/icons/toolbar-export.svg"), QString()},
+                      {mpActionReplay, qsl(":/icons/toolbar-replay.svg"), QString()},
+                      {mpActionReconnectStandalone, qsl(":/icons/toolbar-reconnect.svg"), QString()},
+                      {mpActionAbout, qsl(":/icons/toolbar-about.svg"), QString()},
+                      {mpActionFullScreenView, qsl(":/icons/toolbar-fullscreen.svg"), qsl(":/icons/toolbar-fullscreen-exit.svg")}};
+    restyleToolBarIcons();
 
     // Setup context menu for the toolbar
     mpToolBar->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -1192,6 +1259,12 @@ void TDetachedWindow::updateMenuShortcuts()
         }
 
         action->setShortcut(resolveShortcut(key, fallback));
+        // Held by the window too: Qt fires no shortcut of an action whose only
+        // containers are menus of a hidden menu bar. Adding one the window
+        // already holds would remove it and add it again.
+        if (!actions().contains(action)) {
+            addAction(action);
+        }
     };
 
 #if defined(Q_OS_MACOS)
@@ -1571,7 +1644,7 @@ void TDetachedWindow::updateDockWidgetVisibilityForProfile(const QString& profil
                             if (auto detachedMapper = qobject_cast<dlgMapper*>(mapWidget)) {
                                 // Only set as active mapper if the dock widget should be visible
                                 if (shouldBeVisible) {
-                                    pMap->mpMapper = detachedMapper;
+                                    pMap->setMapper(detachedMapper);
 #if defined(DEBUG_WINDOW_HANDLING)
                                     qDebug() << "TDetachedWindow: Set active mapper for profile" << profileName;
 #endif
@@ -1702,6 +1775,11 @@ void TDetachedWindow::setToolBarVisibility(bool visible)
     }
 }
 
+void TDetachedWindow::setMenuBarVisibility(bool visible)
+{
+    menuBar()->setVisible(visible);
+}
+
 bool TDetachedWindow::isToolBarVisible() const
 {
     // Returns false when mpToolBar is null — callers that distinguish
@@ -1733,7 +1811,7 @@ void TDetachedWindow::slot_saveProfile()
     Host* pHost = pHostManager->getHost(mCurrentProfileName);
 
     if (pHost) {
-        pHost->saveProfile();
+        pHost->saveProfileReportingFailure();
     }
 }
 
@@ -1755,6 +1833,9 @@ void TDetachedWindow::updateWindowMenu()
     if (!pMudlet) {
         return;
     }
+
+    // Disabled when hiding would cause lockout (menu bar also never shown)
+    mpActionToggleToolBar->setEnabled(!(isToolBarVisible() && !canHideToolBar()));
 
     // Clean up existing window list actions
     for (QAction* action : std::as_const(mWindowListActions)) {
@@ -1789,7 +1870,7 @@ void TDetachedWindow::updateWindowMenu()
         QStringList mainWindowProfiles;
 
         for (const auto& host : *HostManager::self()) {
-            if (host && host->mpConsole) {
+            if (host && host->mainConsoleView()) {
                 const QString profileName = host->getName();
                 // Only include profiles that are in the main window (not detached)
                 if (!detachedWindows.contains(profileName)) {
@@ -1802,7 +1883,7 @@ void TDetachedWindow::updateWindowMenu()
         if (!mainWindowProfiles.isEmpty()) {
             for (const QString& profileName : mainWindowProfiles) {
                 //: This is an item in list of profiles in the "Window" menu of a detached Mudlet window. %1 is the name of the profile, and it is located not in the detached window, but in Mudlet's main window.
-                QString actionText = tr("%1 (Main Window)").arg(profileName);
+                QString actionText = tr("%1 (Main Window)").arg(menuItemSafe(profileName));
                 QAction* profileAction = new QAction(actionText, this);
                 profileAction->setCheckable(true);
                 profileAction->setChecked(pMudlet->isActiveWindow() && pMudlet->getActiveHost() && pMudlet->getActiveHost()->getName() == profileName);
@@ -1830,7 +1911,7 @@ void TDetachedWindow::updateWindowMenu()
 
             for (const QString& windowProfileName : std::as_const(profilesInWindow)) {
                 //: This is an item in list of profiles in the "Window" menu of a detached Mudlet window. %1 is the name of the profile, and it is located not in Mudlet's main window, but in the detached window.
-                QString actionText = tr("%1 (Detached)").arg(windowProfileName);
+                QString actionText = tr("%1 (Detached)").arg(menuItemSafe(windowProfileName));
                 QAction* profileAction = new QAction(actionText, this);
                 profileAction->setCheckable(true);
                 profileAction->setChecked(detachedWindow == this && detachedWindow->getCurrentProfileName() == windowProfileName);
@@ -2304,6 +2385,7 @@ void TDetachedWindow::switchToProfile(const QString& profileName)
             if (mpTabBar->currentIndex() != i) {
                 mpTabBar->setCurrentIndex(i);
             }
+            mpTabBar->clearActivity(i);
             break;
         }
     }
@@ -2345,6 +2427,14 @@ void TDetachedWindow::switchToProfile(const QString& profileName)
     raise();
     activateWindow();
     show();
+}
+
+void TDetachedWindow::markTabActivity(const QString& profileName, const bool isLowerPriorityChange)
+{
+    if (profileName == mCurrentProfileName) {
+        return;
+    }
+    mpTabBar->markActivity(profileName, isLowerPriorityChange);
 }
 
 void TDetachedWindow::slot_tabChanged(int index)
@@ -2430,12 +2520,33 @@ void TDetachedWindow::closeProfileByIndex(int index)
         return;
     }
 
-    // Close the specific profile
+    closeProfileByName(profileName);
+}
+
+void TDetachedWindow::closeProfileByName(const QString& profileName)
+{
+    // The save question runs the event loop, so the Host may be gone by the time it is answered
+    const QPointer<Host> pHost = HostManager::self() ? HostManager::self()->getHost(profileName) : nullptr;
+    // Waited out here, not in mudlet::slot_closeProfileByName(): its retry closes the profile without this window
+    // being told, which would leave a tab with no console behind
+    if (pHost && pHost->waitingForProfileSave()) {
+        QTimer::singleShot(50ms, this, [this, profileName, pHost]() {
+            if (pHost && mProfileConsoleMap.contains(profileName)) {
+                closeProfileByName(profileName);
+            }
+        });
+        return;
+    }
+
     if (auto pMudlet = mudlet::self()) {
         pMudlet->slot_closeProfileByName(profileName);
     }
 
-    // Remove the profile from this detached window
+    // Held off by a nested event loop, or the user cancelled the save question: the profile stays open, and here
+    if (pHost && !pHost->isClosingDown()) {
+        return;
+    }
+
     removeProfile(profileName);
 
     // If this was the last profile, close the detached window
@@ -2618,14 +2729,15 @@ void TDetachedWindow::showScriptEditorDialog(std::function<void(dlgTriggerEditor
 
         // Create or get the editor directly, avoiding the main window's focus restoration logic
         dlgTriggerEditor* pEditor = nullptr;
-        if (pHost->mpEditorDialog != nullptr) {
-            pEditor = pHost->mpEditorDialog;
+        HostDialogs& dialogs = HostDialogs::of(pHost);
+        if (dialogs.mpEditorDialog != nullptr) {
+            pEditor = dialogs.mpEditorDialog;
         } else {
             // Create a new editor directly without using the main window's method
             pEditor = new dlgTriggerEditor(pHost);
-            pHost->mpEditorDialog = pEditor;
-            connect(pHost, &Host::profileSaveStarted, pHost->mpEditorDialog, &dlgTriggerEditor::slot_profileSaveStarted);
-            connect(pHost, &Host::profileSaveFinished, pHost->mpEditorDialog, &dlgTriggerEditor::slot_profileSaveFinished);
+            dialogs.mpEditorDialog = pEditor;
+            connect(pHost, &Host::profileSaveStarted, pEditor, &dlgTriggerEditor::slot_profileSaveStarted);
+            connect(pHost, &Host::profileSaveFinished, pEditor, &dlgTriggerEditor::slot_profileSaveFinished);
             pEditor->fillout_form();
         }
 
@@ -2808,7 +2920,7 @@ void TDetachedWindow::slot_showMapperDialog()
             // Ensure the map's active mapper points to our detached instance
             auto mapWidget = existingMapDock->widget();
             if (auto detachedMapper = qobject_cast<dlgMapper*>(mapWidget)) {
-                pMap->mpMapper = detachedMapper;
+                pMap->setMapper(detachedMapper);
             }
         } else if (mpMapDockWidget == existingMapDock) {
             // If we're hiding the current map, clear the global reference and restore main mapper
@@ -2826,8 +2938,8 @@ void TDetachedWindow::slot_showMapperDialog()
     newMapDockWidget->setObjectName(qsl("dockMap_%1_detached").arg(mCurrentProfileName));
 
     // Store the main window's mapper temporarily so we can restore it later
-    QPointer<dlgMapper> mainMapper = pMap->mpMapper;
-    QPointer<QDockWidget> mainDockWidget = (pHost->mpConsole ? pHost->mpConsole->mpDockableMapWidget : nullptr);
+    QPointer<dlgMapper> mainMapper = pMap->mapper();
+    QPointer<QDockWidget> mainDockWidget = (pHost->mainConsoleView() ? pHost->mainConsoleView()->mpDockableMapWidget : nullptr);
 
     // Create a new mapper instance for the detached window
     // We need to copy player room style details first
@@ -2841,7 +2953,7 @@ void TDetachedWindow::slot_showMapperDialog()
 
     // CRITICAL: Set the map's active mapper to our detached instance
     // This ensures map updates go to our detached window instead of the main window
-    pMap->mpMapper = detachedMapper;
+    pMap->setMapper(detachedMapper);
 
     // Initialize the mapper
     if (pMap->mpRoomDB && !pMap->mpRoomDB->isEmpty()) {
@@ -2914,7 +3026,7 @@ void TDetachedWindow::slot_showMapperDialog()
             // Ensure the map's active mapper points to our detached instance
             auto mapWidget = mapDockWidget->widget();
             if (auto detachedMapper = qobject_cast<dlgMapper*>(mapWidget)) {
-                pMap->mpMapper = detachedMapper;
+                pMap->setMapper(detachedMapper);
             }
         }
 
@@ -2951,7 +3063,7 @@ void TDetachedWindow::slot_showPreferencesDialog()
         mudletInstance->slot_showPreferencesDialog();
 
         // Position the preferences dialog on the same screen as this detached window
-        auto pPrefs = pHost ? pHost->mpDlgProfilePreferences : mudletInstance->mpDlgProfilePreferences;
+        auto pPrefs = pHost ? HostDialogs::of(pHost).mpDlgProfilePreferences : mudletInstance->mpDlgProfilePreferences;
         if (pPrefs) {
             widgetutils::positionDialogOnParentScreen(pPrefs, this);
 
@@ -2981,11 +3093,11 @@ void TDetachedWindow::slot_showNotesDialog()
         mudletInstance->slot_notes();
 
         // Position the notes dialog on the same screen as this detached window
-        if (pHost->mpNotePad) {
-            widgetutils::positionDialogOnParentScreen(pHost->mpNotePad, this);
+        if (auto* pDialog = HostDialogs::of(pHost).mpNotePad.data()) {
+            widgetutils::positionDialogOnParentScreen(pDialog, this);
 
             // Set up focus restoration for the notepad to return to this detached window
-            mudletInstance->setupNotepadFocusRestoration(pHost->mpNotePad);
+            mudletInstance->setupNotepadFocusRestoration(pDialog);
         }
     });
 }
@@ -3017,11 +3129,11 @@ void TDetachedWindow::slot_showPackageManagerDialog()
         mudletInstance->slot_packageManager();
 
         // Position the package manager dialog on the same screen as this detached window
-        if (pHost->mpPackageManager) {
-            widgetutils::positionDialogOnParentScreen(pHost->mpPackageManager, this);
+        if (auto* pDialog = HostDialogs::of(pHost).mpPackageManager.data()) {
+            widgetutils::positionDialogOnParentScreen(pDialog, this);
 
             // Set up focus restoration for the package manager to return to this detached window
-            mudletInstance->setupPackageManagerFocusRestoration(pHost->mpPackageManager);
+            mudletInstance->setupPackageManagerFocusRestoration(pDialog);
         }
     });
 }
@@ -3046,11 +3158,11 @@ void TDetachedWindow::slot_showModuleManagerDialog()
         mudletInstance->slot_moduleManager();
 
         // Position the module manager dialog on the same screen as this detached window
-        if (pHost->mpModuleManager) {
-            widgetutils::positionDialogOnParentScreen(pHost->mpModuleManager, this);
+        if (auto* pDialog = HostDialogs::of(pHost).mpModuleManager.data()) {
+            widgetutils::positionDialogOnParentScreen(pDialog, this);
 
             // Set up focus restoration for the module manager to return to this detached window
-            mudletInstance->setupModuleManagerFocusRestoration(pHost->mpModuleManager);
+            mudletInstance->setupModuleManagerFocusRestoration(pDialog);
         }
     });
 }
@@ -3119,29 +3231,57 @@ void TDetachedWindow::slot_mudletDiscord()
 }
 
 
+void TDetachedWindow::showMuteState()
+{
+    auto* media = MudletMedia::self();
+    if (!media) {
+        return;
+    }
+    const bool allMuted = media->allMuted();
+    for (QAction* pAction : {mpMenuMuteMediaAction, mpActionMuteMedia}) {
+        pAction->setChecked(allMuted);
+    }
+    for (QAction* pAction : {mpMenuMuteAPIAction, mpActionMuteAPI}) {
+        pAction->setChecked(media->apiMuted());
+    }
+    for (QAction* pAction : {mpMenuMuteGameAction, mpActionMuteGame}) {
+        pAction->setChecked(media->gameMuted());
+    }
+}
+
 void TDetachedWindow::slot_muteMedia()
 {
     withCurrentProfileActive([this]() {
-        mudlet::self()->slot_muteMedia();
+        MudletMedia::self()->toggleAllMuted();
     });
 }
 
 void TDetachedWindow::slot_muteAPI()
 {
     withCurrentProfileActive([this]() {
-        // Toggle the current API mute state
-        bool currentState = mudlet::self()->muteAPI();
-        mudlet::self()->slot_muteAPI(!currentState);
+        MudletMedia::self()->setApiMuted(!MudletMedia::self()->apiMuted());
     });
 }
 
 void TDetachedWindow::slot_muteGame()
 {
     withCurrentProfileActive([this]() {
-        // Toggle the current game mute state
-        bool currentState = mudlet::self()->muteGame();
-        mudlet::self()->slot_muteGame(!currentState);
+        MudletMedia::self()->setGameMuted(!MudletMedia::self()->gameMuted());
     });
+}
+
+void TDetachedWindow::restyleToolBarIcons()
+{
+    uiDesign::restyleToolBarGlyphs(mToolBarGlyphs, uiDesign::themeTokens());
+    uiDesign::ToolBarOverflow::restyle(mpToolBar, uiDesign::themeTokens());
+
+    if (mpToolBar) {
+        // Unlike the main bar, no profile stylesheet is assigned here to compose after
+        const QString sheet = mudlet::toolBarShellStyleSheet(qsl("QToolBar#detachedMainToolBar"));
+        if (mpToolBar->styleSheet() != sheet) {
+            mpToolBar->setStyleSheet(sheet);
+        }
+    }
 }
 
 void TDetachedWindow::changeEvent(QEvent* event)
@@ -3150,6 +3290,10 @@ void TDetachedWindow::changeEvent(QEvent* event)
     if (mIsBeingDestroyed) {
         QMainWindow::changeEvent(event);
         return;
+    }
+
+    if (event->type() == QEvent::StyleChange || event->type() == QEvent::PaletteChange) {
+        restyleToolBarIcons();
     }
 
     if (event->type() == QEvent::WindowStateChange) {
@@ -3287,7 +3431,7 @@ void TDetachedWindow::addTransferredDockWidget(const QString& mapKey, QDockWidge
             auto mapWidget = mapDockWidget->widget();
 
             if (auto detachedMapper = qobject_cast<dlgMapper*>(mapWidget)) {
-                pMap->mpMapper = detachedMapper;
+                pMap->setMapper(detachedMapper);
             }
         }
 
@@ -3323,7 +3467,7 @@ void TDetachedWindow::slot_updateShowMapActionText()
     }
     bool willHide = false;
     if (pHost) {
-        if (pHost->mpConsole && pHost->mpConsole->mpMapper) {
+        if (pHost->mainConsoleView() && pHost->mainConsoleView()->mpMapper) {
             willHide = pHost->mapperShown();
         } else {
             auto mainMapDock = pMudlet->getMainWindowDockWidget(qsl("map_%1").arg(mCurrentProfileName));
@@ -3331,10 +3475,10 @@ void TDetachedWindow::slot_updateShowMapActionText()
         }
     }
     if (willHide) {
-        //: Toolbox menu entry of a detached window while the map is on screen - activating it hides the map
+        //: Toolbox menu entry of a detached window while the map is on screen - activating it hides the map. Its "&" letter must differ from the other items in that menu, "Module manager" among them.
         mpMenuShowMapAction->setText(tr("Hide &map"));
     } else {
-        //: Toolbox menu entry of a detached window while no map is on screen - activating it shows the map, creating it if need be
+        //: Toolbox menu entry of a detached window while no map is on screen - activating it shows the map, creating it if need be. Its "&" letter must differ from the other items in that menu, "Module manager" among them.
         mpMenuShowMapAction->setText(tr("Show &map"));
     }
 }

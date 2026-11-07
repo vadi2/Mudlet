@@ -44,6 +44,7 @@
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QPushButton>
+#include <QScopeGuard>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -63,6 +64,7 @@
 #include "T2DMap.h"
 #include "TArea.h"
 #include "TLuaInterpreter.h"
+#include "TMainConsole.h"
 #include "TMap.h"
 #include "TMapLabel.h"
 #include "TMapView.h"
@@ -76,6 +78,8 @@
 #include "mudlet.h"
 
 #include "GroupedTest.h"
+
+using namespace std::chrono_literals;
 
 class MapMouseInteractionTest : public QObject
 {
@@ -121,6 +125,7 @@ private:
 
     static inline const QVector3D kLabelPosition{2, 0, 0};
     static inline const QSizeF kLabelClickSize{40, 20};
+    static inline const QVector3D kMapImagePosition{-2, 2, 0};
     static constexpr int kSouthRoomId = 8;
     static constexpr int kOtherAreaRoomId = 20;
 
@@ -167,11 +172,11 @@ private:
     {
         mpHost->mMapViewOnly = viewOnly;
         mpHost->mRoomSize = kRoomSize;
-        if (!map()->mpMapper) {
+        if (!map()->mapper()) {
             mpHost->showHideOrCreateMapper(false);
         }
-        QVERIFY(map()->mpMapper);
-        mp2dMap = map()->mpMapper->mp2dMap;
+        QVERIFY(map()->mapper());
+        mp2dMap = map()->mapper()->mp2dMap;
         QVERIFY(mp2dMap);
         mp2dMap->init();
         mp2dMap->resize(kWidgetWidth, kWidgetHeight);
@@ -230,6 +235,51 @@ private:
         return id;
     }
 
+    // Covers the whole block of rooms and some empty map besides, as createMapImageLabel() would.
+    int addMapImage(const bool onTop) const
+    {
+        TMapLabel label;
+        label.pos = kMapImagePosition;
+        label.size = QSizeF(5, 5);
+        label.clickSize = label.size * kPixelsPerMapUnit;
+        label.pix = QPixmap(10, 10);
+        label.pix.fill(Qt::darkGreen);
+        label.showOnTop = onTop;
+        const int id = area()->mMapLabels.isEmpty() ? 0 : area()->mMapLabels.lastKey() + 1;
+        area()->mMapLabels.insert(id, label);
+        renderFrame();
+        return id;
+    }
+
+    // Lies exactly over the block of rooms, edge to edge with their grid cells.
+    int addMapImageOverTheRooms() const
+    {
+        TMapLabel label;
+        label.pos = QVector3D(-1.5, 1.5, 0);
+        label.size = QSizeF(3, 3);
+        label.clickSize = label.size * kPixelsPerMapUnit;
+        label.pix = QPixmap(10, 10);
+        label.pix.fill(Qt::darkGreen);
+        const int id = area()->mMapLabels.isEmpty() ? 0 : area()->mMapLabels.lastKey() + 1;
+        area()->mMapLabels.insert(id, label);
+        renderFrame();
+        return id;
+    }
+
+    // Inside the picture but clear of every room.
+    QPoint pointOnMapImageAwayFromRooms() const { return pointUnitsFromCentre(2.5, -2.5); }
+
+    // Leaves the image picked up with the mouse inside both it and the east room.
+    void carryMapImageOverEastRoom(const int labelId) const
+    {
+        pressAt(pointOnMapImageAwayFromRooms());
+        QVERIFY(area()->mMapLabels.value(labelId).highlight);
+        const QPoint overEastRoom = pointUnitsFromCentre(1, 0) - QPoint(2, 2);
+        moveTo(overEastRoom);
+        releaseAt(overEastRoom);
+        QVERIFY2(area()->mMapLabels.value(labelId).pos != kMapImagePosition, "the picked up image did not follow the mouse");
+    }
+
     // A label clear of the rooms on the level being shown.
     int addTestLabel() const { return addLabel(kLabelPosition, kLabelClickSize); }
     QPoint pointOnTestLabel() const { return pointOnLabel(kLabelPosition, kLabelClickSize); }
@@ -286,7 +336,7 @@ private:
     bool panning() const { return mp2dMap->testAttribute(Qt::WA_SetCursor) && mp2dMap->cursor().shape() == Qt::BlankCursor; }
 
     // Long enough for the pan's 16ms timer to tick a good few times.
-    void letThePanRun() const { QTest::qWait(150); }
+    void letThePanRun() const { QTest::qWait(150ms); }
 
     // How far east the view moves per tick of the pan's timer. The event loop
     // does not get round to the same number of ticks in every window, so the
@@ -318,7 +368,7 @@ private:
     }
 
     // Longer than the hold that makes a release end the pan rather than leave it running.
-    void holdTheButton() const { QTest::qWait(400); }
+    void holdTheButton() const { QTest::qWait(400ms); }
 
     // A custom line north out of the east room, to the two points the tests
     // click on and drag. Its first segment runs from the room itself up
@@ -362,6 +412,24 @@ private:
         return pRoom;
     }
 
+    // Picks the exit's button in the custom line dialog for that room, which
+    // hides the dialog for the rest of the drawing.
+    bool startDrawingALineFromTheDialog(const int fromRoomId, const QString& exit) const
+    {
+        mp2dMap->mMultiSelectionSet = QSet<int>{fromRoomId};
+        mp2dMap->mMultiSelectionHighlightRoomId = fromRoomId;
+        mp2dMap->slot_setCustomLine();
+        if (!mp2dMap->mpCustomLinesDialog) {
+            return false;
+        }
+        auto* pButton = mp2dMap->mpCustomLinesDialog->findChild<QPushButton*>(exit);
+        if (!pButton || !pButton->isEnabled()) {
+            return false;
+        }
+        pButton->click();
+        return mp2dMap->mCustomLinesRoomFrom == fromRoomId && mp2dMap->mCustomLinesRoomExit == exit;
+    }
+
     void rightClickAt(const QPoint& position) const
     {
         sendMouse(QEvent::MouseButtonPress, position, Qt::RightButton, Qt::RightButton, Qt::NoModifier);
@@ -376,6 +444,21 @@ private:
             return nullptr;
         }
         for (QAction* pAction : mp2dMap->mActiveContextMenu->actions()) {
+            if (pAction->text() == text) {
+                return pAction;
+            }
+        }
+        return nullptr;
+    }
+
+    // An item in the submenu with this title on the menu the last right click put up.
+    QAction* contextSubmenuItem(const QString& title, const QString& text) const
+    {
+        QAction* pSubmenuAction = contextMenuItem(title);
+        if (!pSubmenuAction || !pSubmenuAction->menu()) {
+            return nullptr;
+        }
+        for (QAction* pAction : pSubmenuAction->menu()->actions()) {
             if (pAction->text() == text) {
                 return pAction;
             }
@@ -417,7 +500,7 @@ private:
         mModalDialogAnswered = false;
         mModalAnswerAttemptsLeft = 100;
         mpModalAnswerTimer = new QTimer(this);
-        mpModalAnswerTimer->setInterval(20);
+        mpModalAnswerTimer->setInterval(20ms);
         connect(mpModalAnswerTimer, &QTimer::timeout, this, [this, answer]() {
             QWidget* pDialog = QApplication::activeModalWidget();
             if (!pDialog) {
@@ -448,13 +531,17 @@ private:
     }
 
     // Answers the factor dialog that Spread and Shrink put up; a factor of 0
-    // cancels it instead.
-    bool pickFactorItem(const QString& text, const int factor)
+    // cancels it instead. A script given here runs while the dialog is up,
+    // just before it is answered.
+    bool pickFactorItem(const QString& text, const int factor, const QString& scriptWhileUp = QString())
     {
-        answerNextModalDialog([factor](QWidget* pDialog) {
+        answerNextModalDialog([this, factor, scriptWhileUp](QWidget* pDialog) {
             auto* pInput = qobject_cast<QInputDialog*>(pDialog);
             if (!pInput) {
                 return false;
+            }
+            if (!scriptWhileUp.isEmpty()) {
+                runLua(scriptWhileUp);
             }
             if (factor) {
                 pInput->setIntValue(factor);
@@ -469,13 +556,16 @@ private:
 
     // Answers the coordinates dialog Move to position puts up. Its three
     // fields are the only line edits on it and are made in x, y, z order.
-    bool pickMoveToPosition(const int x, const int y, const int z)
+    bool pickMoveToPosition(const int x, const int y, const int z, const QString& scriptWhileUp = QString())
     {
-        answerNextModalDialog([x, y, z](QWidget* pDialog) {
+        answerNextModalDialog([this, x, y, z, scriptWhileUp](QWidget* pDialog) {
             auto* pMoveDialog = qobject_cast<QDialog*>(pDialog);
             const QList<QLineEdit*> fields = pDialog->findChildren<QLineEdit*>();
             if (!pMoveDialog || fields.size() != 3) {
                 return false;
+            }
+            if (!scriptWhileUp.isEmpty()) {
+                runLua(scriptWhileUp);
             }
             fields[0]->setText(QString::number(x));
             fields[1]->setText(QString::number(y));
@@ -638,9 +728,9 @@ private:
         QVERIFY(map()->addRoom(kOtherAreaRoomId) && map()->setRoomArea(kOtherAreaRoomId, mOtherAreaId) && map()->setRoomCoordinates(kOtherAreaRoomId, 10, 10, 0));
         map()->setDefaultAreaShown(true);
         showMapper(false);
-        map()->mpMapper->updateAreaComboBox();
-        map()->mpMapper->resetAreaComboBoxToPlayerRoomArea();
-        QCOMPARE(map()->mpMapper->comboBox_showArea->currentText(), qsl("Mouse Area"));
+        map()->mapper()->updateAreaComboBox();
+        map()->mapper()->resetAreaComboBoxToPlayerRoomArea();
+        QCOMPARE(map()->mapper()->comboBox_showArea->currentText(), qsl("Mouse Area"));
     }
 
     QSet<int> roomsInArea(const int areaId) const
@@ -670,6 +760,59 @@ private:
         return nullptr;
     }
 
+    static QStringList itemTextsStartingWith(const QMenu* pMenu, const QString& prefix)
+    {
+        QStringList texts;
+        if (!pMenu) {
+            return texts;
+        }
+        for (const QAction* pAction : pMenu->actions()) {
+            if (pAction->text().startsWith(prefix)) {
+                texts << pAction->text();
+            }
+        }
+        return texts;
+    }
+
+    QStringList userSubmenuTexts(const QString& menuText) const
+    {
+        QAction* pMenu = contextMenuItem(menuText);
+        return pMenu ? itemTextsStartingWith(pMenu->menu(), qsl("Order ")) : QStringList();
+    }
+
+    // Five menus, then thirty events, each by unique name, with the given ones moved to the ends
+    static QStringList bigMenuTexts(const QStringList& first, const QStringList& last = {})
+    {
+        QStringList texts = first;
+        for (int i = 1; i <= 5; ++i) {
+            texts << qsl("Order big menu %1").arg(i);
+        }
+        for (int i = 0; i < 30; ++i) {
+            texts << qsl("Order big %1").arg(i, 2, 10, QLatin1Char('0'));
+        }
+        for (const QString& text : first + last) {
+            texts.removeAll(text);
+        }
+        return first + texts + last;
+    }
+
+    // Script entries are the tail of the menu, straight after the mode switch
+    bool scriptEntriesFollowTheModeSwitch() const
+    {
+        if (!mp2dMap->mActiveContextMenu) {
+            return false;
+        }
+        QStringList texts;
+        for (const QAction* pAction : mp2dMap->mActiveContextMenu->actions()) {
+            texts << pAction->text();
+        }
+        qsizetype first = 0;
+        while (first < texts.size() && !texts.at(first).startsWith(qsl("Order "))) {
+            ++first;
+        }
+        return first > 0 && first < texts.size() && texts.at(first - 1).startsWith(qsl("Switch to ")) && texts.mid(first) == itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order "));
+    }
+
     bool runLua(const QString& code) const { return mpHost->getLuaInterpreter()->compileAndExecuteScript(code); }
 
     // The pointer moving over the map with no button down, which is all the
@@ -680,10 +823,12 @@ private:
 
     // Rolls the wheel that many notches forward (away from the user), or back
     // for a negative count.
-    void rollWheelAt(const QPoint& position, const int notches, const Qt::KeyboardModifiers modifiers = Qt::NoModifier) const
+    bool rollWheelAt(const QPoint& position, const int notches, const Qt::KeyboardModifiers modifiers = Qt::NoModifier, T2DMap* pTarget = nullptr) const
     {
-        QWheelEvent event(QPointF(position), mp2dMap->mapToGlobal(QPointF(position)), QPoint(), QPoint(0, notches * 120), Qt::NoButton, modifiers, Qt::NoScrollPhase, false);
-        QApplication::sendEvent(mp2dMap, &event);
+        T2DMap* pMap = pTarget ? pTarget : mp2dMap;
+        QWheelEvent event(QPointF(position), pMap->mapToGlobal(QPointF(position)), QPoint(), QPoint(0, notches * 120), Qt::NoButton, modifiers, Qt::NoScrollPhase, false);
+        QApplication::sendEvent(pMap, &event);
+        return event.isAccepted();
     }
 
     // How many pixels across a map unit is drawn at, for a zoom of that many
@@ -694,7 +839,7 @@ private:
     // The wheel stores the zoom on the area, where the next frame reads it from.
     double zoom() const { return area()->get2DMapZoom(); }
 
-    QString consoleText() const { return mpHost->mpConsole->buffer.lineBuffer.join(QChar::LineFeed); }
+    QString consoleText() const { return mpHost->mainConsoleView()->buffer.lineBuffer.join(QChar::LineFeed); }
 
     QList<QTreeWidgetItem*> listedRooms() const
     {
@@ -758,7 +903,7 @@ private slots:
         mpHost = TestProfile::create(mProfileName, mLocalhost, mPort);
         QVERIFY(mpHost);
         QSignalSpy connected(&(mpHost->mTelnet), &cTelnet::signal_connected);
-        QVERIFY2(connected.wait(3000), "could not connect to the telnet stub");
+        QVERIFY2(connected.wait(3s), "could not connect to the telnet stub");
     }
 
     void cleanupTestCase()
@@ -798,6 +943,8 @@ private slots:
         mp2dMap->slot_setSnapCustomLinePointsToGrid(false);
         map()->mUserMenus.clear();
         map()->mUserActions.clear();
+        map()->mUserMenuPriorities.clear();
+        map()->mHiddenMenuItems.clear();
         map()->setMmpMapLocation(QString());
         mudlet::self()->setInvertMapZoom(false);
         mp2dMap->mRoomBeingMoved = false;
@@ -814,7 +961,10 @@ private slots:
             mp2dMap->mpDlgMapLabel->close();
         }
         runLua(qsl("mudlet.custom_speedwalk = nil\ndoSpeedWalk = nil"));
-        mpHost->mpConsole->discardAll();
+        mpHost->mainConsoleView()->discardAll();
+        if (mp2dMap->mpCustomLinesDialog) {
+            mp2dMap->mpCustomLinesDialog->reject();
+        }
         mp2dMap->mCustomLinesRoomFrom = 0;
         mp2dMap->mCustomLinesRoomTo = 0;
         mp2dMap->mCustomLinesRoomExit.clear();
@@ -955,6 +1105,304 @@ private slots:
         QCOMPARE(mp2dMap->mMultiSelectionSet, expected);
     }
 
+    // Whatever is done to the selection afterwards must not reach a room that is gone.
+    void test_deletingASelectedRoomDropsItFromTheSelection()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(0.5, -0.5));
+        QCOMPARE(mp2dMap->mMultiSelectionSet, (QSet<int>{1, kNorthRoomId, kWestRoomId, kPlayerRoomId}));
+        const int centre = mp2dMap->getCenterSelectedRoomId();
+        QVERIFY(mp2dMap->mMultiSelectionSet.contains(centre));
+
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(centre)));
+
+        QSet<int> remaining{1, kNorthRoomId, kWestRoomId, kPlayerRoomId};
+        remaining.remove(centre);
+        QCOMPARE(mp2dMap->mMultiSelectionSet, remaining);
+        QVERIFY2(remaining.contains(mp2dMap->getCenterSelectedRoomId()), "the selection's centre is still the deleted room");
+    }
+
+    // A shift- or ctrl-drag rebuilds the selection on each move from the rooms
+    // selected at its press, so a room a script deletes mid-drag must leave
+    // those too or the next move brings it back.
+    void test_aRoomDeletedMidDragIsNotBroughtBackByTheDrag()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(0.5, -0.5));
+
+        const QPoint south = pointUnitsFromCentre(0, -1);
+        pressAt(south, Qt::ShiftModifier);
+        moveTo(south, Qt::ShiftModifier);
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(kNorthWestRoomId)));
+        moveTo(south + QPoint(1, 1), Qt::ShiftModifier);
+        const QSet<int> afterShiftDrag{kNorthRoomId, kWestRoomId, kPlayerRoomId, kSouthRoomId};
+        QCOMPARE(mp2dMap->mMultiSelectionSet, afterShiftDrag);
+        releaseAt(south + QPoint(1, 1), Qt::ShiftModifier);
+
+        const QPoint emptySpot = pointUnitsFromCentre(3.5, 3.5);
+        pressAt(emptySpot, Qt::ControlModifier);
+        moveTo(emptySpot, Qt::ControlModifier);
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(kNorthRoomId)));
+        moveTo(emptySpot + QPoint(1, 1), Qt::ControlModifier);
+        const QSet<int> afterCtrlDrag{kWestRoomId, kPlayerRoomId, kSouthRoomId};
+        QCOMPARE(mp2dMap->mMultiSelectionSet, afterCtrlDrag);
+        releaseAt(emptySpot + QPoint(1, 1), Qt::ControlModifier);
+        QCOMPARE(mp2dMap->mMultiSelectionSet, afterCtrlDrag);
+    }
+
+    void test_deletingASelectedRoomKeepsTheRestInTheList()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(0.5, -0.5));
+        const int centre = mp2dMap->getCenterSelectedRoomId();
+        QSet<int> remaining{kNorthWestRoomId, kNorthRoomId, kWestRoomId, kPlayerRoomId};
+        const int deleted = centre == kNorthWestRoomId ? kNorthRoomId : kNorthWestRoomId;
+        remaining.remove(deleted);
+
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(deleted)));
+        QCoreApplication::processEvents();
+
+        QCOMPARE(mp2dMap->mMultiSelectionSet, remaining);
+        QCOMPARE(mp2dMap->getCenterSelectedRoomId(), centre);
+        QVERIFY2(!mp2dMap->mMultiSelectionListWidget.isHidden(), "the list went away with rooms still selected");
+        QCOMPARE(listedRoomIds(), remaining);
+    }
+
+    // Picking a room from the list leaves the others listed but not selected,
+    // and picking a deleted one again would put it back in the selection.
+    void test_deletingAListedButUnselectedRoomDropsItsRow()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(0.5, -0.5));
+        for (QTreeWidgetItem* item : listedRooms()) {
+            item->setSelected(item->text(0).toInt() == kPlayerRoomId);
+        }
+        QCOMPARE(mp2dMap->mMultiSelectionSet, QSet<int>{kPlayerRoomId});
+
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(kNorthWestRoomId)));
+        QCoreApplication::processEvents();
+
+        const QSet<int> stillListed{kNorthRoomId, kWestRoomId, kPlayerRoomId};
+        QCOMPARE(listedRoomIds(), stillListed);
+        QCOMPARE(mp2dMap->mMultiSelectionSet, QSet<int>{kPlayerRoomId});
+        for (QTreeWidgetItem* item : listedRooms()) {
+            item->setSelected(true);
+        }
+        QCOMPARE(mp2dMap->mMultiSelectionSet, stillListed);
+    }
+
+    void test_deletingOneOfTwoSelectedRoomsLeavesTheOtherHighlighted()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(0.5, 0.5));
+        QCOMPARE(mp2dMap->mMultiSelectionSet, (QSet<int>{kNorthWestRoomId, kNorthRoomId}));
+        const int deleted = mp2dMap->getCenterSelectedRoomId();
+        const int other = deleted == kNorthRoomId ? kNorthWestRoomId : kNorthRoomId;
+
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(deleted)));
+        QCoreApplication::processEvents();
+
+        QCOMPARE(mp2dMap->mMultiSelectionSet, QSet<int>{other});
+        QCOMPARE(mp2dMap->mMultiSelectionHighlightRoomId, other);
+        QVERIFY2(mp2dMap->mMultiSelectionListWidget.isHidden(), "the list stayed up for a single room");
+    }
+
+    void test_aSecondaryViewDropsADeletedRoomFromItsSelection()
+    {
+        buildMap();
+        showMapper(false);
+        const auto [viewId, error] = mpHost->createMapView(mAreaId);
+        QVERIFY2(viewId > 0, qPrintable(error));
+        const int openedViewId = viewId;
+        const auto closeTheView = qScopeGuard([this, openedViewId] {
+            mpHost->closeMapView(openedViewId);
+        });
+        T2DMap* pViewMap = map()->getViewManager()->getView(viewId)->get2DMap();
+        pViewMap->mMultiSelectionSet = QSet<int>{kNorthWestRoomId, kNorthRoomId, kWestRoomId, kPlayerRoomId};
+        pViewMap->mMultiSelectionHighlightRoomId = kWestRoomId;
+
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(kWestRoomId)));
+
+        const QSet<int> remaining{kNorthWestRoomId, kNorthRoomId, kPlayerRoomId};
+        QCOMPARE(pViewMap->mMultiSelectionSet, remaining);
+        QVERIFY2(remaining.contains(pViewMap->mMultiSelectionHighlightRoomId), "the view's highlight is still the deleted room");
+    }
+
+    // Room ids are reused, so a line left in progress would go on in another room.
+    void test_deletingTheRoomALineIsDrawnFromEndsTheDrawing()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("setExit(%1, %2, 'n')").arg(kEastRoomId).arg(kNorthEastRoomId)));
+        QVERIFY(startDrawingALineFromTheDialog(kEastRoomId, qsl("n")));
+
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(kEastRoomId)));
+        QCOMPARE(mp2dMap->mCustomLinesRoomFrom, 0);
+        QVERIFY2(!mp2dMap->mpCustomLinesDialog, "the custom line dialog outlived the drawing");
+
+        QVERIFY(addRoomAt(kEastRoomId, 1, 0, 0));
+        clickAt(pointUnitsFromCentre(1.5, 2.5));
+        QVERIFY2(map()->mpRoomDB->getRoom(kEastRoomId)->customLines.isEmpty(), "the click drew a line in the new room");
+    }
+
+    // Deleting the room a line leads to takes the exit and the line with it
+    void test_deletingTheRoomALineIsDrawnToEndsTheDrawing()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("setExit(%1, %2, 'n')").arg(kPlayerRoomId).arg(kNorthRoomId)));
+        QVERIFY(startDrawingALineFromTheDialog(kPlayerRoomId, qsl("n")));
+        QCOMPARE(mp2dMap->mCustomLinesRoomTo, kNorthRoomId);
+
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(kNorthRoomId)));
+        QCOMPARE(mp2dMap->mCustomLinesRoomFrom, 0);
+        QCOMPARE(mp2dMap->mCustomLinesRoomTo, 0);
+
+        clickAt(pointUnitsFromCentre(0.5, 1.5));
+        QVERIFY2(!map()->mpRoomDB->getRoom(kPlayerRoomId)->customLines.contains(qsl("n")), "the click drew a line for an exit that is gone");
+    }
+
+    void test_deletingARoomDropsItsSelectedCustomLine()
+    {
+        buildMap();
+        QVERIFY(addLineToTheEastRoom());
+        showMapper(false);
+        clickAt(pointUnitsFromCentre(1, 2));
+        QCOMPARE(mp2dMap->mCustomLineSelectedRoom, kLineRoomId);
+
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(kLineRoomId)));
+        QCOMPARE(mp2dMap->mCustomLineSelectedRoom, 0);
+
+        QVERIFY(addRoomAt(kLineRoomId, 1, 0, 0));
+        TRoom* pNewRoom = addLineToTheEastRoom();
+        QVERIFY(pNewRoom);
+        rightClickAt(pointUnitsFromCentre(-3, -3));
+        QVERIFY2(!contextMenuItem(qsl("Delete line")), "the menu offers to delete a line in the room that took the deleted one's id");
+    }
+
+    // Room ids are reused, so a room a script makes after deleting a listed one
+    // may get its id, and must not get its row as well.
+    void test_aRoomGivenADeletedListedRoomsIdIsNotListed()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(0.5, -0.5));
+
+        QVERIFY(runLua(qsl("deleteRoom(%1); addRoom(%1); setRoomArea(%1, %2); setRoomCoordinates(%1, 5, 5, 0)").arg(kNorthWestRoomId).arg(mAreaId)));
+        QCoreApplication::processEvents();
+
+        const QSet<int> remaining{kNorthRoomId, kWestRoomId, kPlayerRoomId};
+        QCOMPARE(listedRoomIds(), remaining);
+        for (QTreeWidgetItem* item : listedRooms()) {
+            item->setSelected(item->text(0).toInt() == kPlayerRoomId);
+        }
+        for (QTreeWidgetItem* item : listedRooms()) {
+            item->setSelected(true);
+        }
+        QCOMPARE(mp2dMap->mMultiSelectionSet, remaining);
+    }
+
+    void test_theListFitsTheRoomsLeftAfterADeletion()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(1.5, 0.5));
+        const int threeRowsHigh = mp2dMap->mMultiSelectionListWidget.height();
+        QVERIFY(runLua(qsl("setRoomName(%1, 'a'); setRoomName(%2, 'b')").arg(kNorthWestRoomId).arg(kNorthRoomId)));
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(1.5, -1.5));
+        QVERIFY(mp2dMap->mMultiSelectionListWidget.height() > threeRowsHigh);
+        QVERIFY(!mp2dMap->mMultiSelectionListWidget.isColumnHidden(1));
+
+        QVERIFY(runLua(qsl("for _, id in ipairs({1, 2, 3, 4, 6, 7}) do deleteRoom(id) end")));
+        QCoreApplication::processEvents();
+
+        QCOMPARE(listedRoomIds(), (QSet<int>{kPlayerRoomId, kSouthRoomId, 9}));
+        QCOMPARE(mp2dMap->mMultiSelectionListWidget.height(), threeRowsHigh);
+        QVERIFY2(mp2dMap->mMultiSelectionListWidget.isColumnHidden(1), "the name column is still shown with no named room left");
+    }
+
+    // A hidden list is rebuilt before it is shown again, so it is not worth walking
+    void test_deletingARoomLeavesAHiddenListAlone()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(0.5, -0.5));
+        dragFromTo(pointUnitsFromCentre(0.6, -0.6), pointUnitsFromCentre(1.4, -1.4));
+        QVERIFY(mp2dMap->mMultiSelectionListWidget.isHidden());
+        QVERIFY(mp2dMap->mMultiSelectionListWidget.topLevelItemCount() > 0);
+
+        QVERIFY(runLua(qsl("deleteRoom(%1)").arg(kNorthEastRoomId)));
+
+        QVERIFY2(mp2dMap->mRoomsToDropFromSelectionWidget.isEmpty(), "a walk of the hidden list was queued");
+    }
+
+    // The list of selected rooms is rebuilt when the box takes in different
+    // rooms, not on every move of the mouse, which on a big selection costs
+    // more than the time between two moves.
+    void test_theListOfSelectedRoomsIsOnlyRebuiltWhenTheSelectionChanges()
+    {
+        buildMap();
+        showMapper(false);
+
+        const QPoint from = pointUnitsFromCentre(-1.5, 1.5);
+        pressAt(from);
+        moveTo(from);
+        moveTo(pointUnitsFromCentre(0.5, -0.5));
+        const QSet<int> quarter{kNorthWestRoomId, kNorthRoomId, kWestRoomId, kPlayerRoomId};
+        QCOMPARE(listedRoomIds(), quarter);
+
+        QSignalSpy rowsInserted(mp2dMap->mMultiSelectionListWidget.model(), &QAbstractItemModel::rowsInserted);
+        // Still short of the rooms to the east and south.
+        moveTo(pointUnitsFromCentre(0.6, -0.6));
+        QCOMPARE(mp2dMap->mMultiSelectionSet, quarter);
+        QCOMPARE(rowsInserted.count(), 0);
+        QCOMPARE(listedRoomIds(), quarter);
+
+        moveTo(pointUnitsFromCentre(1.5, -0.5));
+        const QSet<int> withTheEastColumn{kNorthWestRoomId, kNorthRoomId, kNorthEastRoomId, kWestRoomId, kPlayerRoomId, kEastRoomId};
+        QCOMPARE(listedRoomIds(), withTheEastColumn);
+        releaseAt(pointUnitsFromCentre(1.5, -0.5));
+        QCOMPARE(mp2dMap->mMultiSelectionSet, withTheEastColumn);
+    }
+
+    // A shift-press on a room adds it to the selection before the drag's first
+    // move, which does not change the selection again, so the list has to have
+    // taken the room in at the press.
+    void test_aShiftDragListsTheRoomItsPressAdded()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(0.5, -0.5));
+
+        const QPoint south = pointUnitsFromCentre(0, -1);
+        pressAt(south, Qt::ShiftModifier);
+        moveTo(south, Qt::ShiftModifier);
+        moveTo(south + QPoint(1, 1), Qt::ShiftModifier);
+
+        const QSet<int> expected{kNorthWestRoomId, kNorthRoomId, kWestRoomId, kPlayerRoomId, kSouthRoomId};
+        QCOMPARE(mp2dMap->mMultiSelectionSet, expected);
+        QCOMPARE(listedRoomIds(), expected);
+        releaseAt(south + QPoint(1, 1), Qt::ShiftModifier);
+    }
+
+    // With Ctrl the box toggles the rooms it covers in what was selected before.
+    void test_aCtrlDragTogglesTheRoomsTheBoxCovers()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(0.5, -0.5));
+
+        dragFromTo(pointUnitsFromCentre(-0.5, 0.5), pointUnitsFromCentre(1.5, -0.5), Qt::ControlModifier);
+
+        const QSet<int> expected{kNorthWestRoomId, kNorthRoomId, kWestRoomId, kEastRoomId};
+        QCOMPARE(mp2dMap->mMultiSelectionSet, expected);
+    }
+
     // The same drag while viewing pans instead of drawing a box, which is what
     // the map being locked for viewing means.
     void test_draggingWhileViewingDrawsNoSelectionBox()
@@ -997,11 +1445,14 @@ private slots:
         pEastRoom->customLinesArrow[qsl("n")] = false;
         pEastRoom->calcRoomDimensions();
         showMapper(false);
+        map()->resetUnsaved();
 
         // A custom line's first segment runs out of the middle of the room it
         // belongs to, so press just short of the middle: on it, the handler that
         // edits a line's points would take the press instead.
         dragFromTo(pointUnitsFromCentre(1, -0.2), pointUnitsFromCentre(1, 1.8));
+
+        QVERIFY2(map()->isUnsaved(), "moving a room did not mark the map as changed");
 
         QCOMPARE(pEastRoom->x(), 1);
         QCOMPARE(pEastRoom->y(), 2);
@@ -1009,6 +1460,67 @@ private slots:
         QCOMPARE(movedLine.size(), 2);
         QCOMPARE(movedLine.constFirst(), QPointF(1.0, 5.0));
         QCOMPARE(movedLine.constLast(), QPointF(1.0, 6.0));
+    }
+
+    // The area files its rooms by position, by how far it reaches and by how
+    // long their exits are; a dragged room has to be refiled in all of them
+    // without the area rebuilding them from scratch.
+    void test_aDraggedRoomIsFiledWhereItLanded()
+    {
+        buildMap();
+        QVERIFY(map()->setExit(kPlayerRoomId, kEastRoomId, DIR_EAST));
+        QVERIFY(map()->setExit(kEastRoomId, kPlayerRoomId, DIR_WEST));
+        showMapper(false);
+        QVERIFY(!area()->lodVisibleExitRooms(0, 1).contains(kPlayerRoomId));
+        const quint32 lodRebuilds = area()->lodExitIndexRebuildCount();
+
+        dragFromTo(pointUnitsFromCentre(1, -0.2), pointUnitsFromCentre(1, 1.8));
+
+        QCOMPARE(area()->getRoomsByPosition(1, 2, 0), QList<int>{kEastRoomId});
+        QVERIFY(area()->getRoomsByPosition(1, 0, 0).isEmpty());
+        // The area's y extremes run the other way to the rooms' y:
+        QCOMPARE(area()->min_y, -2);
+        QCOMPARE(area()->yminForZ.value(0), -2);
+        // The exit between the two rooms now spans two units, at both ends:
+        const QList<int> lodRooms = area()->lodVisibleExitRooms(0, 1);
+        QVERIFY(lodRooms.contains(kPlayerRoomId));
+        QVERIFY(lodRooms.contains(kEastRoomId));
+        QCOMPARE(area()->lodExitIndexRebuildCount(), lodRebuilds);
+    }
+
+    // Which of the rooms in a drag moves first is down to how a QSet orders
+    // them, so one can briefly land on another that has yet to move away.
+    void test_roomsDraggedTogetherCanLandWhereEachOtherWere()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 0.5), pointUnitsFromCentre(1.5, -0.5));
+        QCOMPARE(mp2dMap->mMultiSelectionSet, (QSet<int>{kWestRoomId, kPlayerRoomId, kEastRoomId}));
+
+        dragFromTo(pointUnitsFromCentre(0, -0.2), pointUnitsFromCentre(1, -0.2));
+
+        QVERIFY(area()->getRoomsByPosition(-1, 0, 0).isEmpty());
+        QCOMPARE(area()->getRoomsByPosition(0, 0, 0), QList<int>{kWestRoomId});
+        QCOMPARE(area()->getRoomsByPosition(1, 0, 0), QList<int>{kPlayerRoomId});
+        QCOMPARE(area()->getRoomsByPosition(2, 0, 0), QList<int>{kEastRoomId});
+        QCOMPARE(area()->max_x, 2);
+        QCOMPARE(area()->xmaxForZ.value(0), 2);
+    }
+
+    void test_draggingEveryRoomInTheAreaRefilesThemAll()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(1.5, -1.5));
+        QCOMPARE(mp2dMap->mMultiSelectionSet, area()->getAreaRooms());
+
+        dragFromTo(pointUnitsFromCentre(0, -0.2), pointUnitsFromCentre(1, -0.2));
+
+        QVERIFY(area()->getRoomsByPosition(-1, 0, 0).isEmpty());
+        QCOMPARE(area()->getRoomsByPosition(0, 0, 0), QList<int>{kWestRoomId});
+        QCOMPARE(area()->getRoomsByPosition(2, 0, 0), QList<int>{kEastRoomId});
+        QCOMPARE(area()->min_x, 0);
+        QCOMPARE(area()->max_x, 2);
     }
 
     // Clicking a map label picks it up, and clicking it again puts it down.
@@ -1083,6 +1595,262 @@ private slots:
         const QVector3D moved = area()->mMapLabels.value(labelId).pos;
         QCOMPARE(static_cast<double>(moved.x()), 3.0);
         QCOMPARE(static_cast<double>(moved.y()), 1.0);
+    }
+
+    // A picture drawn behind the rooms is their backdrop, so a click on a room
+    // over it must not pick the picture up and drag it out of place.
+    void test_clickingARoomOverABackgroundImageSelectsTheRoomNotTheImage()
+    {
+        buildMap();
+        showMapper(false);
+        const int labelId = addMapImage(false);
+        const QPoint onEastRoom = pointUnitsFromCentre(1, 0);
+
+        for (const Qt::KeyboardModifiers modifiers : {Qt::KeyboardModifiers(), Qt::KeyboardModifiers(Qt::ShiftModifier), Qt::KeyboardModifiers(Qt::ControlModifier)}) {
+            mp2dMap->mMultiSelectionSet.clear();
+            pressAt(onEastRoom, modifiers);
+            QVERIFY2(!area()->mMapLabels.value(labelId).highlight, qPrintable(qsl("a click on a room over a background image picked the image up (modifiers %1)").arg(modifiers.toInt())));
+            QVERIFY(!mp2dMap->mLabelHighlighted);
+            QVERIFY2(mp2dMap->mMultiSelectionSet.contains(kEastRoomId), qPrintable(qsl("a click on a room over a background image did not select it (modifiers %1)").arg(modifiers.toInt())));
+            // Without a modifier the press picks the room up to move it instead
+            if (modifiers != Qt::NoModifier) {
+                moveTo(onEastRoom, modifiers);
+                moveTo(pointUnitsFromCentre(1, 2), modifiers);
+            }
+            releaseAt(onEastRoom, modifiers);
+            QCOMPARE(area()->mMapLabels.value(labelId).pos, kMapImagePosition);
+        }
+    }
+
+    void test_rightClickingARoomOverABackgroundImageOffersTheRoomMenu()
+    {
+        buildMap();
+        showMapper(false);
+        const int labelId = addMapImage(false);
+
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QVERIFY2(contextMenuItem(qsl("Set exits...")), "a right click on a room over a background image did not offer the room menu");
+        QVERIFY(!area()->mMapLabels.value(labelId).highlight);
+        QCOMPARE(mp2dMap->mMultiSelectionSet, QSet<int>{kEastRoomId});
+    }
+
+    // Where no room is in the way a background image can still be picked up and moved.
+    void test_aBackgroundImageClickedAwayFromTheRoomsCanBeMoved()
+    {
+        buildMap();
+        showMapper(false);
+        const int labelId = addMapImage(false);
+
+        pressAt(pointOnMapImageAwayFromRooms());
+        QVERIFY2(area()->mMapLabels.value(labelId).highlight, "a background image clicked where there is no room was not picked up");
+        moveTo(pointUnitsFromCentre(3, -2));
+
+        QCOMPARE(area()->mMapLabels.value(labelId).pos, QVector3D(3, -2, 0));
+    }
+
+    // A picked-up image the next click lands on is put down, even where a room
+    // is under the click too, or it would be left marked as picked up.
+    void test_aCarriedBackgroundImageIsPutDownByAClickOverARoom()
+    {
+        buildMap();
+        showMapper(false);
+        const int labelId = addMapImage(false);
+        const QPoint onEastRoom = pointUnitsFromCentre(1, 0);
+        carryMapImageOverEastRoom(labelId);
+        const QVector3D carriedTo = area()->mMapLabels.value(labelId).pos;
+
+        pressAt(onEastRoom, Qt::ShiftModifier);
+
+        QVERIFY2(!area()->mMapLabels.value(labelId).highlight, "a click over a room did not put down the image being carried");
+        QVERIFY(!mp2dMap->mLabelHighlighted);
+        releaseAt(onEastRoom, Qt::ShiftModifier);
+        QCOMPARE(area()->mMapLabels.value(labelId).pos, carriedTo);
+    }
+
+    // An image meant to lie under the rooms is likely to be over one when the click that ends Move comes.
+    void test_aBackgroundImageMovedFromItsMenuCanBePutDownOverARoom()
+    {
+        buildMap();
+        showMapper(false);
+        const int labelId = addMapImage(false);
+        const QPoint onEastRoom = pointUnitsFromCentre(1, 0);
+
+        rightClickAt(pointOnMapImageAwayFromRooms());
+        QVERIFY(pickContextMenuItem(qsl("Move")));
+        QVERIFY(mp2dMap->mMoveLabel);
+        hoverTo(onEastRoom - QPoint(2, 2));
+        const QVector3D putDownAt = area()->mMapLabels.value(labelId).pos;
+        QVERIFY2(putDownAt != kMapImagePosition, "the image being moved did not follow the mouse");
+        pressAt(onEastRoom);
+
+        QVERIFY2(!mp2dMap->mMoveLabel, "a click over a room did not finish moving the image");
+        QVERIFY2(!mp2dMap->mRoomBeingMoved, "the click that finished moving the image picked up the room under it");
+        const QPoint dragTo = pointUnitsFromCentre(1, 2);
+        moveTo(onEastRoom);
+        moveTo(dragTo);
+        releaseAt(dragTo);
+        QVERIFY(!area()->mMapLabels.value(labelId).highlight);
+        QCOMPARE(area()->mMapLabels.value(labelId).pos, putDownAt);
+        TRoom* pEastRoom = map()->mpRoomDB->getRoom(kEastRoomId);
+        QVERIFY(pEastRoom);
+        QCOMPARE(pEastRoom->x(), 1);
+        QCOMPARE(pEastRoom->y(), 0);
+    }
+
+    void test_rightClickingABackgroundImageBeingMovedOverARoomOffersTheLabelMenu()
+    {
+        buildMap();
+        showMapper(false);
+        const int labelId = addMapImage(false);
+        const QPoint onEastRoom = pointUnitsFromCentre(1, 0);
+
+        rightClickAt(pointOnMapImageAwayFromRooms());
+        QVERIFY(pickContextMenuItem(qsl("Move")));
+        hoverTo(onEastRoom - QPoint(2, 2));
+        QVERIFY2(area()->mMapLabels.value(labelId).pos != kMapImagePosition, "the image being moved did not follow the mouse");
+        rightClickAt(onEastRoom);
+
+        QVERIFY2(!contextMenuItem(qsl("Set exits...")), "a right click on an image being moved offered the room menu instead of its own");
+        QVERIFY(area()->mMapLabels.value(labelId).highlight);
+    }
+
+    // Closing a label's menu leaves the label marked as picked up, which must not stop a room drag.
+    void test_aRoomCanBeDraggedAfterALabelMenuIsClosed()
+    {
+        buildMap();
+        showMapper(false);
+        addTestLabel();
+
+        rightClickAt(pointOnTestLabel());
+        QVERIFY(contextMenuItem(qsl("Move")));
+        closeContextMenu();
+        dragFromTo(pointUnitsFromCentre(1, 0), pointUnitsFromCentre(1, 2));
+
+        TRoom* pEastRoom = map()->mpRoomDB->getRoom(kEastRoomId);
+        QVERIFY(pEastRoom);
+        QCOMPARE(pEastRoom->y(), 2);
+    }
+
+    void test_rightClickingARoomOverABackgroundImageAfterItsMenuIsClosedOffersTheRoomMenu()
+    {
+        buildMap();
+        showMapper(false);
+        addMapImage(false);
+
+        rightClickAt(pointOnMapImageAwayFromRooms());
+        QVERIFY(contextMenuItem(qsl("Move")));
+        closeContextMenu();
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QVERIFY2(contextMenuItem(qsl("Set exits...")), "a right click on a room over a background image whose menu was just closed did not offer the room menu");
+    }
+
+    // Over a room on a background image, Alt and a drag moves the map, not the image.
+    void test_holdingAltAndDraggingOverABackgroundImagePansTheMap()
+    {
+        buildMap();
+        showMapper(false);
+        const int labelId = addMapImage(false);
+
+        dragFromTo(pointUnitsFromCentre(1, 0), pointUnitsFromCentre(1, -1), Qt::AltModifier);
+
+        QCOMPARE(mp2dMap->mMapCenterY, -1.0);
+        QVERIFY(!area()->mMapLabels.value(labelId).highlight);
+        QCOMPARE(area()->mMapLabels.value(labelId).pos, kMapImagePosition);
+    }
+
+    void test_rightClickingABackgroundImageAwayFromTheRoomsOffersTheLabelMenu()
+    {
+        buildMap();
+        showMapper(false);
+        const int labelId = addMapImage(false);
+
+        rightClickAt(pointOnMapImageAwayFromRooms());
+
+        QVERIFY2(contextMenuItem(qsl("Move")) && !contextMenuItem(qsl("Set exits...")), "a right click on a background image where there is no room did not offer the label menu");
+        QVERIFY(area()->mMapLabels.value(labelId).highlight);
+    }
+
+    // In grid mode every cell of a block of rooms takes the click, so an image lined up with the block has no spot of its own.
+    void test_aBackgroundImageWhollyUnderRoomsCanBeMovedFromTheRoomMenu()
+    {
+        buildMap(true);
+        showMapper(false);
+        const int labelId = addMapImageOverTheRooms();
+
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QVERIFY2(contextMenuItem(qsl("Set exits...")), "a right click on a room over a background image did not offer the room menu");
+        QVERIFY2(pickContextMenuItem(qsl("Move label")), "the room menu did not offer to move the image under the room");
+        QVERIFY(mp2dMap->mMoveLabel);
+        QVERIFY(area()->mMapLabels.value(labelId).highlight);
+        hoverTo(pointUnitsFromCentre(2, 2));
+        pressAt(pointUnitsFromCentre(2, 2));
+        releaseAt(pointUnitsFromCentre(2, 2));
+
+        QVERIFY(!mp2dMap->mMoveLabel);
+        QVERIFY(!area()->mMapLabels.value(labelId).highlight);
+        QCOMPARE(area()->mMapLabels.value(labelId).pos, QVector3D(2, 2, 0));
+    }
+
+    void test_aBackgroundImageWhollyUnderRoomsCanBeDeletedFromTheRoomMenu()
+    {
+        buildMap(true);
+        showMapper(false);
+        const int labelId = addMapImageOverTheRooms();
+        const int otherLabelId = addTestLabel();
+
+        rightClickAt(pointUnitsFromCentre(-1, 1));
+        QVERIFY2(pickContextMenuItem(qsl("Delete label")), "the room menu did not offer to delete the image under the room");
+
+        QVERIFY2(!area()->mMapLabels.contains(labelId), "the image under the room was not deleted");
+        QVERIFY2(area()->mMapLabels.contains(otherLabelId), "deleting the image under the room deleted another label too");
+        QVERIFY(!mp2dMap->mLabelHighlighted);
+    }
+
+    // A small label laid on a room over a background image is drawn on top of the image, and must not be shadowed by it.
+    void test_eachLabelUnderARoomCanBeReachedFromTheRoomMenu()
+    {
+        buildMap();
+        showMapper(false);
+        const int imageId = addMapImage(false);
+        const int iconId = addLabel(QVector3D(0.9F, 0.1F, 0), QSizeF(4, 4));
+
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QVERIFY(contextMenuItem(qsl("Set exits...")));
+        QVERIFY2(!contextMenuItem(qsl("Delete label")), "the room menu offered to delete just one of the two labels under the room");
+        QVERIFY2(contextSubmenuItem(qsl("Image label %1").arg(imageId), qsl("Delete")), "the room menu did not offer the background image under the room");
+        QAction* pDeleteIcon = contextSubmenuItem(qsl("Label: a label"), qsl("Delete"));
+        QVERIFY2(pDeleteIcon, "the room menu did not offer the small label lying on the room");
+        pDeleteIcon->trigger();
+        closeContextMenu();
+
+        QVERIFY2(!area()->mMapLabels.contains(iconId), "the small label under the room was not deleted");
+        QVERIFY2(area()->mMapLabels.contains(imageId), "deleting the small label deleted the background image too");
+    }
+
+    void test_theRoomMenuOffersNoLabelActionsWithoutALabelUnderTheRoom()
+    {
+        buildMap();
+        showMapper(false);
+        addTestLabel();
+
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QVERIFY(contextMenuItem(qsl("Set exits...")));
+        QVERIFY2(!contextMenuItem(qsl("Move label")) && !contextMenuItem(qsl("Delete label")), "the room menu offered label actions with no label under the room");
+    }
+
+    // A picture drawn over the rooms hides them, so it is what a click there lands on.
+    void test_clickingARoomUnderAnImageOnTopPicksTheImageUp()
+    {
+        buildMap();
+        showMapper(false);
+        const int labelId = addMapImage(true);
+
+        pressAt(pointUnitsFromCentre(1, 0), Qt::ShiftModifier);
+
+        QVERIFY2(area()->mMapLabels.value(labelId).highlight, "a click on an image drawn over the rooms did not pick it up");
     }
 
     // A room the map is locked for viewing cannot be dragged out of place by a
@@ -1308,8 +2076,13 @@ private slots:
         TRoom* pRoom = startDrawingALine(kPlayerRoomId, qsl("e"));
         QVERIFY(pRoom);
 
+        // Each point is a change to the map, which views keeping what they drew from it go by
+        quint64 revision = mpHost->mpMap->revision();
         clickAt(pointUnitsFromCentre(0.5, 0.5));
+        QVERIFY(mpHost->mpMap->revision() > revision);
+        revision = mpHost->mpMap->revision();
         clickAt(pointUnitsFromCentre(1.5, 0.5));
+        QVERIFY(mpHost->mpMap->revision() > revision);
 
         const QList<QPointF> expected{QPointF(0.5, 0.5), QPointF(1.5, 0.5)};
         QCOMPARE(pRoom->customLines.value(qsl("e")), expected);
@@ -1970,6 +2743,338 @@ private slots:
                                .arg(kEastRoomId)));
     }
 
+    void test_scriptEntriesListMenusThenEventsEachByUniqueName()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapEvent('orderTopWhiskey', 'orderEvent', '', 'Order Whiskey')\n"
+                           "addMapMenu('orderZulu', '', 'Order Zulu')\n"
+                           "addMapEvent('orderTopDelta', 'orderEvent', '', 'Order Delta')\n"
+                           "addMapMenu('orderAlpha', '', 'Order Alpha')\n"
+                           "addMapEvent('orderZuluEventX', 'orderEvent', 'orderZulu', 'Order X-ray')\n"
+                           "addMapMenu('orderZuluSubYankee', 'orderZulu', 'Order Yankee')\n"
+                           "addMapEvent('orderZuluEventC', 'orderEvent', 'orderZulu', 'Order Charlie')\n"
+                           "addMapMenu('orderZuluSubBravo', 'orderZulu', 'Order Bravo')")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order Alpha"), qsl("Order Zulu"), qsl("Order Delta"), qsl("Order Whiskey")}));
+        QCOMPARE(userSubmenuTexts(qsl("Order Zulu")), QStringList({qsl("Order Bravo"), qsl("Order Yankee"), qsl("Order Charlie"), qsl("Order X-ray")}));
+    }
+
+    void test_negativeAndPositivePrioritiesMoveScriptEntries()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapEvent('orderTopWhiskey', 'orderEvent', '', 'Order Whiskey')\n"
+                           "addMapMenu('orderZulu', '', 'Order Zulu')\n"
+                           "addMapEvent('orderTopDelta', 'orderEvent', '', 'Order Delta')\n"
+                           "addMapMenu('orderAlpha', '', 'Order Alpha')\n"
+                           "addMapEvent('orderZuluEventX', 'orderEvent', 'orderZulu', 'Order X-ray')\n"
+                           "addMapMenu('orderZuluSubYankee', 'orderZulu', 'Order Yankee')\n"
+                           "addMapEvent('orderZuluEventC', 'orderEvent', 'orderZulu', 'Order Charlie')\n"
+                           "addMapMenu('orderZuluSubBravo', 'orderZulu', 'Order Bravo')\n"
+                           "assert(setMapMenuPriority('orderTopWhiskey', -1))\n"
+                           "assert(setMapMenuPriority('orderAlpha', 1))\n"
+                           "assert(setMapMenuPriority('orderZuluEventX', -10))\n"
+                           "assert(setMapMenuPriority('orderZuluSubBravo', 5))")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order Whiskey"), qsl("Order Zulu"), qsl("Order Delta"), qsl("Order Alpha")}));
+        QCOMPARE(userSubmenuTexts(qsl("Order Zulu")), QStringList({qsl("Order X-ray"), qsl("Order Yankee"), qsl("Order Charlie"), qsl("Order Bravo")}));
+    }
+
+    void test_menusAndEventsInterleaveByPriority()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapMenu('orderMenuA', '', 'Order menu A')\n"
+                           "addMapMenu('orderMenuB', '', 'Order menu B')\n"
+                           "addMapEvent('orderEventC', 'orderEvent', '', 'Order event C')\n"
+                           "addMapEvent('orderEventD', 'orderEvent', '', 'Order event D')\n"
+                           "addMapEvent('orderEventE', 'orderEvent', '', 'Order event E')\n"
+                           "setMapMenuPriority('orderEventC', 1)\n"
+                           "setMapMenuPriority('orderMenuA', 2)\n"
+                           "setMapMenuPriority('orderEventD', 3)\n"
+                           "setMapMenuPriority('orderMenuB', 4)\n"
+                           "setMapMenuPriority('orderEventE', 5)")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")),
+                 QStringList({qsl("Order event C"), qsl("Order menu A"), qsl("Order event D"), qsl("Order menu B"), qsl("Order event E")}));
+    }
+
+    void test_aMenuAndAnEventSharingAUniqueNameShareOnePriority()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapMenu('orderSame', '', 'Order same menu')\n"
+                           "addMapEvent('orderSame', 'orderEvent', '', 'Order same event')\n"
+                           "addMapEvent('orderA', 'orderEvent', '', 'Order A')\n"
+                           "assert(setMapMenuPriority('orderSame', 1))")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order A"), qsl("Order same menu"), qsl("Order same event")}));
+    }
+
+    void test_tiedPrioritiesKeepTheDefaultOrder()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapEvent('orderTopWhiskey', 'orderEvent', '', 'Order Whiskey')\n"
+                           "addMapMenu('orderZulu', '', 'Order Zulu')\n"
+                           "addMapEvent('orderTopDelta', 'orderEvent', '', 'Order Delta')\n"
+                           "addMapMenu('orderAlpha', '', 'Order Alpha')\n"
+                           "addMapEvent('orderTopEcho', 'orderEvent', '', 'Order Echo')\n"
+                           "for _, name in ipairs({'orderTopWhiskey', 'orderZulu', 'orderTopDelta', 'orderAlpha'}) do assert(setMapMenuPriority(name, 7)) end")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order Echo"), qsl("Order Alpha"), qsl("Order Zulu"), qsl("Order Delta"), qsl("Order Whiskey")}));
+    }
+
+    void test_settingAPriorityBackToZeroPutsTheDefaultBack()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapEvent('orderTopB', 'orderEvent', '', 'Order B')\n"
+                           "addMapEvent('orderTopA', 'orderEvent', '', 'Order A')\n"
+                           "assert(setMapMenuPriority('orderTopB', -1))")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order B"), qsl("Order A")}));
+        closeContextMenu();
+
+        QVERIFY(runLua(qsl("assert(setMapMenuPriority('orderTopB', 0))")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order A"), qsl("Order B")}));
+    }
+
+    void test_aPriorityOutlivesRemovingAndReAddingItsEntry()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapEvent('orderAaa', 'orderEvent', '', 'Order Aaa')\n"
+                           "addMapEvent('orderWalkPause', 'orderEvent', '', 'Order Pause walking')\n"
+                           "addMapMenu('orderP', '', 'Order P')\n"
+                           "addMapMenu('orderC', 'orderP', 'Order C')\n"
+                           "addMapEvent('orderPa', 'orderEvent', 'orderP', 'Order Pa')\n"
+                           "assert(setMapMenuPriority('orderWalkPause', -1))\n"
+                           "assert(setMapMenuPriority('orderP', 2))\n"
+                           "assert(setMapMenuPriority('orderC', 1))\n"
+                           "removeMapEvent('orderWalkPause')\n"
+                           "removeMapMenu('orderP')\n"
+                           "addMapEvent('orderWalkPause', 'orderEvent', '', 'Order Resume walking')\n"
+                           "addMapMenu('orderP', '', 'Order P')\n"
+                           "addMapMenu('orderC', 'orderP', 'Order C')\n"
+                           "addMapEvent('orderPa', 'orderEvent', 'orderP', 'Order Pa')")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order Resume walking"), qsl("Order Aaa"), qsl("Order P")}));
+        QCOMPARE(userSubmenuTexts(qsl("Order P")), QStringList({qsl("Order Pa"), qsl("Order C")}));
+    }
+
+    void test_aPrioritisedMenuToggledBetweenRightClicksKeepsItsPlace()
+    {
+        buildMap();
+        showMapper(false);
+        const QString addWalking = qsl("addMapMenu('orderM', '', 'Order M')\n"
+                                       "addMapEvent('orderMa', 'orderEvent', 'orderM', 'Order Ma')\n"
+                                       "addMapEvent('orderMz', 'orderEvent', 'orderM', 'Order Mz')\n"
+                                       "addMapEvent('orderE', 'orderEvent', '', 'Order E')\n");
+        QVERIFY(runLua(qsl("addMapEvent('orderA', 'orderEvent', '', 'Order A')\n") + addWalking
+                       + qsl("assert(setMapMenuPriority('orderE', -2))\n"
+                             "assert(setMapMenuPriority('orderM', -1))\n"
+                             "assert(setMapMenuPriority('orderMz', -1))\n")));
+        const QStringList expectedTop{qsl("Order E"), qsl("Order M"), qsl("Order A")};
+        const QStringList expectedM{qsl("Order Mz"), qsl("Order Ma")};
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), expectedTop);
+        QCOMPARE(userSubmenuTexts(qsl("Order M")), expectedM);
+        closeContextMenu();
+
+        QVERIFY(runLua(qsl("removeMapMenu('orderM')\nremoveMapEvent('orderE')")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order A")}));
+        closeContextMenu();
+
+        QVERIFY(runLua(addWalking));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), expectedTop);
+        QCOMPARE(userSubmenuTexts(qsl("Order M")), expectedM);
+    }
+
+    void test_manyScriptEntriesKeepTheDefaultOrder()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("for i = 29, 0, -1 do addMapEvent(string.format('orderBig%02d', i), 'orderEvent', '', string.format('Order big %02d', i)) end\n"
+                           "for i = 5, 1, -1 do addMapMenu('orderBigMenu' .. i, '', 'Order big menu ' .. i) end")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), bigMenuTexts({}));
+    }
+
+    void test_manyScriptEntriesKeepTheDefaultOrderAroundPrioritisedOnes()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("for i = 29, 0, -1 do addMapEvent(string.format('orderBig%02d', i), 'orderEvent', '', string.format('Order big %02d', i)) end\n"
+                           "for i = 5, 1, -1 do addMapMenu('orderBigMenu' .. i, '', 'Order big menu ' .. i) end\n"
+                           "assert(setMapMenuPriority('orderBig17', -1))\n"
+                           "assert(setMapMenuPriority('orderBig05', 1))\n"
+                           "assert(setMapMenuPriority('orderBigMenu3', 1))")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), bigMenuTexts({qsl("Order big 17")}, {qsl("Order big menu 3"), qsl("Order big 05")}));
+    }
+
+    void test_scriptEntriesFollowTheBuiltInItems()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapEvent('orderB', 'orderEvent', '', 'Order B')\n"
+                           "addMapMenu('orderA', '', 'Order A')")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order A"), qsl("Order B")}));
+        QVERIFY(scriptEntriesFollowTheModeSwitch());
+    }
+
+    void test_prioritisedScriptEntriesStillFollowTheBuiltInItems()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapEvent('orderB', 'orderEvent', '', 'Order B')\n"
+                           "addMapMenu('orderA', '', 'Order A')\n"
+                           "assert(setMapMenuPriority('orderB', -100))")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order B"), qsl("Order A")}));
+        QVERIFY(scriptEntriesFollowTheModeSwitch());
+    }
+
+    void test_tiesFollowUniqueNamesNotDisplayTexts()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapEvent('order1', 'orderEvent', '', 'Order Zebra')\n"
+                           "addMapEvent('order2', 'orderEvent', '', 'Order Apple')\n"
+                           "addMapMenu('order3', '', 'Order Yak')\n"
+                           "addMapMenu('order4', '', 'Order Bee')")));
+        const QStringList expected{qsl("Order Yak"), qsl("Order Bee"), qsl("Order Zebra"), qsl("Order Apple")};
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), expected);
+        closeContextMenu();
+
+        QVERIFY(runLua(qsl("for i = 1, 4 do assert(setMapMenuPriority('order' .. i, 3)) end")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), expected);
+    }
+
+    void test_eachMovedScriptEntryFiresItsOwnEvent()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapEvent('orderA', 'orderEvent', '', 'Order A')\n"
+                           "addMapEvent('orderB', 'orderEvent', '', 'Order B')\n"
+                           "addMapMenu('orderSub', '', 'Order Sub')\n"
+                           "addMapMenu('orderSubMenu', 'orderSub', 'Order Sub menu')\n"
+                           "addMapEvent('orderSubX', 'orderEvent', 'orderSub', 'Order Sub X')\n"
+                           "addMapEvent('orderSubY', 'orderEvent', 'orderSub', 'Order Sub Y')\n"
+                           "assert(setMapMenuPriority('orderB', -1))\n"
+                           "assert(setMapMenuPriority('orderSubY', -1))\n"
+                           "registerAnonymousEventHandler('orderEvent', function(_, uniqueName) orderFired = uniqueName end)")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order B"), qsl("Order Sub"), qsl("Order A")}));
+        QCOMPARE(userSubmenuTexts(qsl("Order Sub")), QStringList({qsl("Order Sub Y"), qsl("Order Sub menu"), qsl("Order Sub X")}));
+
+        const QList<std::pair<QAction*, QString>> picks{{contextMenuItem(qsl("Order B")), qsl("orderB")},
+                                                        {contextMenuItem(qsl("Order A")), qsl("orderA")},
+                                                        {userMenuItem(qsl("Order Sub"), qsl("Order Sub Y")), qsl("orderSubY")},
+                                                        {userMenuItem(qsl("Order Sub"), qsl("Order Sub X")), qsl("orderSubX")}};
+        for (const auto& [pAction, uniqueName] : picks) {
+            QVERIFY(pAction);
+            QVERIFY(runLua(qsl("orderFired = nil")));
+            pAction->trigger();
+            QVERIFY2(runLua(qsl("assert(orderFired == '%1', tostring(orderFired))").arg(uniqueName)), qPrintable(uniqueName));
+        }
+    }
+
+    void test_scriptEntriesWhoseParentMenuIsMissingStayHidden()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("addMapEvent('orderOrphanEvent', 'orderEvent', 'orderNeverAdded', 'Order orphan event')\n"
+                           "addMapMenu('orderOrphanMenu', 'orderNeverAdded', 'Order orphan menu')\n"
+                           "addMapEvent('orderKept', 'orderEvent', '', 'Order kept')")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order kept")}));
+        closeContextMenu();
+
+        QVERIFY(runLua(qsl("assert(setMapMenuPriority('orderOrphanEvent', -5))\n"
+                           "assert(setMapMenuPriority('orderOrphanMenu', -5))")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+        QCOMPARE(itemTextsStartingWith(mp2dMap->mActiveContextMenu, qsl("Order ")), QStringList({qsl("Order kept")}));
+    }
+
+    void test_aScriptCanHideTheViewingItemsAndKeepItsOwn()
+    {
+        buildMap();
+        showMapper(true);
+        QVERIFY(runLua(qsl("hideMapMenuItem('setPlayerLocation')\n"
+                           "hideMapMenuItem('switchMapMode')\n"
+                           "addMapEvent('mouseTestAction', 'mouseTestEvent', '', 'Do the thing')")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QVERIFY(!contextMenuItem(qsl("Set player location")));
+        QVERIFY(!contextMenuItem(qsl("Switch to editing mode")));
+        QVERIFY(contextMenuItem(qsl("Do the thing")));
+    }
+
+    void test_aMenuWithEveryItemHiddenDoesNotPopUp()
+    {
+        buildMap();
+        showMapper(true);
+        QVERIFY(runLua(qsl("hideMapMenuItem('setPlayerLocation')\n"
+                           "hideMapMenuItem('switchMapMode')")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QVERIFY2(!mp2dMap->mActiveContextMenu, "an empty context menu was put up");
+    }
+
+    void test_hidingAnEditingItemLeavesTheOthersOnTheMenu()
+    {
+        buildMap();
+        showMapper(false);
+        QVERIFY(runLua(qsl("hideMapMenuItem('deleteRoom')")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QVERIFY(!contextMenuItem(qsl("Delete")));
+        QVERIFY(contextMenuItem(qsl("Set exits...")));
+        QVERIFY(contextMenuItem(qsl("Create label...")));
+        QVERIFY(contextMenuItem(qsl("Switch to viewing mode")));
+    }
+
+    void test_showingAHiddenItemPutsItBackOnTheMenu()
+    {
+        buildMap();
+        showMapper(true);
+        QVERIFY(runLua(qsl("hideMapMenuItem('setPlayerLocation')\n"
+                           "showMapMenuItem('setPlayerLocation')")));
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QVERIFY(contextMenuItem(qsl("Set player location")));
+    }
+
+    void test_theMenuOnAnEmptyMapLeavesOutHiddenItems()
+    {
+        buildMap();
+        showMapper(true);
+        map()->mapClear();
+        QVERIFY(runLua(qsl("hideMapMenuItem('loadMap')")));
+        rightClickAt(viewCentre());
+
+        QVERIFY(!contextMenuItem(qsl("Load map...")));
+        QVERIFY(contextMenuItem(qsl("Create new map")));
+    }
+
     void test_theMenuOnAnEmptyMapOffersToLoadOrCreateOne()
     {
         buildMap();
@@ -2040,6 +3145,38 @@ private slots:
         QCOMPARE(mp2dMap->mRoomWidth, pixelsPerMapUnitAtZoom(expectedZoom));
     }
 
+    // A secondary view never centred on a room has no room id but must still zoom.
+    void test_rollingTheWheelOverASecondaryViewZoomsIt()
+    {
+        buildMap();
+        showMapper(true);
+        const auto [viewId, error] = mpHost->createMapView(mAreaId);
+        QVERIFY2(viewId > 0, qPrintable(error));
+        TMapView* pView = map()->getViewManager()->getView(viewId);
+        QVERIFY(pView);
+        T2DMap* pViewMap = pView->get2DMap();
+        const double before = zoom();
+
+        const bool accepted = rollWheelAt(QPoint(pViewMap->width() / 2, pViewMap->height() / 2), 1, Qt::NoModifier, pViewMap);
+
+        mpHost->closeMapView(viewId);
+        QVERIFY(accepted);
+        QCOMPARE(zoom(), before / 1.07);
+    }
+
+    void test_rollingTheWheelOverAnUnknownAreaIsIgnored()
+    {
+        buildMap();
+        showMapper(true);
+        const double before = zoom();
+        mp2dMap->mAreaID = 12345;
+
+        QVERIFY(!rollWheelAt(viewCentre(), 1));
+
+        mp2dMap->mAreaID = mAreaId;
+        QCOMPARE(zoom(), before);
+    }
+
     // The preference for the older way round: forward zooms out.
     void test_invertedZoomRollsTheOtherWay()
     {
@@ -2092,9 +3229,9 @@ private slots:
 
         rollWheelAt(viewCentre(), 100);
 
-        QCOMPARE(zoom(), T2DMap::csmMinXYZoom);
+        QCOMPARE(zoom(), TMap::scmMinXYZoom);
         rollWheelAt(viewCentre(), 1);
-        QCOMPARE(zoom(), T2DMap::csmMinXYZoom);
+        QCOMPARE(zoom(), TMap::scmMinXYZoom);
     }
 
     // "Move" from the context menu picks the selected rooms up without a
@@ -2731,6 +3868,55 @@ private slots:
         QVERIFY(map()->isUnsaved());
     }
 
+    // The factor and coordinates dialogs run their own event loop, in which a
+    // script can delete the room the selection is centred on.
+    void test_spreadingAroundARoomAScriptDeletedLeavesTheRestWhereTheyAre()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 0.5), pointUnitsFromCentre(1.5, -0.5));
+        QCOMPARE(mp2dMap->mMultiSelectionHighlightRoomId, kPlayerRoomId);
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QVERIFY(pickFactorItem(qsl("Spread..."), 3, qsl("deleteRoom(%1)").arg(kPlayerRoomId)));
+
+        QVERIFY(!map()->mpRoomDB->getRoom(kPlayerRoomId));
+        QCOMPARE(roomPosition(kWestRoomId), QVector3D(-1, 0, 0));
+        QCOMPARE(roomPosition(kEastRoomId), QVector3D(1, 0, 0));
+    }
+
+    void test_shrinkingAroundARoomAScriptDeletedLeavesTheRestWhereTheyAre()
+    {
+        buildMap();
+        QVERIFY(map()->setRoomCoordinates(kWestRoomId, -4, 0, 0));
+        QVERIFY(map()->setRoomCoordinates(kEastRoomId, 4, 0, 0));
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-4.5, 0.5), pointUnitsFromCentre(4.5, -0.5));
+        QCOMPARE(mp2dMap->mMultiSelectionHighlightRoomId, kPlayerRoomId);
+        rightClickAt(pointUnitsFromCentre(4, 0));
+
+        QVERIFY(pickFactorItem(qsl("Shrink..."), 2, qsl("deleteRoom(%1)").arg(kPlayerRoomId)));
+
+        QVERIFY(!map()->mpRoomDB->getRoom(kPlayerRoomId));
+        QCOMPARE(roomPosition(kWestRoomId), QVector3D(-4, 0, 0));
+        QCOMPARE(roomPosition(kEastRoomId), QVector3D(4, 0, 0));
+    }
+
+    void test_movingASelectionWhoseHighlightedRoomAScriptDeletedLeavesTheRestWhereTheyAre()
+    {
+        buildMap();
+        showMapper(false);
+        dragFromTo(pointUnitsFromCentre(-1.5, 0.5), pointUnitsFromCentre(1.5, -0.5));
+        QCOMPARE(mp2dMap->mMultiSelectionHighlightRoomId, kPlayerRoomId);
+        rightClickAt(pointUnitsFromCentre(1, 0));
+
+        QVERIFY(pickMoveToPosition(3, 2, 1, qsl("deleteRoom(%1)").arg(kPlayerRoomId)));
+
+        QVERIFY(!map()->mpRoomDB->getRoom(kPlayerRoomId));
+        QCOMPARE(roomPosition(kWestRoomId), QVector3D(-1, 0, 0));
+        QCOMPARE(roomPosition(kEastRoomId), QVector3D(1, 0, 0));
+    }
+
     void test_moveToPositionCarriesTheCustomLinesAlong()
     {
         buildMap();
@@ -2764,7 +3950,7 @@ private slots:
         }
         showMapper(false);
         // The mapper's list of areas was filled before this map's areas existed.
-        map()->mpMapper->updateAreaComboBox();
+        map()->mapper()->updateAreaComboBox();
         dragFromTo(pointUnitsFromCentre(-1.5, 1.5), pointUnitsFromCentre(1.5, 0.5));
         const QSet<int> northRow{kNorthWestRoomId, kNorthRoomId, kNorthEastRoomId};
         QCOMPARE(mp2dMap->mMultiSelectionSet, northRow);
@@ -2782,7 +3968,7 @@ private slots:
         QCOMPARE(roomsInArea(otherAreaId), northRow + farRooms);
         QVERIFY2(!roomsInArea(mAreaId).intersects(northRow), "the rooms are still in the area they came from");
         QCOMPARE(mp2dMap->mAreaID, otherAreaId);
-        QCOMPARE(map()->mpMapper->comboBox_showArea->currentText(), qsl("Next Door"));
+        QCOMPARE(map()->mapper()->comboBox_showArea->currentText(), qsl("Next Door"));
         QCOMPARE(mp2dMap->mMapCenterX, 0.0);
         QCOMPARE(mp2dMap->mMapCenterY, -1.0);
         QVERIFY(map()->isUnsaved());
@@ -2806,7 +3992,7 @@ private slots:
         QVERIFY2(newAreaId > 0, "no area called Brand New was made");
         QCOMPARE(roomsInArea(newAreaId), QSet<int>{kEastRoomId});
         QCOMPARE(mp2dMap->mAreaID, newAreaId);
-        QCOMPARE(map()->mpMapper->comboBox_showArea->currentText(), qsl("Brand New"));
+        QCOMPARE(map()->mapper()->comboBox_showArea->currentText(), qsl("Brand New"));
         QVERIFY(map()->isUnsaved());
     }
 
@@ -2858,8 +4044,8 @@ private slots:
         QVERIFY(mLastWarningText.isEmpty());
         QCOMPARE(configuredAreas(), (QStringList{qsl("Brand New (%1)").arg(newAreaId), qsl("Default Area (-1)"), mouseAreaRow(), otherAreaRow()}));
         QCOMPARE(configuredAreaSelected(), qsl("Brand New (%1)").arg(newAreaId));
-        QVERIFY2(map()->mpMapper->comboBox_showArea->findText(qsl("Brand New")) >= 0, "the dropdown does not offer the new area");
-        QCOMPARE(map()->mpMapper->comboBox_showArea->currentText(), qsl("Mouse Area"));
+        QVERIFY2(map()->mapper()->comboBox_showArea->findText(qsl("Brand New")) >= 0, "the dropdown does not offer the new area");
+        QCOMPARE(map()->mapper()->comboBox_showArea->currentText(), qsl("Mouse Area"));
         QCOMPARE(mp2dMap->mAreaID, mAreaId);
     }
 
@@ -2881,7 +4067,7 @@ private slots:
         showMapWithAnotherArea();
         QVERIFY(openConfigureAreas());
         const QStringList before = configuredAreas();
-        const int dropdownCountBefore = map()->mpMapper->comboBox_showArea->count();
+        const int dropdownCountBefore = map()->mapper()->comboBox_showArea->count();
 
         QVERIFY(pressAndName(qsl("Create"), QString()));
 
@@ -2889,8 +4075,8 @@ private slots:
         QCOMPARE(configuredAreas(), before);
         QCOMPARE(configuredAreaSelected(), mouseAreaRow());
         QCOMPARE(map()->mpRoomDB->getAreaNamesMap().size(), 3);
-        QCOMPARE(map()->mpMapper->comboBox_showArea->count(), dropdownCountBefore);
-        QCOMPARE(map()->mpMapper->comboBox_showArea->currentText(), qsl("Mouse Area"));
+        QCOMPARE(map()->mapper()->comboBox_showArea->count(), dropdownCountBefore);
+        QCOMPARE(map()->mapper()->comboBox_showArea->currentText(), qsl("Mouse Area"));
     }
 
     void test_renamingTheAreaShownRenamesItInTheListAndTheDropdown()
@@ -2904,7 +4090,7 @@ private slots:
         QCOMPARE(map()->mpRoomDB->getAreaNamesMap().value(mAreaId), qsl("Renamed Area"));
         QCOMPARE(configuredAreas(), (QStringList{qsl("Default Area (-1)"), otherAreaRow(), qsl("Renamed Area (%1)").arg(mAreaId)}));
         QCOMPARE(configuredAreaSelected(), qsl("Renamed Area (%1)").arg(mAreaId));
-        QCOMPARE(map()->mpMapper->comboBox_showArea->currentText(), qsl("Renamed Area"));
+        QCOMPARE(map()->mapper()->comboBox_showArea->currentText(), qsl("Renamed Area"));
         QCOMPARE(mp2dMap->mAreaID, mAreaId);
     }
 
@@ -2918,7 +4104,7 @@ private slots:
         QCOMPARE(mLastWarningText, qsl("Unable to rename area. Name may be invalid or already in use."));
         QCOMPARE(map()->mpRoomDB->getAreaNamesMap().value(mAreaId), qsl("Mouse Area"));
         QCOMPARE(configuredAreaSelected(), mouseAreaRow());
-        QCOMPARE(map()->mpMapper->comboBox_showArea->currentText(), qsl("Mouse Area"));
+        QCOMPARE(map()->mapper()->comboBox_showArea->currentText(), qsl("Mouse Area"));
     }
 
     void test_cancellingTheRenamePromptLeavesTheAreaAlone()
@@ -2945,8 +4131,8 @@ private slots:
         QVERIFY(!map()->mpRoomDB->getAreaNamesMap().contains(mOtherAreaId));
         QVERIFY2(!map()->mpRoomDB->getRoom(kOtherAreaRoomId), "the deleted area's room is still on the map");
         QCOMPARE(configuredAreas(), (QStringList{qsl("Default Area (-1)"), mouseAreaRow()}));
-        QCOMPARE(map()->mpMapper->comboBox_showArea->findText(qsl("Other")), -1);
-        QCOMPARE(map()->mpMapper->comboBox_showArea->currentText(), qsl("Mouse Area"));
+        QCOMPARE(map()->mapper()->comboBox_showArea->findText(qsl("Other")), -1);
+        QCOMPARE(map()->mapper()->comboBox_showArea->currentText(), qsl("Mouse Area"));
         QCOMPARE(mp2dMap->mAreaID, mAreaId);
     }
 
@@ -2958,8 +4144,8 @@ private slots:
     {
         showMapWithAnotherArea();
         map()->setDefaultAreaShown(false);
-        map()->mpMapper->updateAreaComboBox();
-        QCOMPARE(map()->mpMapper->comboBox_showArea->currentText(), qsl("Mouse Area"));
+        map()->mapper()->updateAreaComboBox();
+        QCOMPARE(map()->mapper()->comboBox_showArea->currentText(), qsl("Mouse Area"));
 
         QVERIFY(openConfigureAreas());
 
@@ -2995,7 +4181,7 @@ private slots:
 
         QVERIFY(mLastWarningText.isEmpty());
         QCOMPARE(map()->mpRoomDB->getAreaNamesMap().value(mOtherAreaId), qsl("Renamed Area"));
-        QCOMPARE(map()->mpMapper->comboBox_showArea->currentText(), qsl("Mouse Area"));
+        QCOMPARE(map()->mapper()->comboBox_showArea->currentText(), qsl("Mouse Area"));
         QCOMPARE(mp2dMap->mAreaID, mAreaId);
     }
 
@@ -3013,13 +4199,13 @@ private slots:
         QVERIFY(openConfigureAreasOn(pView->get2DMap()));
         QVERIFY(pressAndName(qsl("Create"), qsl("Brand New"), pView->get2DMap()));
         QVERIFY(mLastWarningText.isEmpty());
-        QVERIFY2(map()->mpMapper->comboBox_showArea->findText(qsl("Brand New")) >= 0, "the primary dropdown was not refreshed after a secondary view's dialog created an area");
+        QVERIFY2(map()->mapper()->comboBox_showArea->findText(qsl("Brand New")) >= 0, "the primary dropdown was not refreshed after a secondary view's dialog created an area");
 
         QVERIFY(selectConfiguredArea(otherAreaRow(), pView->get2DMap()));
         QVERIFY(pressAndName(qsl("Rename"), qsl("Renamed Other"), pView->get2DMap()));
         QVERIFY(mLastWarningText.isEmpty());
-        QCOMPARE(map()->mpMapper->comboBox_showArea->findText(qsl("Other")), -1);
-        QVERIFY2(map()->mpMapper->comboBox_showArea->findText(qsl("Renamed Other")) >= 0, "the primary dropdown was not refreshed after a secondary view's dialog renamed an area");
+        QCOMPARE(map()->mapper()->comboBox_showArea->findText(qsl("Other")), -1);
+        QVERIFY2(map()->mapper()->comboBox_showArea->findText(qsl("Renamed Other")) >= 0, "the primary dropdown was not refreshed after a secondary view's dialog renamed an area");
 
         mpHost->closeMapView(viewId);
     }
@@ -3043,9 +4229,56 @@ private slots:
 
         QVERIFY2(pView->getCurrentAreaId() != mOtherAreaId, "the secondary view is still showing the deleted area");
         QCOMPARE(pView->getCurrentAreaId(), -1);
-        QCOMPARE(map()->mpMapper->comboBox_showArea->findText(qsl("Other")), -1);
+        QCOMPARE(map()->mapper()->comboBox_showArea->findText(qsl("Other")), -1);
 
         mpHost->closeMapView(viewId);
+    }
+
+    void test_aMapViewClosedWithItsCloseButtonIsForgotten()
+    {
+        const auto [viewId, error] = mpHost->createMapView();
+        QVERIFY2(viewId > 0, qPrintable(error));
+        TMapViewManager* manager = map()->getViewManager();
+        QPointer<QDockWidget> dock = qobject_cast<QDockWidget*>(manager->getView(viewId)->parentWidget());
+        QVERIFY(dock);
+        QSignalSpy closed(manager, &TMapViewManager::viewClosed);
+
+        // what the window's X button does
+        dock->close();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+        QVERIFY2(!dock, "closing the window only hid it");
+        QVERIFY(!manager->getViewIds().contains(viewId));
+        QCOMPARE(closed.count(), 1);
+        QCOMPARE(closed.first().first().toInt(), viewId);
+        QVERIFY(!mpHost->closeMapView(viewId).first);
+    }
+
+    void test_aMapViewWhoseWindowIsDestroyedIsForgotten()
+    {
+        const auto [viewId, error] = mpHost->createMapView();
+        QVERIFY2(viewId > 0, qPrintable(error));
+        TMapViewManager* manager = map()->getViewManager();
+        QSignalSpy closed(manager, &TMapViewManager::viewClosed);
+
+        delete manager->getView(viewId)->parentWidget();
+
+        QVERIFY(!manager->getViewIds().contains(viewId));
+        QCOMPARE(manager->getView(viewId), nullptr);
+        QCOMPARE(closed.count(), 1);
+    }
+
+    void test_closingAMapViewReportsItOnce()
+    {
+        const auto [viewId, error] = mpHost->createMapView();
+        QVERIFY2(viewId > 0, qPrintable(error));
+        TMapViewManager* manager = map()->getViewManager();
+        QSignalSpy closed(manager, &TMapViewManager::viewClosed);
+
+        QVERIFY(mpHost->closeMapView(viewId).first);
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+        QCOMPARE(closed.count(), 1);
     }
 };
 

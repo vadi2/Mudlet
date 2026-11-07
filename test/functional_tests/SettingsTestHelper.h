@@ -27,6 +27,7 @@
 #include <QSignalSpy>
 #include <QStackedWidget>
 #include <QTimer>
+#include <QTranslator>
 #include <QWidget>
 #include <QtTest/QTest>
 
@@ -39,12 +40,12 @@
 //
 // Nothing here may use QVERIFY or QFAIL - both expand to a bare return, so they
 // are ill-formed in a function returning anything. The object names are the
-// dialog's test interface, documented in docs/settings-redesign.md.
+// dialog's test interface, documented in docs/design-language.md.
 namespace TestSettings {
 
-// Comfortably past the 400ms debounce even on a loaded sanitiser build, and
-// what a case waits out to say that no apply happened at all
-inline constexpr int scmQuietWindow = 1500;
+// What a case waits out to say that no apply happened at all: the 400ms
+// debounce plus a margin for a loaded sanitiser build
+inline constexpr int scmQuietWindow = 900;
 inline constexpr int scmApplyTimeout = 10000;
 
 inline void deleteProfileDirectory(const QString& profileName)
@@ -126,6 +127,23 @@ inline bool search(QWidget* pDialog, const QString& query)
     pField->setText(query);
     return waitForSearch(pDialog);
 }
+
+// Brackets every string it is asked for, so that a case can tell what the
+// dialog re-read on a language change from what it is still showing from
+// before it - without depending on which translations this build shipped.
+class BracketingTranslator : public QTranslator
+{
+public:
+    QString translate(const char* context, const char* sourceText, const char* disambiguation, int n) const override
+    {
+        Q_UNUSED(context)
+        Q_UNUSED(disambiguation)
+        Q_UNUSED(n)
+        return qsl("[%1]").arg(QString::fromUtf8(sourceText));
+    }
+
+    bool isEmpty() const override { return false; }
+};
 
 } // namespace TestSettings
 
