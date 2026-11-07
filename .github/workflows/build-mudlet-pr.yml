@@ -201,6 +201,21 @@ jobs:
         echo "LUA_PATH=$LUA_PATH" >> $GITHUB_ENV
         echo "LUA_CPATH=$LUA_CPATH" >> $GITHUB_ENV
 
+    # FORK ONLY: lua.org has been timing out from the ubuntu-22.04 runners. Build into .lua
+    # the way gh-actions-lua does, from Debian's copy of the same tarball if lua.org won't
+    # answer; the action then skips its own download because .lua exists.
+    - name: (Linux) Build Lua from a mirror if lua.org is unreachable
+      if: runner.os == 'Linux' && hashFiles('.lua/bin/lua') == ''
+      run: |
+        tarball="${RUNNER_TEMP}/lua-${LUA_VERSION}.tar.gz"
+        curl -fsSL --max-time 60 -o "$tarball" "https://www.lua.org/ftp/lua-${LUA_VERSION}.tar.gz" \
+          || curl -fsSL --retry 3 --retry-all-errors -o "$tarball" "https://deb.debian.org/debian/pool/main/l/lua5.1/lua5.1_${LUA_VERSION}.orig.tar.gz"
+        echo "2640fc56a795f29d28ef15e13c34a47e223960b0240e8cb0a82d9b0738695333  $tarball" | sha256sum -c -
+        sudo apt-get install -qy libreadline-dev libncurses-dev
+        tar -xzf "$tarball" -C "${RUNNER_TEMP}"
+        make -C "${RUNNER_TEMP}/lua-${LUA_VERSION}" -j linux
+        make -C "${RUNNER_TEMP}/lua-${LUA_VERSION}" -j INSTALL_TOP="${GITHUB_WORKSPACE}/.lua" install
+
     - name: (Linux) Install Lua via GitHub Actions
       uses: leafo/gh-actions-lua@v13
       if: runner.os == 'Linux'
