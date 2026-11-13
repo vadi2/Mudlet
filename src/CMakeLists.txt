@@ -1146,7 +1146,9 @@ if(USE_VARIABLE_SPLASH_SCREEN)
   target_compile_definitions(${LIB_MUDLET_TARGET} PUBLIC INCLUDE_VARIABLE_SPLASH_SCREEN)
 endif()
 
-target_compile_options(${LIB_MUDLET_TARGET} PUBLIC -Wno-deprecated)
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  target_compile_options(${LIB_MUDLET_TARGET} PUBLIC -Wno-deprecated)
+endif()
 
 # The widgets: main window, dialogs, consoles, map views and editors.
 # ${LIB_MUDLET_TARGET} must not depend on anything here, nor link Qt Widgets.
