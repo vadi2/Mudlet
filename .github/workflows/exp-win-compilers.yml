@@ -156,14 +156,15 @@ jobs:
         with:
           arch: x64
 
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          arch: win64_msvc2022_64
-          dir: ${{ runner.temp }}
-          cache: false
-          aqtversion: '>=3.2.1'
-          modules: qt5compat qtmultimedia qtspeech qtimageformats qtwebsockets qthttpserver
+      - name: Qt ${{ env.QT_VERSION }} msvc2022_64
+        shell: pwsh
+        run: |
+          $qt = "$env:RUNNER_TEMP\Qt"
+          $env:PATH = "$env:ProgramFiles\7-Zip;$env:PATH"
+          python .github/exp/getqt.py $qt qt5compat qtmultimedia qtspeech qtimageformats qtwebsockets qthttpserver
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          "QT_ROOT_DIR=$qt" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Get-ChildItem "$qt\bin" -Filter Qt6Core*.dll
 
       - name: LLVM ${{ env.LLVM_VERSION }}
         if: matrix.v.cc == 'clang-cl'
