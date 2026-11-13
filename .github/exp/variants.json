@@ -1,32 +1,11 @@
 [
     {
-        "id": "clang64-pgo-L2",
-        "kind": "mingw",
-        "msystem": "CLANG64",
-        "pgo": "true",
-        "cmake_args": "-DMUDLET_LAYOUT_PAD=1040"
-    },
-    {
-        "id": "clang64-pgo-L3",
-        "kind": "mingw",
-        "msystem": "CLANG64",
-        "pgo": "true",
-        "cmake_args": "-DMUDLET_LAYOUT_PAD=2208"
-    },
-    {
-        "id": "clang64-pgo-fulllto-L2",
-        "kind": "mingw",
-        "msystem": "CLANG64",
-        "pgo": "true",
-        "cmake_args": "-DCMAKE_C_FLAGS=-flto=full -DCMAKE_CXX_FLAGS=-flto=full -DCMAKE_EXE_LINKER_FLAGS=-flto=full -DCMAKE_SHARED_LINKER_FLAGS=-flto=full -DMUDLET_LAYOUT_PAD=1040"
-    },
-    {
-        "id": "clang64-pgo-fulllto-L3",
+        "id": "clang64-pgo-sentry",
         "kind": "mingw",
         "msystem": "CLANG64",
         "pgo": "true",
         "sentry": "true",
         "targets": "mudlet_executable PipelineBenchmark MudletCrashReporter",
-        "cmake_args": "-DCMAKE_C_FLAGS=-flto=full -DCMAKE_CXX_FLAGS=-flto=full -DCMAKE_EXE_LINKER_FLAGS=-flto=full -DCMAKE_SHARED_LINKER_FLAGS=-flto=full -DMUDLET_LAYOUT_PAD=2208"
+        "cmake_args": "-DMUDLET_LAYOUT_PAD=0"
     }
 ]
