@@ -71,6 +71,9 @@
 #include <climits>
 #include <cmath>
 #include <numbers>
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <xmmintrin.h>
+#endif
 
 namespace {
 const QString& key_n = qsl("n");
@@ -1379,7 +1382,11 @@ void TMapPainter::drawNonGridModeRoomsLod(QPainter& painter,
 
     for (qsizetype index = 0; index < candidateCount; ++index) {
         if (index + prefetchDistance < candidateCount) {
+#if defined(_MSC_VER) && !defined(__clang__)
+            _mm_prefetch(reinterpret_cast<const char*>(resolvedRooms[index + prefetchDistance]), _MM_HINT_T0);
+#else
             __builtin_prefetch(resolvedRooms[index + prefetchDistance]);
+#endif
         }
         TRoom* room = resolvedRooms[index];
         if (!room) {

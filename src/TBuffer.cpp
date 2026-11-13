@@ -73,6 +73,9 @@
 #include <optional>
 #include <utility>
 #include <chrono>
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <xmmintrin.h>
+#endif
 
 // for system physical memory info
 #if defined(Q_OS_WINDOWS)
@@ -293,6 +296,9 @@ inline void prefetchAllocatorHeader(const void* contents, const quintptr ownHead
 #if defined(__GNUC__) || defined(__clang__)
     constexpr quintptr allocatorHeaderBytes = 8;
     __builtin_prefetch(reinterpret_cast<const void*>(reinterpret_cast<quintptr>(contents) - ownHeaderBytes - allocatorHeaderBytes));
+#elif defined(_MSC_VER)
+    constexpr quintptr allocatorHeaderBytes = 8;
+    _mm_prefetch(reinterpret_cast<const char*>(reinterpret_cast<quintptr>(contents) - ownHeaderBytes - allocatorHeaderBytes), _MM_HINT_T0);
 #else
     Q_UNUSED(contents)
     Q_UNUSED(ownHeaderBytes)
