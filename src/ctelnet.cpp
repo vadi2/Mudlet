@@ -2679,7 +2679,8 @@ QByteArray cTelnet::prepareNewEnvironData(const QString& arg)
     ret.replace(NEW_ENVIRON_ESC, qsl("%1%2").arg(NEW_ENVIRON_ESC, NEW_ENVIRON_ESC));
     ret.replace(NEW_ENVIRON_VAL, qsl("%1%2").arg(NEW_ENVIRON_ESC, NEW_ENVIRON_VAL));
     ret.replace(NEW_ENVIRON_USERVAR, qsl("%1%2").arg(NEW_ENVIRON_ESC, NEW_ENVIRON_USERVAR));
-    ret.replace(NEW_ENVIRON_VAR, qsl("%1%2").arg(NEW_ENVIRON_ESC, NEW_ENVIRON_VAR));
+    // clang-cl (-fms-compatibility) takes a constant 0 for a null pointer, making this ambiguous
+    ret.replace(QChar(NEW_ENVIRON_VAR), qsl("%1%2").arg(NEW_ENVIRON_ESC, NEW_ENVIRON_VAR));
 
     return ret.toLatin1().constData();
 }
