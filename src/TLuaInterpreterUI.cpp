@@ -185,6 +185,30 @@ static QColor colorFromColorTable(lua_State* L, const QString& name)
 // variable names within these macros have trailing underscores because in
 // at least one case, masking an existing variable with the new one confused
 // GCC, leading to a crash.
+#if defined(_MSC_VER) && !defined(__clang__)
+// cl.exe has no GNU statement expressions; lua_error() longjmps, so a bad type never returns here
+static const char* msvcWindowName(lua_State* L, int pos, const char* func)
+{
+    if ((lua_gettop(L) < pos) || lua_isnil(L, pos)) {
+        return "";
+    }
+    if (!lua_isstring(L, pos)) {
+        lua_pushfstring(L, bad_window_type, func, pos, luaL_typename(L, pos));
+        lua_error(L);
+    }
+    return lua_tostring(L, pos);
+}
+static const char* msvcCmdlineName(lua_State* L, int pos, const char* func)
+{
+    if (!lua_isstring(L, pos)) {
+        lua_pushfstring(L, bad_cmdline_type, func, pos, luaL_typename(L, pos));
+        lua_error(L);
+    }
+    return lua_tostring(L, pos);
+}
+#define WINDOW_NAME(ARG_L, ARG_pos) msvcWindowName(ARG_L, ARG_pos, __FUNCTION__)
+#define CMDLINE_NAME(ARG_L, ARG_pos) msvcCmdlineName(ARG_L, ARG_pos, __FUNCTION__)
+#else
 #define WINDOW_NAME(ARG_L, ARG_pos)                                                                                                                                                                    \
     ({                                                                                                                                                                                                 \
         int pos_ = (ARG_pos);                                                                                                                                                                          \
@@ -210,6 +234,7 @@ static QColor colorFromColorTable(lua_State* L, const QString& name)
         }                                                                                                                                                                                              \
         lua_tostring(ARG_L, pos_);                                                                                                                                                                     \
     })
+#endif
 
 static int windowNotFound(lua_State* L, const QString& name)
 {

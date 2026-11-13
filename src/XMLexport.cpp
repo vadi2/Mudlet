@@ -1478,7 +1478,7 @@ void XMLexport::writeScriptElement(const QString& script, pugi::xml_node xmlElem
     // the U+FFFC + Control Picture stand-in that sanitizeForQxml() gives the other control characters
     if (script.contains(QChar(u'\0'))) {
         QString encoded = script;
-        encoded.replace(QChar(u'\0'), qsl("\xFFFC\x2400"));
+        encoded.replace(QChar(u'\0'), qsl(u"\xFFFC\x2400"));
         xmlElement.append_child("script").text().set(encoded.toUtf8().constData());
         return;
     }

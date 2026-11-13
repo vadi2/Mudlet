@@ -60,7 +60,7 @@ static QString compressXML(const QString& xml)
 // XMLexport::writeScriptElement() writes a NUL as U+FFFC U+2400, as pugixml cannot hold one in text
 static QString scriptFromSnapshot(QString script)
 {
-    return script.replace(qsl("\xFFFC\x2400"), QChar(u'\0'));
+    return script.replace(qsl(u"\xFFFC\x2400"), QChar(u'\0'));
 }
 
 static QString decompressXML(const QString& data)
