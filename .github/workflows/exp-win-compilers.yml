@@ -175,7 +175,7 @@ jobs:
           mkdir llvm
           if command -v zstd >/dev/null; then
             curl -fsSL --retry 5 -o llvm.tar.zst "$base.tar.zst"
-            zstd -d -q llvm.tar.zst -o llvm.tar
+            zstd -d -q --long=31 llvm.tar.zst -o llvm.tar
           else
             curl -fsSL --retry 5 -o llvm.tar.xz "$base.tar.xz"
             xz -d -T0 llvm.tar.xz
