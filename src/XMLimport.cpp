@@ -2081,36 +2081,36 @@ QString XMLimport::readScriptElement()
     // From format 1.001, control characters are stored as U+FFFC then the matching Control Picture.
     // Few scripts hold a U+FFFC, so one contains() spares most scripts the 30 replace() scans below:
     if ((mVersionMajor > 1 || (mVersionMajor == 1 && mVersionMinor > 0)) && localScript.contains(QChar(0xFFFC))) {
-        localScript.replace(qsl("\xFFFC\x2400"), QChar(u'\0'));  // NUL
-        localScript.replace(qsl("\xFFFC\x2401"), QChar('\x01')); // SOH
-        localScript.replace(qsl("\xFFFC\x2402"), QChar('\x02')); // STX
-        localScript.replace(qsl("\xFFFC\x2403"), QChar('\x03')); // ETX
-        localScript.replace(qsl("\xFFFC\x2404"), QChar('\x04')); // EOT
-        localScript.replace(qsl("\xFFFC\x2405"), QChar('\x05')); // ENQ
-        localScript.replace(qsl("\xFFFC\x2406"), QChar('\x06')); // ACK
-        localScript.replace(qsl("\xFFFC\x2407"), QChar('\x07')); // BEL
-        localScript.replace(qsl("\xFFFC\x2408"), QChar('\x08')); // BS
-        localScript.replace(qsl("\xFFFC\x240B"), QChar('\x0B')); // VT
-        localScript.replace(qsl("\xFFFC\x240C"), QChar('\x0C')); // FF
-        localScript.replace(qsl("\xFFFC\x240E"), QChar('\x0E')); // SS
-        localScript.replace(qsl("\xFFFC\x240F"), QChar('\x0F')); // SI
-        localScript.replace(qsl("\xFFFC\x2410"), QChar('\x10')); // DLE
-        localScript.replace(qsl("\xFFFC\x2411"), QChar('\x11')); // DC1
-        localScript.replace(qsl("\xFFFC\x2412"), QChar('\x12')); // DC2
-        localScript.replace(qsl("\xFFFC\x2413"), QChar('\x13')); // DC3
-        localScript.replace(qsl("\xFFFC\x2414"), QChar('\x14')); // DC4
-        localScript.replace(qsl("\xFFFC\x2415"), QChar('\x15')); // NAK
-        localScript.replace(qsl("\xFFFC\x2416"), QChar('\x16')); // SYN
-        localScript.replace(qsl("\xFFFC\x2417"), QChar('\x17')); // ETB
-        localScript.replace(qsl("\xFFFC\x2418"), QChar('\x18')); // CAN
-        localScript.replace(qsl("\xFFFC\x2419"), QChar('\x19')); // EM
-        localScript.replace(qsl("\xFFFC\x241A"), QChar('\x1A')); // SUB
-        localScript.replace(qsl("\xFFFC\x241B"), QChar('\x1B')); // ESC
-        localScript.replace(qsl("\xFFFC\x241C"), QChar('\x1C')); // FS
-        localScript.replace(qsl("\xFFFC\x241D"), QChar('\x1D')); // GS
-        localScript.replace(qsl("\xFFFC\x241E"), QChar('\x1E')); // RS
-        localScript.replace(qsl("\xFFFC\x241F"), QChar('\x1F')); // US
-        localScript.replace(qsl("\xFFFC\x2421"), QChar('\x7F')); // DEL
+        localScript.replace(qsl(u"\xFFFC\x2400"), QChar(u'\0'));  // NUL
+        localScript.replace(qsl(u"\xFFFC\x2401"), QChar('\x01')); // SOH
+        localScript.replace(qsl(u"\xFFFC\x2402"), QChar('\x02')); // STX
+        localScript.replace(qsl(u"\xFFFC\x2403"), QChar('\x03')); // ETX
+        localScript.replace(qsl(u"\xFFFC\x2404"), QChar('\x04')); // EOT
+        localScript.replace(qsl(u"\xFFFC\x2405"), QChar('\x05')); // ENQ
+        localScript.replace(qsl(u"\xFFFC\x2406"), QChar('\x06')); // ACK
+        localScript.replace(qsl(u"\xFFFC\x2407"), QChar('\x07')); // BEL
+        localScript.replace(qsl(u"\xFFFC\x2408"), QChar('\x08')); // BS
+        localScript.replace(qsl(u"\xFFFC\x240B"), QChar('\x0B')); // VT
+        localScript.replace(qsl(u"\xFFFC\x240C"), QChar('\x0C')); // FF
+        localScript.replace(qsl(u"\xFFFC\x240E"), QChar('\x0E')); // SS
+        localScript.replace(qsl(u"\xFFFC\x240F"), QChar('\x0F')); // SI
+        localScript.replace(qsl(u"\xFFFC\x2410"), QChar('\x10')); // DLE
+        localScript.replace(qsl(u"\xFFFC\x2411"), QChar('\x11')); // DC1
+        localScript.replace(qsl(u"\xFFFC\x2412"), QChar('\x12')); // DC2
+        localScript.replace(qsl(u"\xFFFC\x2413"), QChar('\x13')); // DC3
+        localScript.replace(qsl(u"\xFFFC\x2414"), QChar('\x14')); // DC4
+        localScript.replace(qsl(u"\xFFFC\x2415"), QChar('\x15')); // NAK
+        localScript.replace(qsl(u"\xFFFC\x2416"), QChar('\x16')); // SYN
+        localScript.replace(qsl(u"\xFFFC\x2417"), QChar('\x17')); // ETB
+        localScript.replace(qsl(u"\xFFFC\x2418"), QChar('\x18')); // CAN
+        localScript.replace(qsl(u"\xFFFC\x2419"), QChar('\x19')); // EM
+        localScript.replace(qsl(u"\xFFFC\x241A"), QChar('\x1A')); // SUB
+        localScript.replace(qsl(u"\xFFFC\x241B"), QChar('\x1B')); // ESC
+        localScript.replace(qsl(u"\xFFFC\x241C"), QChar('\x1C')); // FS
+        localScript.replace(qsl(u"\xFFFC\x241D"), QChar('\x1D')); // GS
+        localScript.replace(qsl(u"\xFFFC\x241E"), QChar('\x1E')); // RS
+        localScript.replace(qsl(u"\xFFFC\x241F"), QChar('\x1F')); // US
+        localScript.replace(qsl(u"\xFFFC\x2421"), QChar('\x7F')); // DEL
     }
 
     return localScript;

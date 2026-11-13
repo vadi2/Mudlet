@@ -297,8 +297,13 @@ if(APPLE OR MSVC)
   # option() in the subdirectory (CMP0077) and is unset afterwards so the
   # generic name cannot leak into other 3rdparty projects.
   set(BUILD_TRANSLATIONS OFF)
+  if(MSVC)
+    # mudlet_core builds with QTKEYCHAIN_NO_EXPORT, so a DLL's data symbols would not resolve
+    set(BUILD_SHARED_LIBS OFF)
+  endif()
   add_subdirectory(3rdparty/qtkeychain)
   unset(BUILD_TRANSLATIONS)
+  unset(BUILD_SHARED_LIBS)
 endif()
 
 git_submodule_init(
