@@ -76,9 +76,24 @@ jobs:
         run: |
           echo "toolchain:"; (clang --version || gcc --version) 2>/dev/null | head -2
           pacman -Q $MINGW_PACKAGE_PREFIX-clang $MINGW_PACKAGE_PREFIX-lld $MINGW_PACKAGE_PREFIX-qt6-base 2>/dev/null || true
+          grep -E '^(MemTotal|SwapTotal):' /proc/meminfo || true
+          ( while :; do echo "$(date +%T) $(awk '/^(MemFree|SwapFree):/ {printf "%s ", $2}' /proc/meminfo)"; sleep 15; done ) > $GITHUB_WORKSPACE/mem.log 2>&1 < /dev/null &
+          SAMPLER=$!
+          trap 'kill $SAMPLER 2>/dev/null; awk "NR==1 || \$2<m {m=\$2; t=\$1} NR==1 || \$3<sw {sw=\$3; ts=\$1} END {printf \"min MemFree %.2f GB at %s, min SwapFree %.2f GB at %s\\n\", m/1048576, t, sw/1048576, ts}" $GITHUB_WORKSPACE/mem.log' EXIT
           $GITHUB_WORKSPACE/CI/build-mudlet-for-windows.sh
-          grep -E '^(CMAKE_BUILD_TYPE|CMAKE_CXX_FLAGS|CMAKE_C_FLAGS|CMAKE_INTERPROCEDURAL|MUDLET_PGO|CMAKE_CXX_COMPILER|WITH_SENTRY|SENTRY_SEND_DEBUG|MUDLET_LAYOUT_PAD):' $GITHUB_WORKSPACE/build-$MSYSTEM/CMakeCache.txt || true
-          awk '$4 ~ /(mudlet|Benchmark|MudletCrashReporter)\.exe$/ {printf "link %-55s %7.1f s\n", $4, ($2-$1)/1000}' $GITHUB_WORKSPACE/build-$MSYSTEM/.ninja_log | tee $GITHUB_WORKSPACE/link-times.txt
+          grep -E '^(CMAKE_BUILD_TYPE|CMAKE_CXX_FLAGS|CMAKE_C_FLAGS|CMAKE_EXE_LINKER_FLAGS|CMAKE_INTERPROCEDURAL|MUDLET_PGO|CMAKE_CXX_COMPILER|WITH_SENTRY|SENTRY_SEND_DEBUG|MUDLET_LAYOUT_PAD|BUILD_TESTING):' $GITHUB_WORKSPACE/build-$MSYSTEM/CMakeCache.txt || true
+          awk '$4 ~ /\.exe$/ {printf "link %-55s %7.1f s  done %7.1f s\n", $4, ($2-$1)/1000, $2/1000}' $GITHUB_WORKSPACE/build-$MSYSTEM/.ninja_log | tee $GITHUB_WORKSPACE/link-times.txt
+
+      - name: QTest as release CI runs it
+        if: matrix.v.ctest == 'true'
+        continue-on-error: true
+        shell: msys2 {0}
+        run: |
+          LUA_PATH=$(luarocks --lua-version 5.1 path --lr-path)
+          export LUA_PATH
+          LUA_CPATH=$(luarocks --lua-version 5.1 path --lr-cpath)
+          export LUA_CPATH
+          ctest --test-dir $GITHUB_WORKSPACE/build-$MSYSTEM/test --output-on-failure -j $(( 2 * $(nproc) ))
 
       - name: Layout and debug info
         shell: msys2 {0}

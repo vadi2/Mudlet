@@ -151,8 +151,12 @@ fi
 # Only the benchmarks in the first pass, as building mudlet would send the
 # instrumented binary's debug files to Sentry.
 if [ "${MUDLET_PGO_BUILD}" = "true" ]; then
+  # ThinLTO: CMake gives Clang -flto=thin for this; -flto=full in CMAKE_{C,CXX,EXE_LINKER,SHARED_LINKER}_FLAGS
+  # would select full LTO instead, which runs the runner out of memory linking the tests.
+  LTO_ARGS=(-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON)
   echo "Building the instrumented pass of a profile-guided build ..."
-  if ! cmake --preset ci-windows -DMUDLET_PGO=GENERATE ${EXP_CMAKE_ARGS}; then
+  # Line tables are enough to train on; full debug info makes these three LTO links far slower
+  if ! cmake --preset ci-windows -DMUDLET_PGO=GENERATE -DSENTRY_SEND_DEBUG=0 "${LTO_ARGS[@]}" ${EXP_CMAKE_ARGS}; then
     echo "=== ERROR: CMake configuration of the instrumented pass failed ==="
     exit 4
   fi
@@ -167,11 +171,12 @@ if [ "${MUDLET_PGO_BUILD}" = "true" ]; then
   PGO_ARGS=(-DMUDLET_PGO=USE)
 else
   PGO_ARGS=()
+  LTO_ARGS=()
 fi
 
 # The flags live in CMakePresets.json, and the preset picks WITH_SENTRY,
 # SENTRY_DSN and SENTRY_SEND_DEBUG up out of the environment the workflow set
-if ! cmake --preset ci-windows "${PGO_ARGS[@]}" ${EXP_CMAKE_ARGS}; then
+if ! cmake --preset ci-windows "${PGO_ARGS[@]}" "${LTO_ARGS[@]}" ${EXP_CMAKE_ARGS}; then
   echo "=== ERROR: CMake configuration failed ==="
   exit 4
 fi
