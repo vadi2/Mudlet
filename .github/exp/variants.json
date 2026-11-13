@@ -12,5 +12,12 @@
         "cc": "clang-cl",
         "pgo": "false",
         "cmake_args": "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON"
+    },
+    {
+        "id": "clangcl-pgo",
+        "kind": "msvc",
+        "cc": "clang-cl",
+        "pgo": "true",
+        "cmake_args": ""
     }
 ]
