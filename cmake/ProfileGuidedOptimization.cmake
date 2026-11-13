@@ -68,7 +68,7 @@ elseif(MUDLET_PGO_COMPILER STREQUAL "GCC")
   # -fprofile-partial-training GCC optimises everything it did not reach for
   # size. With it, functions the training never entered are compiled as if
   # there were no profile; unreached blocks inside trained ones stay cold.
-  add_compile_options("-fprofile-use=${MUDLET_PGO_DIR}" "-fprofile-partial-training" "-fprofile-correction" "-Wno-missing-profile")
+  add_compile_options("-fprofile-use=${MUDLET_PGO_DIR}" "-fprofile-partial-training" "-fprofile-correction" "-Wno-missing-profile" "-Wno-error=coverage-mismatch")
 else()
   # Clang's counterpart is CI/pgo-train.sh merging the profile with -sparse, which
   # leaves out functions the training never entered so they are not treated as cold.
