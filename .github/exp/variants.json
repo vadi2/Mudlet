@@ -1,16 +1,9 @@
 [
     {
-        "id": "gcc-o3",
+        "id": "gcc-o3-pgo",
         "kind": "mingw",
         "msystem": "UCRT64",
-        "pgo": "false",
+        "pgo": "true",
         "cmake_args": ""
-    },
-    {
-        "id": "gcc-o3-lto",
-        "kind": "mingw",
-        "msystem": "UCRT64",
-        "pgo": "false",
-        "cmake_args": "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON"
     }
 ]
