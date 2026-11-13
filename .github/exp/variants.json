@@ -1,1 +1,16 @@
-[]
+[
+    {
+        "id": "clangcl-o3",
+        "kind": "msvc",
+        "cc": "clang-cl",
+        "pgo": "false",
+        "cmake_args": ""
+    },
+    {
+        "id": "clangcl-thinlto",
+        "kind": "msvc",
+        "cc": "clang-cl",
+        "pgo": "false",
+        "cmake_args": "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON"
+    }
+]
