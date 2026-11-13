@@ -1,1 +1,16 @@
-[]
+[
+    {
+        "id": "msvc-o2",
+        "kind": "msvc",
+        "cc": "cl",
+        "pgo": "false",
+        "cmake_args": ""
+    },
+    {
+        "id": "msvc-ltcg",
+        "kind": "msvc",
+        "cc": "cl",
+        "pgo": "false",
+        "cmake_args": "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON"
+    }
+]
