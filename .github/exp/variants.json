@@ -1,11 +1,20 @@
 [
     {
-        "id": "clang64-pgo-sentry",
+        "id": "clang64-pgo-sentry-all",
         "kind": "mingw",
         "msystem": "CLANG64",
         "pgo": "true",
         "sentry": "true",
-        "targets": "mudlet_executable PipelineBenchmark MudletCrashReporter",
+        "targets": "all",
         "cmake_args": "-DMUDLET_LAYOUT_PAD=0"
+    },
+    {
+        "id": "clang64-pgo-fulllto-sentry-all",
+        "kind": "mingw",
+        "msystem": "CLANG64",
+        "pgo": "true",
+        "sentry": "true",
+        "targets": "all",
+        "cmake_args": "-DCMAKE_C_FLAGS=-flto=full -DCMAKE_CXX_FLAGS=-flto=full -DCMAKE_EXE_LINKER_FLAGS=-flto=full -DCMAKE_SHARED_LINKER_FLAGS=-flto=full -DMUDLET_LAYOUT_PAD=0"
     }
 ]
