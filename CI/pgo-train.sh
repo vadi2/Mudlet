@@ -78,6 +78,9 @@ train() {
       exit 1
     fi
   done
+  if [ -n "${PGO_TOLERATE_EXIT:-}" ]; then
+    ls -l "${PROFILE_DIR}"/*.profraw >&2 2>/dev/null || true
+  fi
 }
 
 # Clang names each raw profile after the binary that wrote it, so an older

@@ -107,6 +107,23 @@
 #undef small
 #endif
 
+#ifdef MUDLET_PGO_FLUSH_ON_ABORT
+#include <csignal>
+#include <cstdlib>
+extern "C" int __llvm_profile_write_file(void);
+namespace {
+// The MSVC-ABI build aborts during teardown after its last measurement; abort() skips the
+// profile runtime's atexit writer, so write the profile from the SIGABRT handler instead
+const bool pgoFlushOnAbort = [] {
+    std::signal(SIGABRT, [](int) {
+        __llvm_profile_write_file();
+        std::_Exit(3);
+    });
+    return true;
+}();
+} // namespace
+#endif
+
 using namespace std::chrono_literals;
 
 extern int qInitResources_mudlet();
