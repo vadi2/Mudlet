@@ -1,1 +1,16 @@
-[]
+[
+    {
+        "id": "clang64-plain",
+        "kind": "mingw",
+        "msystem": "CLANG64",
+        "pgo": "false",
+        "cmake_args": ""
+    },
+    {
+        "id": "clang64-pgo",
+        "kind": "mingw",
+        "msystem": "CLANG64",
+        "pgo": "true",
+        "cmake_args": ""
+    }
+]
