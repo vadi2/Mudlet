@@ -136,12 +136,14 @@ jobs:
       matrix:
         v: ${{ fromJSON(needs.setup.outputs.msvc) }}
     name: ${{ matrix.v.id }}
-    env:
-      VCPKG_DIR: ${{ runner.temp }}/vcpkg_installed/x64-windows-exp
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: VCPKG_DIR
+        shell: bash
+        run: echo "VCPKG_DIR=$RUNNER_TEMP\vcpkg_installed\x64-windows-exp" >> "$GITHUB_ENV"
 
       - name: vcpkg cache
         uses: actions/cache/restore@v4
