@@ -63,15 +63,41 @@ jobs:
         shell: msys2 {0}
         env:
           GITHUB_REPO_TAG: 'false'
-          WITH_SENTRY: 'OFF'
+          # Sentry exactly as release CI configures it, except that the debug-file upload is a dry run
+          WITH_SENTRY: ${{ matrix.v.sentry == 'true' && 'ON' || 'OFF' }}
+          SENTRY_DSN: ${{ matrix.v.sentry == 'true' && 'https://0@o0.ingest.sentry.invalid/0' || '' }}
+          SENTRY_SEND_DEBUG: ${{ matrix.v.sentry == 'true' && '1' || '0' }}
+          SENTRY_AUTH_TOKEN: ${{ matrix.v.sentry == 'true' && 'exp-dry-run' || '' }}
+          EXP_SENTRY_DRY_RUN: '1'
           WITH_MCPSERVER: 'ON'
           MUDLET_PGO_BUILD: ${{ matrix.v.pgo }}
           EXP_CMAKE_ARGS: ${{ matrix.v.cmake_args }}
-          EXP_BUILD_TARGETS: 'mudlet_executable PipelineBenchmark'
+          EXP_BUILD_TARGETS: ${{ matrix.v.targets || 'mudlet_executable PipelineBenchmark' }}
         run: |
           echo "toolchain:"; (clang --version || gcc --version) 2>/dev/null | head -2
+          pacman -Q $MINGW_PACKAGE_PREFIX-clang $MINGW_PACKAGE_PREFIX-lld $MINGW_PACKAGE_PREFIX-qt6-base 2>/dev/null || true
           $GITHUB_WORKSPACE/CI/build-mudlet-for-windows.sh
-          grep -E '^(CMAKE_BUILD_TYPE|CMAKE_CXX_FLAGS|CMAKE_C_FLAGS|CMAKE_INTERPROCEDURAL|MUDLET_PGO|CMAKE_CXX_COMPILER):' $GITHUB_WORKSPACE/build-$MSYSTEM/CMakeCache.txt || true
+          grep -E '^(CMAKE_BUILD_TYPE|CMAKE_CXX_FLAGS|CMAKE_C_FLAGS|CMAKE_INTERPROCEDURAL|MUDLET_PGO|CMAKE_CXX_COMPILER|WITH_SENTRY|SENTRY_SEND_DEBUG|MUDLET_LAYOUT_PAD):' $GITHUB_WORKSPACE/build-$MSYSTEM/CMakeCache.txt || true
+          awk '$4 ~ /(mudlet|Benchmark|MudletCrashReporter)\.exe$/ {printf "link %-55s %7.1f s\n", $4, ($2-$1)/1000}' $GITHUB_WORKSPACE/build-$MSYSTEM/.ninja_log | tee $GITHUB_WORKSPACE/link-times.txt
+
+      - name: Layout and debug info
+        shell: msys2 {0}
+        run: |
+          cd $GITHUB_WORKSPACE/build-$MSYSTEM/release
+          mkdir -p $GITHUB_WORKSPACE/exp-debug
+          cp $GITHUB_WORKSPACE/link-times.txt $GITHUB_WORKSPACE/exp-debug/
+          ls -la mudlet.exe mudlet.pdb mudlet.map 2>/dev/null || true
+          if [ -f mudlet.map ]; then
+            head -4 mudlet.map
+            grep -m2 -B1 mudlet_layout_pad mudlet.map || true
+            for s in TTrigger5match TriggerUnit TBuffer9translate TLuaInterpreter; do grep -m1 "$s" mudlet.map || true; done
+            cp mudlet.map $GITHUB_WORKSPACE/exp-debug/
+          fi
+          if [ -f mudlet.pdb ]; then
+            cp mudlet.exe mudlet.pdb $GITHUB_WORKSPACE/exp-debug/
+            (llvm-readobj --coff-debug-directory mudlet.exe | grep -E 'PDBGUID|PDBAge|PDBFileName') || true
+            (llvm-pdbutil dump --summary mudlet.pdb | grep -E 'GUID|Age') || true
+          fi
 
       - name: PipelineBenchmark on the runner
         continue-on-error: true
@@ -83,7 +109,7 @@ jobs:
       - name: Package
         shell: msys2 {0}
         env:
-          WITH_SENTRY: 'OFF'
+          WITH_SENTRY: ${{ matrix.v.sentry == 'true' && 'ON' || 'OFF' }}
         run: |
           $GITHUB_WORKSPACE/CI/package-mudlet-for-windows.sh
           cp $GITHUB_WORKSPACE/bench-${{ matrix.v.id }}.txt $GITHUB_WORKSPACE/package-$MSYSTEM-release/ 2>/dev/null || true
@@ -94,6 +120,12 @@ jobs:
         with:
           name: mudlet-${{ matrix.v.id }}
           path: package-${{ matrix.v.msystem }}-release
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debug-${{ matrix.v.id }}
+          path: exp-debug
           retention-days: 30
 
   vcpkg-deps:

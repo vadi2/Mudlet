@@ -106,6 +106,14 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 
 download_sentry_cli "$OS" "$ARCH" "sentry-cli"
+if [ -n "${EXP_SENTRY_DRY_RUN:-}" ]; then
+    # exp: show what Sentry would be given instead of uploading it
+    for f in "$MUDLET_EXEC" "${MUDLET_EXEC%.exe}.pdb"; do
+        echo "=== sentry-cli debug-files check $f"
+        ./sentry-cli debug-files check "$f" || true
+    done
+    exit 0
+fi
 ./sentry-cli login --auth-token "$SENTRY_AUTH_TOKEN"
 
 FILES_TO_UPLOAD=("$MUDLET_EXEC")
