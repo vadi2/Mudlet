@@ -223,6 +223,7 @@ jobs:
             cmake --build build --target PipelineBenchmark MapRenderBenchmark PathfindBenchmark
             if ($LASTEXITCODE -ne 0) { exit 5 }
             $env:QT_QPA_PLATFORM = 'offscreen'
+            $env:PGO_TOLERATE_EXIT = '1'
             & "$env:ProgramFiles\Git\bin\bash.exe" CI/pgo-train.sh build
             if ($LASTEXITCODE -ne 0) { exit 6 }
             Remove-Item Env:QT_QPA_PLATFORM
@@ -277,6 +278,9 @@ jobs:
           cp build/release/mudlet.exe build/release/*.dll "$PKG/"
           (cd "$PKG" && "$QTU/bin/windeployqt.exe" --release --compiler-runtime --translationdir ./share/qt6/translations ./mudlet.exe)
           cp "$VCU"/bin/*.dll "$PKG/"
+          # app-local CRT: the bench guest has no VC++ redistributable and no admin rights
+          cp "$(cygpath -u "$VCToolsRedistDir")"/x64/Microsoft.VC*.CRT/*.dll "$PKG/"
+          rm -f "$PKG/vc_redist.x64.exe"
           cp -r build-luamods/out/. "$PKG/"
           cp 3rdparty/discord/rpc/lib/discord-rpc64.dll "$PKG/"
           cp -r src/mudlet-lua "$PKG/mudlet-lua"

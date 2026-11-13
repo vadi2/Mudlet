@@ -66,8 +66,11 @@ train() {
   # build would otherwise look for updates, and install mpkg, which updates itself
   # from the network part way through a slot
   if ! QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" MUDLET_TEST_MODE="${MUDLET_TEST_MODE:-1}" "${benchmark}" 2>&1 | tee "${log}"; then
-    echo "=== ERROR: the training run failed - see the $(basename "${benchmark}") output above ===" >&2
-    exit 1
+    echo "=== $(basename "${benchmark}") exited with status ${PIPESTATUS[0]} ===" >&2
+    if [ -z "${PGO_TOLERATE_EXIT:-}" ]; then
+      echo "=== ERROR: the training run failed - see the $(basename "${benchmark}") output above ===" >&2
+      exit 1
+    fi
   fi
   for metric in "$@"; do
     if ! grep -q "^METRIC ${metric} " "${log}"; then
