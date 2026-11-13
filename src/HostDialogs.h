@@ -26,7 +26,7 @@
 #include <memory>
 
 class Host;
-class TConsoleModel;
+struct TConsoleModel;
 class dlgModuleManager;
 class dlgNotepad;
 class dlgPackageManager;

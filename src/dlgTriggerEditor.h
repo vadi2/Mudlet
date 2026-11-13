@@ -109,7 +109,7 @@ class TAction;
 class TKey;
 class TVar;
 class TConsole;
-class TConsoleModel;
+struct TConsoleModel;
 class dlgVarsMainArea;
 class QShortcut;
 

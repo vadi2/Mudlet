@@ -17,7 +17,7 @@ find_library(SQLITE_LIB NAMES sqlite3 REQUIRED)
 function(luamod target outname outdir)
   add_library(${target} SHARED ${ARGN})
   target_include_directories(${target} PRIVATE ${LUA_INC})
-  target_compile_definitions(${target} PRIVATE LUA_BUILD_AS_DLL _CRT_SECURE_NO_WARNINGS)
+  target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
   target_link_libraries(${target} PRIVATE ${LUA_LIB})
   set_target_properties(${target} PROPERTIES PREFIX "" OUTPUT_NAME ${outname}
     WINDOWS_EXPORT_ALL_SYMBOLS ON
