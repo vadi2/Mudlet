@@ -1194,13 +1194,10 @@ if(USE_GUI)
   # will fail to load with "undefined symbol" errors.
   set_target_properties(${EXE_MUDLET_TARGET} PROPERTIES ENABLE_EXPORTS ON)
 
-  # exp: another code layout of the same program. Module-level asm survives LTO and PGO, and
-  # MinGW links with -opt:noref, so these bytes stay ahead of every function in .text.
+  # exp: another code layout of the same program, shifted by MUDLET_LAYOUT_PAD bytes of int3
   set(MUDLET_LAYOUT_PAD "0" CACHE STRING "exp: bytes of int3 placed in front of all code")
   if(MUDLET_LAYOUT_PAD GREATER 0)
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/layout_pad.cpp"
-      "asm(\".section .text,\\\"xr\\\"\\n\\t.globl mudlet_layout_pad\\nmudlet_layout_pad:\\n\\t.fill ${MUDLET_LAYOUT_PAD}, 1, 0xcc\\n\\t.text\\n\");\n"
-      "#pragma comment(linker, \"/include:mudlet_layout_pad\")\n")
+    configure_file(exp_layout_pad.cpp.in "${CMAKE_CURRENT_BINARY_DIR}/layout_pad.cpp" @ONLY)
     set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/layout_pad.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
     target_sources(${EXE_MUDLET_TARGET} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/layout_pad.cpp")
     target_link_options(${EXE_MUDLET_TARGET} PRIVATE "-Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/mudlet.map")

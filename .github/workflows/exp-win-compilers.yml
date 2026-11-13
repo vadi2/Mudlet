@@ -88,7 +88,7 @@ jobs:
           cp $GITHUB_WORKSPACE/link-times.txt $GITHUB_WORKSPACE/exp-debug/
           ls -la mudlet.exe mudlet.pdb mudlet.map 2>/dev/null || true
           if [ -f mudlet.map ]; then
-            head -4 mudlet.map
+            head -8 mudlet.map
             grep -m2 -B1 mudlet_layout_pad mudlet.map || true
             for s in TTrigger5match TriggerUnit TBuffer9translate TLuaInterpreter; do grep -m1 "$s" mudlet.map || true; done
             cp mudlet.map $GITHUB_WORKSPACE/exp-debug/

@@ -1,0 +1,17 @@
+// exp: lld's call-graph sort puts the profiled hot code first in .text, so the pad joins the
+// profile with an edge heavier than any real one; that places it ahead of every function.
+asm(R"(
+	.section .text$mudlet_layout_pad_head,"xr",one_only,mudlet_layout_pad_head
+	.globl mudlet_layout_pad_head
+mudlet_layout_pad_head:
+	int3
+	.section .text$mudlet_layout_pad,"xr",one_only,mudlet_layout_pad
+	.globl mudlet_layout_pad
+	.p2align 6
+mudlet_layout_pad:
+	.fill @MUDLET_LAYOUT_PAD@, 1, 0xcc
+	.text
+	.cg_profile mudlet_layout_pad_head, mudlet_layout_pad, 1152921504606846976
+)");
+#pragma comment(linker, "/include:mudlet_layout_pad")
+#pragma comment(linker, "/include:mudlet_layout_pad_head")
