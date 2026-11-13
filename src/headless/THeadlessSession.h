@@ -50,7 +50,7 @@ class QPainter;
 class QSize;
 class QTimer;
 class TBuffer;
-class TConsoleModel;
+struct TConsoleModel;
 class TLineFormat;
 class QKeyEvent;
 class QMimeData;

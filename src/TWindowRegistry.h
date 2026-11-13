@@ -30,8 +30,8 @@
 
 #include <optional>
 
-class TConsoleModel;
-class TLabelModel;
+struct TConsoleModel;
+struct TLabelModel;
 
 // Host's index of named windows (kind and model by name), so the core needs no Qt Widgets to ask.
 // Entries are NON-OWNING: each model belongs to its view object (TLabel, TConsole), which must register
