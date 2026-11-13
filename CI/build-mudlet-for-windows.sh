@@ -52,7 +52,7 @@ if [ "${MSYSTEM}" = "MSYS" ]; then
   echo "Please run this script from a CLANG64 type bash terminal as the MSYS one"
   echo "does not supported what is needed."
   exit 2
-elif [ "${MSYSTEM}" = "CLANG64" ]; then
+elif [ "${MSYSTEM}" = "CLANG64" ] || [ "${MSYSTEM}" = "UCRT64" ]; then
   echo "Building with CLANG64"
 else
   echo "This script is not set up to handle systems of type ${MSYSTEM}, only"
@@ -152,7 +152,7 @@ fi
 # instrumented binary's debug files to Sentry.
 if [ "${MUDLET_PGO_BUILD}" = "true" ]; then
   echo "Building the instrumented pass of a profile-guided build ..."
-  if ! cmake --preset ci-windows -DMUDLET_PGO=GENERATE; then
+  if ! cmake --preset ci-windows -DMUDLET_PGO=GENERATE ${EXP_CMAKE_ARGS}; then
     echo "=== ERROR: CMake configuration of the instrumented pass failed ==="
     exit 4
   fi
@@ -171,7 +171,7 @@ fi
 
 # The flags live in CMakePresets.json, and the preset picks WITH_SENTRY,
 # SENTRY_DSN and SENTRY_SEND_DEBUG up out of the environment the workflow set
-if ! cmake --preset ci-windows "${PGO_ARGS[@]}"; then
+if ! cmake --preset ci-windows "${PGO_ARGS[@]}" ${EXP_CMAKE_ARGS}; then
   echo "=== ERROR: CMake configuration failed ==="
   exit 4
 fi
@@ -182,7 +182,11 @@ echo ""
 echo "Running CMake build ..."
 echo ""
 
-cmake --build --preset ci-windows "${PARALLEL[@]}"
+if [ -n "${EXP_BUILD_TARGETS}" ]; then
+  cmake --build --preset ci-windows "${PARALLEL[@]}" --target ${EXP_BUILD_TARGETS}
+else
+  cmake --build --preset ci-windows "${PARALLEL[@]}"
+fi
 BUILD_STATUS=$?
 if [ "${BUILD_STATUS}" -ne 0 ]; then
   echo "=== ERROR: CMake build failed with exit code ${BUILD_STATUS} ==="

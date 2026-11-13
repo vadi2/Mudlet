@@ -53,7 +53,7 @@ if [ "${MSYSTEM}" = "MSYS" ]; then
   echo "Please run this script from a CLANG64 type bash terminal as the MSYS one"
   echo "does not supported what is needed."
   exit 2
-elif [ "${MSYSTEM}" = "CLANG64" ]; then
+elif [ "${MSYSTEM}" = "CLANG64" ] || [ "${MSYSTEM}" = "UCRT64" ]; then
   echo "Building with CLANG64"
 else
   echo "This script is not set up to handle systems of type ${MSYSTEM}, only"

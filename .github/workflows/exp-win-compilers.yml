@@ -1,0 +1,292 @@
+# Throwaway: builds the Windows binary with several toolchains for benchmarking.
+# Lives only on vadi2/Mudlet exp/win-* branches. Variants come from .github/exp/variants.json.
+name: exp-win-compilers
+on:
+  push:
+    branches: ['exp/win-*']
+
+permissions:
+  contents: read
+
+env:
+  QT_VERSION: '6.12.0'
+  LLVM_VERSION: '23.1.5'
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      mingw: ${{ steps.m.outputs.mingw }}
+      msvc: ${{ steps.m.outputs.msvc }}
+      has_mingw: ${{ steps.m.outputs.has_mingw }}
+      has_msvc: ${{ steps.m.outputs.has_msvc }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: m
+        run: |
+          f=.github/exp/variants.json
+          mingw=$(jq -c '[.[] | select(.kind=="mingw")]' "$f")
+          msvc=$(jq -c '[.[] | select(.kind=="msvc")]' "$f")
+          echo "mingw=$mingw" >> "$GITHUB_OUTPUT"
+          echo "msvc=$msvc" >> "$GITHUB_OUTPUT"
+          echo "has_mingw=$([ "$mingw" != "[]" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_msvc=$([ "$msvc" != "[]" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          cat "$f"
+
+  mingw:
+    needs: setup
+    if: needs.setup.outputs.has_mingw == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        v: ${{ fromJSON(needs.setup.outputs.mingw) }}
+    name: ${{ matrix.v.id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.v.msystem }}
+          update: true
+
+      - name: Build environment
+        shell: msys2 {0}
+        env:
+          SENTRY_SEND_DEBUG: '0'
+        run: $GITHUB_WORKSPACE/CI/setup-windows-sdk.sh
+
+      - name: Build
+        shell: msys2 {0}
+        env:
+          GITHUB_REPO_TAG: 'false'
+          WITH_SENTRY: 'OFF'
+          WITH_MCPSERVER: 'ON'
+          MUDLET_PGO_BUILD: ${{ matrix.v.pgo }}
+          EXP_CMAKE_ARGS: ${{ matrix.v.cmake_args }}
+          EXP_BUILD_TARGETS: 'mudlet_executable PipelineBenchmark'
+        run: |
+          echo "toolchain:"; (clang --version || gcc --version) 2>/dev/null | head -2
+          $GITHUB_WORKSPACE/CI/build-mudlet-for-windows.sh
+          grep -E '^(CMAKE_BUILD_TYPE|CMAKE_CXX_FLAGS|CMAKE_C_FLAGS|CMAKE_INTERPROCEDURAL|MUDLET_PGO|CMAKE_CXX_COMPILER):' $GITHUB_WORKSPACE/build-$MSYSTEM/CMakeCache.txt || true
+
+      - name: PipelineBenchmark on the runner
+        continue-on-error: true
+        shell: msys2 {0}
+        run: |
+          cd $GITHUB_WORKSPACE/build-$MSYSTEM/release
+          for i in 1 2 3; do QT_QPA_PLATFORM=offscreen MUDLET_TEST_MODE=1 ./PipelineBenchmark.exe 2>&1 | grep '^METRIC' | tee -a $GITHUB_WORKSPACE/bench-${{ matrix.v.id }}.txt; done
+
+      - name: Package
+        shell: msys2 {0}
+        env:
+          WITH_SENTRY: 'OFF'
+        run: |
+          $GITHUB_WORKSPACE/CI/package-mudlet-for-windows.sh
+          cp $GITHUB_WORKSPACE/bench-${{ matrix.v.id }}.txt $GITHUB_WORKSPACE/package-$MSYSTEM-release/ 2>/dev/null || true
+          echo "${{ matrix.v.id }} $(git -C $GITHUB_WORKSPACE rev-parse HEAD)" > $GITHUB_WORKSPACE/package-$MSYSTEM-release/exp-variant.txt
+          du -sh $GITHUB_WORKSPACE/package-$MSYSTEM-release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mudlet-${{ matrix.v.id }}
+          path: package-${{ matrix.v.msystem }}-release
+          retention-days: 30
+
+  vcpkg-deps:
+    needs: setup
+    if: needs.setup.outputs.has_msvc == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: vcpkg cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg_installed
+          key: vcpkg-exp-${{ hashFiles('.github/exp/vcpkg/vcpkg.json', '.github/exp/triplets/*') }}-v1
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          arch: x64
+      - name: vcpkg install
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
+            --x-manifest-root=.github/exp/vcpkg `
+            --x-install-root="$env:RUNNER_TEMP\vcpkg_installed" `
+            --overlay-triplets=.github/exp/triplets `
+            --triplet x64-windows-exp
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem "$env:RUNNER_TEMP\vcpkg_installed\x64-windows-exp\bin"
+          Get-ChildItem "$env:RUNNER_TEMP\vcpkg_installed\x64-windows-exp\lib"
+
+  msvc:
+    needs: [setup, vcpkg-deps]
+    if: needs.setup.outputs.has_msvc == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        v: ${{ fromJSON(needs.setup.outputs.msvc) }}
+    name: ${{ matrix.v.id }}
+    env:
+      VCPKG_DIR: ${{ runner.temp }}/vcpkg_installed/x64-windows-exp
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: vcpkg cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg_installed
+          key: vcpkg-exp-${{ hashFiles('.github/exp/vcpkg/vcpkg.json', '.github/exp/triplets/*') }}-v1
+          fail-on-cache-miss: true
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          dir: ${{ runner.temp }}
+          cache: false
+          aqtversion: '>=3.2.1'
+          modules: qt5compat qtmultimedia qtspeech qtimageformats qtwebsockets qthttpserver
+
+      - name: LLVM ${{ env.LLVM_VERSION }}
+        if: matrix.v.cc == 'clang-cl'
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-pc-windows-msvc"
+          mkdir llvm
+          if command -v zstd >/dev/null; then
+            curl -fsSL --retry 5 -o llvm.tar.zst "$base.tar.zst"
+            zstd -d -q llvm.tar.zst -o llvm.tar
+          else
+            curl -fsSL --retry 5 -o llvm.tar.xz "$base.tar.xz"
+            xz -d -T0 llvm.tar.xz
+          fi
+          tar xf llvm.tar -C llvm --strip-components=1
+          rm -f llvm.tar llvm.tar.zst
+          ls llvm/bin | head -50
+          echo "$(cygpath -w "$RUNNER_TEMP/llvm/bin")" >> "$GITHUB_PATH"
+
+      - name: Tidy PATH
+        shell: pwsh
+        run: |
+          $p = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Strawberry' -and $_ -notmatch 'Program Files\\LLVM' }) -join ';'
+          "PATH=$p" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          (Get-Command cl).Source
+          if ('${{ matrix.v.cc }}' -eq 'clang-cl') { (Get-Command clang-cl).Source; clang-cl --version }
+
+      - name: Configure and build
+        shell: pwsh
+        env:
+          CFLAGS: '/DNOMINMAX /D_USE_MATH_DEFINES /D_CRT_SECURE_NO_WARNINGS /utf-8'
+          CXXFLAGS: '/DNOMINMAX /D_USE_MATH_DEFINES /D_CRT_SECURE_NO_WARNINGS /utf-8 /bigobj'
+          WITH_SENTRY: 'OFF'
+          WITH_UPDATER: 'NO'
+          WITH_MCPSERVER: 'ON'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cc = '${{ matrix.v.cc }}'
+          $common = @('-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
+            "-DCMAKE_C_COMPILER=$cc", "-DCMAKE_CXX_COMPILER=$cc",
+            "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR;$env:VCPKG_DIR",
+            "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=$env:GITHUB_WORKSPACE/build/release",
+            '-DBUILD_TESTING=ON')
+          if ($cc -eq 'clang-cl') {
+            $common += @('-DCMAKE_LINKER=lld-link', '-DCMAKE_AR=llvm-lib',
+              '-DCMAKE_CXX_FLAGS_RELEASE=/O2 /Ob2 /DNDEBUG /clang:-O3')
+          }
+          $common += ('${{ matrix.v.cmake_args }}' -split ' ' | Where-Object { $_ })
+          $env:PATH = "$env:QT_ROOT_DIR\bin;$env:VCPKG_DIR\bin;$env:PATH"
+          if ('${{ matrix.v.pgo }}' -eq 'true') {
+            cmake -S . -B build @common -DMUDLET_PGO=GENERATE
+            if ($LASTEXITCODE -ne 0) { exit 4 }
+            cmake --build build --target PipelineBenchmark MapRenderBenchmark PathfindBenchmark
+            if ($LASTEXITCODE -ne 0) { exit 5 }
+            $env:QT_QPA_PLATFORM = 'offscreen'
+            & "$env:ProgramFiles\Git\bin\bash.exe" CI/pgo-train.sh build
+            if ($LASTEXITCODE -ne 0) { exit 6 }
+            Remove-Item Env:QT_QPA_PLATFORM
+            cmake -S . -B build @common -DMUDLET_PGO=USE
+          } else {
+            cmake -S . -B build @common
+          }
+          if ($LASTEXITCODE -ne 0) { exit 4 }
+          cmake --build build --target mudlet_executable PipelineBenchmark -- -k 0
+          if ($LASTEXITCODE -ne 0) { exit 5 }
+          Select-String -Path build/CMakeCache.txt -Pattern '^(CMAKE_BUILD_TYPE|CMAKE_CXX_FLAGS|CMAKE_C_FLAGS|CMAKE_INTERPROCEDURAL|MUDLET_PGO|CMAKE_CXX_COMPILER|CMAKE_LINKER):'
+
+      - name: Lua C modules
+        shell: pwsh
+        env:
+          CFLAGS: '/D_CRT_SECURE_NO_WARNINGS /utf-8'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $modsrc = "$env:RUNNER_TEMP/modsrc" -replace '\\','/'
+          & "$env:ProgramFiles\Git\bin\bash.exe" .github/exp/luamods/fetch.sh $modsrc
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $lualib = (Get-ChildItem -Recurse build -Filter lua51.lib | Select-Object -First 1).FullName
+          $cc = '${{ matrix.v.cc }}'
+          $extra = @()
+          if ($cc -eq 'clang-cl') { $extra = @('-DCMAKE_LINKER=lld-link', '-DCMAKE_AR=llvm-lib') }
+          cmake -S .github/exp/luamods -B build-luamods -G Ninja -DCMAKE_BUILD_TYPE=Release `
+            "-DCMAKE_C_COMPILER=$cc" "-DCMAKE_PREFIX_PATH=$env:VCPKG_DIR" @extra `
+            "-DMODSRC=$modsrc" "-DLUA_INC=$env:GITHUB_WORKSPACE/3rdparty/lua51/src" "-DLUA_LIB=$lualib"
+          if ($LASTEXITCODE -ne 0) { exit 4 }
+          cmake --build build-luamods
+          if ($LASTEXITCODE -ne 0) { exit 5 }
+          Get-ChildItem -Recurse build-luamods/out
+
+      - name: PipelineBenchmark on the runner
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:QT_ROOT_DIR\bin;$env:VCPKG_DIR\bin;$env:PATH"
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $env:MUDLET_TEST_MODE = '1'
+          Set-Location build/release
+          1..3 | ForEach-Object { .\PipelineBenchmark.exe 2>&1 | Select-String '^METRIC' | Tee-Object -FilePath "$env:GITHUB_WORKSPACE/bench-${{ matrix.v.id }}.txt" -Append }
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG="$(cygpath -u "$GITHUB_WORKSPACE")/package"
+          QTU="$(cygpath -u "$QT_ROOT_DIR")"
+          VCU="$(cygpath -u "$VCPKG_DIR")"
+          mkdir -p "$PKG"
+          cp build/release/mudlet.exe build/release/*.dll "$PKG/"
+          (cd "$PKG" && "$QTU/bin/windeployqt.exe" --release --compiler-runtime --translationdir ./share/qt6/translations ./mudlet.exe)
+          cp "$VCU"/bin/*.dll "$PKG/"
+          cp -r build-luamods/out/. "$PKG/"
+          cp 3rdparty/discord/rpc/lib/discord-rpc64.dll "$PKG/"
+          cp -r src/mudlet-lua "$PKG/mudlet-lua"
+          (cd 3rdparty/lcf && find . -name '.*' -prune -o \( -name '*.lua' -o -name 'LICENSE*' -o -name 'COPYING*' \) -type f -print | while read -r f; do mkdir -p "$PKG/lcf/$(dirname "$f")"; cp "$f" "$PKG/lcf/$f"; done)
+          mkdir -p "$PKG/translations/lua/translated"
+          cp translations/lua/translated/mudlet-lua_??_??.json "$PKG/translations/lua/translated/"
+          cp translations/lua/mudlet-lua.json "$PKG/translations/lua/"
+          cp src/*.aff src/*.dic "$PKG/"
+          cp "bench-${{ matrix.v.id }}.txt" "$PKG/" 2>/dev/null || true
+          echo "${{ matrix.v.id }} $(git rev-parse HEAD)" > "$PKG/exp-variant.txt"
+          ls "$PKG"
+          du -sh "$PKG"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mudlet-${{ matrix.v.id }}
+          path: package
+          retention-days: 30

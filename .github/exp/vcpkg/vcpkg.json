@@ -1,0 +1,16 @@
+{
+  "name": "mudlet-exp-deps",
+  "version-string": "0",
+  "dependencies": [
+    "pcre2",
+    "zlib",
+    { "name": "libzip", "default-features": false },
+    "pugixml",
+    "yajl",
+    "hunspell",
+    "boost-graph",
+    "boost-range",
+    "assimp",
+    "sqlite3"
+  ]
+}
