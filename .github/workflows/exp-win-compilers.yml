@@ -203,6 +203,8 @@ jobs:
           WITH_MCPSERVER: 'ON'
         run: |
           $ErrorActionPreference = 'Stop'
+          # no Lua interpreter on the runner; the stats only feed the language picker
+          Set-Content -NoNewline -Path translations/translated/translation-stats.json -Value '{}'
           $cc = '${{ matrix.v.cc }}'
           $common = @('-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
             "-DCMAKE_C_COMPILER=$cc", "-DCMAKE_CXX_COMPILER=$cc",
