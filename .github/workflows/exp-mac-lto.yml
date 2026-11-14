@@ -1,0 +1,193 @@
+# Throwaway: macOS release builds with and without LTO, and benchmarks of them.
+# Lives only on vadi2/Mudlet exp/mac-* branches; what runs comes from .github/exp-mac/config.json.
+# Never signs (beyond ad hoc), notarises or uploads anything outside this run's artifacts.
+name: exp-mac-lto
+on:
+  push:
+    branches: ['exp/mac-*']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.c.outputs.build }}
+      bench: ${{ steps.c.outputs.bench }}
+      ship: ${{ steps.c.outputs.ship }}
+      source: ${{ steps.c.outputs.source }}
+      build_run: ${{ steps.c.outputs.build_run }}
+      rounds: ${{ steps.c.outputs.rounds }}
+      arms: ${{ steps.c.outputs.arms }}
+      prefix: ${{ steps.c.outputs.prefix }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: c
+        run: |
+          f=.github/exp-mac/config.json
+          cat "$f"
+          for k in build bench ship; do echo "$k=$(jq -c ".$k" "$f")" >> "$GITHUB_OUTPUT"; done
+          echo "source=$(jq -r .bench_source "$f")" >> "$GITHUB_OUTPUT"
+          echo "build_run=$(jq -r .build_run "$f")" >> "$GITHUB_OUTPUT"
+          echo "rounds=$(jq -r .rounds "$f")" >> "$GITHUB_OUTPUT"
+          echo "arms=$(jq -r .arms "$f")" >> "$GITHUB_OUTPUT"
+          echo "prefix=$(jq -r .prefix "$f")" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: setup
+    if: needs.setup.outputs.build != '[]'
+    name: build ${{ matrix.arch }} ${{ matrix.variant }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.setup.outputs.build) }}
+    env:
+      LUA_VERSION: '5.1.5'
+    steps:
+    - name: Checkout Mudlet source code
+      uses: actions/checkout@v7
+      with:
+        submodules: recursive
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.11.3'
+        dir: ${{runner.workspace}}
+        cache: false
+        modules: qt5compat qtmultimedia qtspeech qtwebsockets qthttpserver
+
+    - name: Install Lua
+      uses: leafo/gh-actions-lua@v13
+      with:
+        luaVersion: ${{ env.LUA_VERSION }}
+        buildCache: false
+
+    - name: Install Luarocks
+      uses: leafo/gh-actions-luarocks@v6
+
+    - name: Install dependencies
+      env:
+        HOMEBREW_NO_ANALYTICS: "ON"
+        HOMEBREW_NO_AUTO_UPDATE: "ON"
+        HOMEBREW_NO_BOTTLE_SOURCE_FALLBACK: "ON"
+        HOMEBREW_NO_INSTALL_CLEANUP: "ON"
+      timeout-minutes: 15
+      run: |
+        brew uninstall --ignore-dependencies llvm@15 2>/dev/null || true
+        command -v ninja || brew install ninja
+        for attempt in 1 2 3; do
+          brew install libzzip libzip ccache assimp hunspell oniguruma pcre2 pugixml sqlite yajl boost &
+          brew_pid=$!
+          ( sleep 120 && kill $brew_pid 2>/dev/null ) &
+          watcher_pid=$!
+          wait $brew_pid && { kill $watcher_pid 2>/dev/null || true; wait $watcher_pid 2>/dev/null || true; break; }
+          kill $watcher_pid 2>/dev/null || true; wait $watcher_pid 2>/dev/null || true
+          echo "::warning::brew install attempt $attempt failed or timed out, retrying..."
+          [ "$attempt" -eq 3 ] && exit 1
+        done
+        echo "CCACHE_DIR=${{runner.workspace}}/ccache" >> $GITHUB_ENV
+        echo "DEVELOPER_DIR=$(xcode-select --print-path)" >> $GITHUB_ENV
+        echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+        if [ "$(uname -m)" = "arm64" ]; then HOMEBREW_PREFIX=/opt/homebrew; else HOMEBREW_PREFIX=/usr/local; fi
+        echo "HOMEBREW_PREFIX=$HOMEBREW_PREFIX" >> $GITHUB_ENV
+        echo "CMAKE_PREFIX_PATH=${QT_ROOT_DIR}:${HOMEBREW_PREFIX}" >> $GITHUB_ENV
+        echo "LUA_DIR=$HOME/.lua" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=${HOMEBREW_PREFIX}/opt/pcre2/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+        HOMEBREW_PREFIX="${HOMEBREW_PREFIX}" ${{github.workspace}}/CI/install-lua-rocks.sh lua-yajl
+        HOMEBREW_PREFIX="${HOMEBREW_PREFIX}" ${{github.workspace}}/CI/install-lua-rocks.sh
+        eval "$(luarocks path --local --lua-version "5.1")"
+        echo "LUA_PATH=$LUA_PATH" >> $GITHUB_ENV
+        echo "LUA_CPATH=$LUA_CPATH" >> $GITHUB_ENV
+
+    - name: Set build info
+      run: |
+        ${{github.workspace}}/CI/set-build-info.sh
+        echo "CXX=clang++" >> $GITHUB_ENV
+        echo "CC=clang" >> $GITHUB_ENV
+
+    - name: Build, train, rebuild, relink three layouts
+      env:
+        BUILD_DIR: ${{runner.workspace}}/b/ninja
+        GITHUB_WORKSPACE: ${{github.workspace}}
+      run: ${{github.workspace}}/.github/exp-mac/build.sh ${{ matrix.variant }} ${{runner.workspace}}/exp-out
+
+    - name: Upload apps
+      if: success()
+      uses: actions/upload-artifact@v7
+      with:
+        name: apps-${{ matrix.arch }}-${{ matrix.variant }}
+        path: ${{runner.workspace}}/exp-out/apps/*.zip
+        compression-level: 0
+        retention-days: 10
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: logs-${{ matrix.arch }}-${{ matrix.variant }}
+        path: |
+          ${{runner.workspace}}/exp-out/*.txt
+          ${{runner.workspace}}/exp-out/*.log
+          ${{runner.workspace}}/b/ninja/src/mudlet.map
+        retention-days: 10
+
+  bench:
+    needs: setup
+    if: needs.setup.outputs.bench != '[]'
+    name: bench ${{ matrix.arch }} ${{ matrix.job }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.setup.outputs.bench) }}
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install Qt (offscreen plugin for a release app)
+      if: needs.setup.outputs.source == 'release'
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.11.3'
+        dir: ${{runner.workspace}}
+        cache: false
+
+    - name: Download the release
+      if: needs.setup.outputs.source == 'release'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh release download Mudlet-5.1.1 -R Mudlet/Mudlet -p "Mudlet-5.1.1-${{ matrix.arch }}.dmg" -D ${{runner.workspace}}
+
+    - name: Download the build run's apps
+      if: needs.setup.outputs.source == 'run'
+      uses: actions/download-artifact@v8
+      with:
+        run-id: ${{ needs.setup.outputs.build_run }}
+        github-token: ${{ github.token }}
+        pattern: apps-${{ matrix.arch }}-*
+        path: ${{runner.workspace}}/zips
+        merge-multiple: true
+
+    - name: Benchmark
+      env:
+        W: ${{runner.workspace}}/w
+        SOURCE: ${{ needs.setup.outputs.source }}
+        ZIPS: ${{runner.workspace}}/zips
+        RELEASE_DMG: ${{runner.workspace}}/Mudlet-5.1.1-${{ matrix.arch }}.dmg
+        KEEP_FAILED_RUN: ${{runner.workspace}}/w/out/failed
+      run: |
+        ${{github.workspace}}/.github/exp-mac/bench-job.sh "${{ needs.setup.outputs.prefix }}${{ matrix.arch == 'arm64' && 'a' || 'i' }}${{ matrix.job }}" \
+          "${{ needs.setup.outputs.rounds }}" "${{ needs.setup.outputs.arms }}" "${{ matrix.offset }}"
+
+    - name: Upload results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: results-${{ needs.setup.outputs.prefix }}-${{ matrix.arch }}-${{ matrix.job }}
+        path: ${{runner.workspace}}/w/out
+        retention-days: 10

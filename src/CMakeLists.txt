@@ -1195,6 +1195,20 @@ if(USE_GUI)
   # can find and use Lua API symbols (like lua_gettop) at runtime. Without this, modules
   # will fail to load with "undefined symbol" errors.
   set_target_properties(${EXE_MUDLET_TARGET} PROPERTIES ENABLE_EXPORTS ON)
+
+  # exp/mac-lto: a link map always, and with MUDLET_LAYOUT_PAD a non-LTO object of N padding bytes
+  # that an ld64 order file places first in __TEXT,__text, so every function after it moves by N
+  if(APPLE)
+    target_link_options(${EXE_MUDLET_TARGET} PRIVATE "LINKER:-map,${CMAKE_CURRENT_BINARY_DIR}/mudlet.map")
+    set(MUDLET_LAYOUT_PAD "" CACHE STRING "exp: bytes of padding placed first in __text (empty = none)")
+    if(MUDLET_LAYOUT_PAD)
+      configure_file(exp_layout_pad.c.in ${CMAKE_CURRENT_BINARY_DIR}/exp_layout_pad.c @ONLY)
+      set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/exp_layout_pad.c PROPERTIES COMPILE_OPTIONS "-fno-lto")
+      target_sources(${EXE_MUDLET_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/exp_layout_pad.c)
+      file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exp_layout.order "_mudlet_layout_pad\n")
+      target_link_options(${EXE_MUDLET_TARGET} PRIVATE "LINKER:-order_file,${CMAKE_CURRENT_BINARY_DIR}/exp_layout.order")
+    endif()
+  endif()
 endif()
 
 if(USE_HEADLESS)

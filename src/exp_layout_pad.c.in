@@ -1,0 +1,7 @@
+// exp/mac-lto: @MUDLET_LAYOUT_PAD@ bytes the order file puts at the head of __text
+__asm__(".section __TEXT,__text,regular,pure_instructions\n"
+        ".globl _mudlet_layout_pad\n"
+        ".no_dead_strip _mudlet_layout_pad\n"
+        ".p2align 6\n"
+        "_mudlet_layout_pad:\n"
+        ".space @MUDLET_LAYOUT_PAD@, 0\n");

@@ -83,7 +83,8 @@ add_dependencies(${EXE_MUDLET_TARGET} sentry_native)
 # ccache cost. The price is that builds which do upload - nightly PTBs and
 # tagged releases - no longer share mudlet_core's objects with the development
 # pushes whose ccache they start from, so they compile it afresh.
-if(SENTRY_SEND_DEBUG OR CMAKE_BUILD_TYPE MATCHES "^(Debug|RelWithDebInfo)$")
+# exp/mac-lto: EXP_FULL_DEBUG gives the -g of a tag build without its Sentry upload
+if(SENTRY_SEND_DEBUG OR EXP_FULL_DEBUG OR CMAKE_BUILD_TYPE MATCHES "^(Debug|RelWithDebInfo)$")
   set(SENTRY_DEBUG_INFO_FLAG -g)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(SENTRY_DEBUG_INFO_FLAG -gline-tables-only)
@@ -184,6 +185,14 @@ add_dependencies(copy_sentry sentry_native)
 add_dependencies(${EXE_MUDLET_TARGET} copy_sentry)
 
 if(APPLE)
+    # dsymutil reads the debug info from the objects the linker used, and the linker deletes the ones
+    # LTO makes unless told where to keep them
+    if(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mudlet-lto")
+        target_link_options(${EXE_MUDLET_TARGET} PRIVATE "LINKER:-object_path_lto,${CMAKE_CURRENT_BINARY_DIR}/mudlet-lto")
+    elseif(CMAKE_CXX_FLAGS MATCHES "-flto=full")
+        target_link_options(${EXE_MUDLET_TARGET} PRIVATE "LINKER:-object_path_lto,${CMAKE_CURRENT_BINARY_DIR}/mudlet-lto.o")
+    endif()
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_custom_command(TARGET ${EXE_MUDLET_TARGET} POST_BUILD
             COMMAND dsymutil $<TARGET_FILE:${EXE_MUDLET_TARGET}> -o $<TARGET_FILE:${EXE_MUDLET_TARGET}>.dSYM
