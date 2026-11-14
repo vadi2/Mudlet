@@ -1,10 +1,10 @@
 # Throwaway: macOS release builds with and without LTO, and benchmarks of them.
-# Lives only on vadi2/Mudlet exp/mac-* branches; what runs comes from .github/exp-mac/config.json.
+# Lives only on vadi2/Mudlet's exp/mac-lto branch; what runs comes from .github/exp-mac/config.json.
 # Never signs (beyond ad hoc), notarises or uploads anything outside this run's artifacts.
 name: exp-mac-lto
 on:
   push:
-    branches: ['exp/mac-*']
+    branches: ['exp/mac-lto']
 
 permissions:
   contents: read
@@ -163,20 +163,12 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: gh release download Mudlet-5.1.1 -R Mudlet/Mudlet -p "Mudlet-5.1.1-${{ matrix.arch }}.dmg" -D ${{runner.workspace}}
 
-    - name: Download the build run's apps
-      if: needs.setup.outputs.source == 'run'
-      uses: actions/download-artifact@v8
-      with:
-        run-id: ${{ needs.setup.outputs.build_run }}
-        github-token: ${{ github.token }}
-        pattern: apps-${{ matrix.arch }}-*
-        path: ${{runner.workspace}}/zips
-        merge-multiple: true
-
     - name: Benchmark
       env:
         W: ${{runner.workspace}}/w
         SOURCE: ${{ needs.setup.outputs.source }}
+        BUILD_RUNS: ${{ needs.setup.outputs.build_run }}
+        GH_TOKEN: ${{ github.token }}
         ZIPS: ${{runner.workspace}}/zips
         RELEASE_DMG: ${{runner.workspace}}/Mudlet-5.1.1-${{ matrix.arch }}.dmg
         KEEP_FAILED_RUN: ${{runner.workspace}}/w/out/failed

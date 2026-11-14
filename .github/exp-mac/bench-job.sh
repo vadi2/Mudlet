@@ -1,7 +1,7 @@
 #!/bin/bash
 # One benchmark job: unpack every app onto this runner, fetch the svof bundle, run drive.sh.
 # usage: bench-job.sh <prefix> <rounds> <arms> <offset>
-# env: W (work dir), SOURCE (release | run), ZIPS (the build artifacts' zips), RELEASE_DMG, QT_ROOT_DIR
+# env: W (work dir), SOURCE (release | run), BUILD_RUNS, ZIPS, RELEASE_DMG, QT_ROOT_DIR, GH_TOKEN
 set -u
 H="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 prefix=$1 rounds=$2 arms=$3
@@ -32,6 +32,17 @@ if [ "$SOURCE" = release ]; then
   add_offscreen "$W/apps/bp/Mudlet.app"
   otool -L "$W/apps/bp/Mudlet.app/Contents/Frameworks/QtCore.framework/Versions/A/QtCore" | head -3
 else
+  # every apps-<arch>-* artifact of the build runs named in BUILD_RUNS
+  mkdir -p "$ZIPS"
+  for run in $BUILD_RUNS; do
+    gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts" \
+      --jq ".artifacts[] | select(.name | startswith(\"apps-$(uname -m)-\")) | \"\(.id) \(.name)\"" |
+    while read -r id name; do
+      echo "run $run artifact $name"
+      gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$W/$name.zip" && unzip -qo "$W/$name.zip" -d "$ZIPS" && rm "$W/$name.zip"
+    done
+  done
+  ls -la "$ZIPS"
   for z in "$ZIPS"/*.zip; do
     base=$(basename "$z" .zip)
     v=${base%-L*} l=${base##*-L}

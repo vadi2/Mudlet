@@ -39,7 +39,7 @@ trap 'kill $MEMPID 2>/dev/null' EXIT
 export CMAKE_BUILD_TYPE=Release MUDLET_PGO=GENERATE USE_SANITIZER= WITH_SENTRY=ON SENTRY_SEND_DEBUG=0 SENTRY_DSN= WITH_MCPSERVER=ON
 export NINJA_STATUS='[%f/%t %o/sec] '
 stamp "configure GENERATE"
-cmake --preset ci-macos -DEXP_FULL_DEBUG=ON "${VFLAGS[@]}" > "$OUT/configure-generate.log" 2>&1 || { tail -40 "$OUT/configure-generate.log"; die "configure GENERATE"; }
+cmake --preset ci-macos -DEXP_FULL_DEBUG=ON ${VFLAGS[@]+"${VFLAGS[@]}"} > "$OUT/configure-generate.log" 2>&1 || { tail -40 "$OUT/configure-generate.log"; die "configure GENERATE"; }
 nlog() { # the .ninja_log lines the last build appended (all of it if ninja recompacted the log)
   local n; n=$(wc -l < "$B/.ninja_log")
   if [ "$n" -gt "$1" ]; then tail -n +$(($1 + 1)) "$B/.ninja_log"; else cat "$B/.ninja_log"; fi > "$2"

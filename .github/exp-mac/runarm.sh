@@ -18,7 +18,7 @@ cpu_ms() { ps -o time= -p "$1" 2>/dev/null | awk '{n = split($1, p, ":"); s = 0;
 
 goarg=()
 [ "$usego" = 1 ] && goarg=(--go "$go")
-python3 "$H/logserver.py" "$corpus" "$repeats" "$slog" "$R/port" "${goarg[@]}" &
+python3 "$H/logserver.py" "$corpus" "$repeats" "$slog" "$R/port" ${goarg[@]+"${goarg[@]}"} &
 srv=$!
 for _ in $(seq 1 100); do [ -f "$R/port" ] && break; sleep 0.05; done
 port=$(cat "$R/port" 2>/dev/null)
