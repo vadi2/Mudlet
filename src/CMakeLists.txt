@@ -1186,7 +1186,17 @@ if(USE_GUI)
 
   # main() stays out of the libraries: a test that links them brings its own, and
   # the linker can pull main.cpp's object in for any inline function it defines.
-  add_executable(${EXE_MUDLET_TARGET} main.cpp HardwareDeviceTypes.h)
+  # EXPERIMENT ONLY (exp/linux-*): MUDLET_LAYOUT_PAD bytes of int3 in plain .text of a non-LTO object
+  # linked first, so mold places it ahead of all other code (LTO output comes after crtn.o); the map proves it.
+  set(MUDLET_LAYOUT_PAD "0" CACHE STRING "experiment: bytes of padding ahead of all code")
+  set(MUDLET_LAYOUT_PAD_SRC)
+  if(MUDLET_LAYOUT_PAD GREATER 0)
+    set(MUDLET_LAYOUT_PAD_SRC "${CMAKE_CURRENT_BINARY_DIR}/exp_layout_pad.cpp")
+    file(WRITE "${MUDLET_LAYOUT_PAD_SRC}" "__asm__(\".text\\n.globl mudlet_layout_pad\\nmudlet_layout_pad:\\n.fill ${MUDLET_LAYOUT_PAD},1,0xcc\\n\");\n")
+    set_source_files_properties("${MUDLET_LAYOUT_PAD_SRC}" PROPERTIES COMPILE_OPTIONS "-fno-lto" SKIP_PRECOMPILE_HEADERS ON)
+  endif()
+  add_executable(${EXE_MUDLET_TARGET} ${MUDLET_LAYOUT_PAD_SRC} main.cpp HardwareDeviceTypes.h)
+  target_link_options(${EXE_MUDLET_TARGET} PRIVATE "LINKER:-Map=${CMAKE_CURRENT_BINARY_DIR}/mudlet.map")
   target_compile_definitions(${EXE_MUDLET_TARGET} PRIVATE APP_TARGET="${APP_TARGET}")
   set_target_properties(${EXE_MUDLET_TARGET} PROPERTIES OUTPUT_NAME ${EXE_MUDLET_NAME})
   target_link_libraries(${EXE_MUDLET_TARGET} ${LIB_MUDLET_APP_TARGET} mudlet_lsan_hooks)

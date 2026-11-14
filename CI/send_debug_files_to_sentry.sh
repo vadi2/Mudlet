@@ -106,6 +106,13 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 
 download_sentry_cli "$OS" "$ARCH" "sentry-cli"
+# EXPERIMENT ONLY: check the debug files, upload nothing
+if [ "${EXP_SENTRY_DRYRUN:-}" = "1" ]; then
+    ./sentry-cli debug-files check "$MUDLET_EXEC" || true
+    if [[ -f "${MUDLET_EXEC}.debug" ]]; then ./sentry-cli debug-files check "${MUDLET_EXEC}.debug" || true; fi
+    rm -f sentry-cli
+    exit 0
+fi
 ./sentry-cli login --auth-token "$SENTRY_AUTH_TOKEN"
 
 FILES_TO_UPLOAD=("$MUDLET_EXEC")
