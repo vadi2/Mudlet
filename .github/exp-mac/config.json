@@ -3,22 +3,25 @@
     {
       "os": "macos-15",
       "arch": "arm64",
-      "variant": "bp"
+      "variant": "tl"
     },
     {
       "os": "macos-15-intel",
       "arch": "x86_64",
-      "variant": "bp"
-    }
-  ],
-  "bench": [
+      "variant": "tl"
+    },
     {
       "os": "macos-15",
       "arch": "arm64",
-      "job": 1,
-      "offset": 0
+      "variant": "fl"
+    },
+    {
+      "os": "macos-15-intel",
+      "arch": "x86_64",
+      "variant": "fl"
     }
   ],
+  "bench": [],
   "bench_source": "release",
   "build_run": "",
   "rounds": 1,
