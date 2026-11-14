@@ -1,4 +1,8 @@
 [
-  {"name": "gcc12-pgo-L2", "cc": "gcc", "ver": "12", "ipo": "OFF", "args": "", "pad": "1040", "tests": "false"},
-  {"name": "gcc12-pgo-L3", "cc": "gcc", "ver": "12", "ipo": "OFF", "args": "", "pad": "2208", "tests": "false"}
+  {"name": "clang23-pgo-L2", "cc": "clang", "ver": "23", "ipo": "OFF", "args": "-DUSE_ALTERNATE_LINKER=lld", "pad": "1040", "tests": "false"},
+  {"name": "clang23-pgo-L3", "cc": "clang", "ver": "23", "ipo": "OFF", "args": "-DUSE_ALTERNATE_LINKER=lld", "pad": "2208", "tests": "false"},
+  {"name": "clang23-pgo-thin-L2", "cc": "clang", "ver": "23", "ipo": "ON", "args": "-DUSE_ALTERNATE_LINKER=lld", "pad": "1040", "tests": "false"},
+  {"name": "clang23-pgo-thin-L3", "cc": "clang", "ver": "23", "ipo": "ON", "args": "-DUSE_ALTERNATE_LINKER=lld", "pad": "2208", "tests": "false"},
+  {"name": "gcc12-pgo-lto-L2", "cc": "gcc", "ver": "12", "ipo": "ON", "args": "", "pad": "1040", "tests": "false"},
+  {"name": "gcc12-pgo-lto-L3", "cc": "gcc", "ver": "12", "ipo": "ON", "args": "", "pad": "2208", "tests": "false"}
 ]
