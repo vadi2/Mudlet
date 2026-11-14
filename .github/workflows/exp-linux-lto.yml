@@ -3,25 +3,32 @@
 # ctest, AppImage, Lua tests) once per variant, with the toolchain/LTO/layout knobs varied.
 name: exp linux lto
 on:
-  workflow_dispatch:
-    inputs:
-      variants:
-        description: 'JSON list of {name, cc (gcc|clang), ver, ipo (ON|OFF), args, pad, tests}'
-        required: true
-        type: string
+  push:
+    branches: ['exp/linux-*']
 
 permissions:
   contents: read
 
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      variants: ${{ steps.v.outputs.variants }}
+    steps:
+    - uses: actions/checkout@v7
+    - id: v
+      # each entry: {name, cc (gcc|clang), ver, ipo (ON|OFF), args, pad, tests}
+      run: echo "variants=$(jq -c . .github/exp/linux-variants.json)" >> "$GITHUB_OUTPUT"
+
   build:
     name: ${{ matrix.v.name }}
+    needs: setup
     runs-on: ubuntu-22.04
     timeout-minutes: 340
     strategy:
       fail-fast: false
       matrix:
-        v: ${{ fromJSON(inputs.variants) }}
+        v: ${{ fromJSON(needs.setup.outputs.variants) }}
     env:
       LUA_VERSION: '5.1.5'
       CCACHE_MAXSIZE: 2G
