@@ -1,31 +1,48 @@
 {
-  "build": [
+  "build": [],
+  "bench": [
     {
       "os": "macos-15",
       "arch": "arm64",
-      "variant": "tl"
-    },
-    {
-      "os": "macos-15-intel",
-      "arch": "x86_64",
-      "variant": "tl"
+      "job": 1,
+      "offset": 0
     },
     {
       "os": "macos-15",
       "arch": "arm64",
-      "variant": "fl"
+      "job": 2,
+      "offset": 1
+    },
+    {
+      "os": "macos-15",
+      "arch": "arm64",
+      "job": 3,
+      "offset": 2
     },
     {
       "os": "macos-15-intel",
       "arch": "x86_64",
-      "variant": "fl"
+      "job": 1,
+      "offset": 0
+    },
+    {
+      "os": "macos-15-intel",
+      "arch": "x86_64",
+      "job": 2,
+      "offset": 1
+    },
+    {
+      "os": "macos-15-intel",
+      "arch": "x86_64",
+      "job": 3,
+      "offset": 2
     }
   ],
-  "bench": [],
-  "bench_source": "release",
-  "build_run": "",
-  "rounds": 1,
-  "arms": "bpsvof,bp46",
-  "prefix": "smoketwo",
-  "ship": []
+  "bench_source": "run",
+  "build_run": "43576142451 43580173186",
+  "rounds": 10,
+  "arms": "ctl46,bp46,tl46,fl46,bpsvof,tlsvof,flsvof,bp0,tl0,fl0,bpb46,tlb46,flb46,bpbsvof,tlbsvof,flbsvof,bpb0,tlb0,flb0,bpc46,tlc46,flc46,bpcsvof,tlcsvof,flcsvof,bpc0,tlc0,flc0",
+  "prefix": "m",
+  "ship": [],
+  "stride": 5
 }
