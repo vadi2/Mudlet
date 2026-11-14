@@ -22,6 +22,7 @@ jobs:
       rounds: ${{ steps.c.outputs.rounds }}
       arms: ${{ steps.c.outputs.arms }}
       prefix: ${{ steps.c.outputs.prefix }}
+      stride: ${{ steps.c.outputs.stride }}
     steps:
       - uses: actions/checkout@v7
       - id: c
@@ -34,6 +35,7 @@ jobs:
           echo "rounds=$(jq -r .rounds "$f")" >> "$GITHUB_OUTPUT"
           echo "arms=$(jq -r .arms "$f")" >> "$GITHUB_OUTPUT"
           echo "prefix=$(jq -r .prefix "$f")" >> "$GITHUB_OUTPUT"
+          echo "stride=$(jq -r '.stride // ""' "$f")" >> "$GITHUB_OUTPUT"
 
   build:
     needs: setup
@@ -168,6 +170,7 @@ jobs:
         W: ${{runner.workspace}}/w
         SOURCE: ${{ needs.setup.outputs.source }}
         BUILD_RUNS: ${{ needs.setup.outputs.build_run }}
+        STRIDE: ${{ needs.setup.outputs.stride }}
         GH_TOKEN: ${{ github.token }}
         ZIPS: ${{runner.workspace}}/zips
         RELEASE_DMG: ${{runner.workspace}}/Mudlet-5.1.1-${{ matrix.arch }}.dmg

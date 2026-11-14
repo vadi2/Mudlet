@@ -2,7 +2,7 @@
 # N interleaved rounds of every arm, one arm at a time, the order rotated each round.
 # Arm = <code><workload>: workload 46 (bench3.lua), 0 (bench0.lua), svof (the real svof replay).
 # ctl46 = bp's own app on 46 a second time, the control. The app for <code> is $W/apps/<code>/*.app.
-# usage: drive.sh <prefix> <rounds> <arm,arm,...>    env: W, SVOF_BUNDLE, OFFSET (rotation start)
+# usage: drive.sh <prefix> <rounds> <arm,arm,...>    env: W, SVOF_BUNDLE, OFFSET (rotation start), STRIDE
 set -u
 prefix=$1 rounds=$2
 IFS=, read -r -a list <<< "$3"
@@ -12,7 +12,7 @@ mkdir -p "$O"
 prog=$O/progress.txt
 mark() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$prog"; }
 n=${#list[@]}
-stride=$(( n / rounds )); [ $stride -lt 1 ] && stride=1
+stride=${STRIDE:-}; [ -n "$stride" ] || stride=$(( n / rounds )); [ "$stride" -lt 1 ] && stride=1
 SVOF="mode = [==[socket]==], bundle = [==[$SVOF_BUNDLE]==], settle = 4.0"
 svofcorpus=$SVOF_BUNDLE/$(python3 -c 'import re, sys; print(re.search(r"corpus\s*=\s*\"([^\"]+)\"", open(sys.argv[1]).read()).group(1))' "$SVOF_BUNDLE/manifest.lua")
 
