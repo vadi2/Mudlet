@@ -1,8 +1,5 @@
 [
-  {"name": "clang23-pgo-L2", "cc": "clang", "ver": "23", "ipo": "OFF", "args": "-DUSE_ALTERNATE_LINKER=lld", "pad": "1040", "tests": "false"},
-  {"name": "clang23-pgo-L3", "cc": "clang", "ver": "23", "ipo": "OFF", "args": "-DUSE_ALTERNATE_LINKER=lld", "pad": "2208", "tests": "false"},
-  {"name": "clang23-pgo-thin-L2", "cc": "clang", "ver": "23", "ipo": "ON", "args": "-DUSE_ALTERNATE_LINKER=lld", "pad": "1040", "tests": "false"},
-  {"name": "clang23-pgo-thin-L3", "cc": "clang", "ver": "23", "ipo": "ON", "args": "-DUSE_ALTERNATE_LINKER=lld", "pad": "2208", "tests": "false"},
-  {"name": "gcc12-pgo-lto-L2", "cc": "gcc", "ver": "12", "ipo": "ON", "args": "", "pad": "1040", "tests": "false"},
-  {"name": "gcc12-pgo-lto-L3", "cc": "gcc", "ver": "12", "ipo": "ON", "args": "", "pad": "2208", "tests": "false"}
+  {"name": "clang23-pgo-full", "cc": "clang", "ver": "23", "ipo": "OFF", "args": "-DUSE_ALTERNATE_LINKER=lld -DCMAKE_C_FLAGS=-flto=full -DCMAKE_CXX_FLAGS=-flto=full -DCMAKE_EXE_LINKER_FLAGS=-flto=full -DCMAKE_SHARED_LINKER_FLAGS=-flto=full", "pad": "0", "tests": "false"},
+  {"name": "clang23-pgo-full-tests", "cc": "clang", "ver": "23", "ipo": "OFF", "args": "-DUSE_ALTERNATE_LINKER=lld -DCMAKE_C_FLAGS=-flto=full -DCMAKE_CXX_FLAGS=-flto=full -DCMAKE_EXE_LINKER_FLAGS=-flto=full -DCMAKE_SHARED_LINKER_FLAGS=-flto=full -DCMAKE_JOB_POOLS=link=2 -DCMAKE_JOB_POOL_LINK=link", "pad": "0", "tests": "true"},
+  {"name": "clang23-pgo-thin-cache", "cc": "clang", "ver": "23", "ipo": "ON", "args": "-DUSE_ALTERNATE_LINKER=lld -DCMAKE_EXE_LINKER_FLAGS=-Wl,--thinlto-cache-dir=thinlto-cache", "pad": "0", "tests": "true"}
 ]
