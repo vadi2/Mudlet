@@ -1,0 +1,10 @@
+[
+  {"name": "gcc12-pgo", "cc": "gcc", "ver": "12", "ipo": "OFF", "args": "", "pad": "0", "tests": "true"},
+  {"name": "gcc12-pgo-lto", "cc": "gcc", "ver": "12", "ipo": "ON", "args": "", "pad": "0", "tests": "true"},
+  {"name": "gcc12-pgo-lto1", "cc": "gcc", "ver": "12", "ipo": "ON", "args": "-DCMAKE_EXE_LINKER_FLAGS=-flto-partition=one", "pad": "0", "tests": "true"},
+  {"name": "clang23-pgo", "cc": "clang", "ver": "23", "ipo": "OFF", "args": "-DUSE_ALTERNATE_LINKER=lld", "pad": "0", "tests": "true"},
+  {"name": "clang23-pgo-thin", "cc": "clang", "ver": "23", "ipo": "ON", "args": "-DUSE_ALTERNATE_LINKER=lld", "pad": "0", "tests": "true"},
+  {"name": "gcc12-pgo-ktsp", "cc": "gcc", "ver": "12", "ipo": "OFF", "args": "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-z,keep-text-section-prefix", "pad": "0", "tests": "false"},
+  {"name": "gcc14-pgo", "cc": "gcc", "ver": "14", "ipo": "OFF", "args": "", "pad": "0", "tests": "false"},
+  {"name": "gcc14-pgo-lto", "cc": "gcc", "ver": "14", "ipo": "ON", "args": "", "pad": "0", "tests": "false"}
+]
