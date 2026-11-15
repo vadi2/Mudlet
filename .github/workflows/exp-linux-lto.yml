@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - id: v
-      # each entry: {name, cc (gcc|clang), ver, ipo (ON|OFF), args, pad, tests}
+      # each entry: {name, cc (gcc|clang), ver, ipo (ON|OFF), args, pad, tests, cflags?, ldflags?}
       run: echo "variants=$(jq -c . .github/exp/linux-variants.json)" >> "$GITHUB_OUTPUT"
 
   build:
@@ -175,6 +175,13 @@ jobs:
       run: |
         ${{github.workspace}}/CI/validate_deployment.sh
         ${{github.workspace}}/CI/set-build-info.sh
+
+    - name: exp hardening env
+      if: matrix.v.cflags != ''
+      run: |
+        echo "CFLAGS=${{ matrix.v.cflags }}" >> "$GITHUB_ENV"
+        echo "CXXFLAGS=${{ matrix.v.cflags }}" >> "$GITHUB_ENV"
+        echo "LDFLAGS=${{ matrix.v.ldflags }}" >> "$GITHUB_ENV"
 
     - name: Build Mudlet (instrumented benchmarks)
       env:

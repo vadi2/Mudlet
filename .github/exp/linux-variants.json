@@ -1,3 +1,35 @@
 [
-  {"name": "clang23-pgo-thin-cache", "cc": "clang", "ver": "23", "ipo": "ON", "args": "-DUSE_ALTERNATE_LINKER=lld '-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -Wl,--thinlto-cache-dir=thinlto-cache'", "pad": "0", "tests": "true"}
+  {
+    "name": "clang23-pgo-thin-hard",
+    "cc": "clang",
+    "ver": "23",
+    "ipo": "ON",
+    "args": "-DUSE_ALTERNATE_LINKER=lld",
+    "pad": "0",
+    "tests": "true",
+    "cflags": "-fstack-protector-strong -fstack-clash-protection -fcf-protection -D_FORTIFY_SOURCE=2",
+    "ldflags": "-fuse-ld=lld -Wl,--thinlto-cache-dir=thinlto-cache -Wl,-z,now -Wl,--as-needed"
+  },
+  {
+    "name": "clang23-pgo-thin-hard-L2",
+    "cc": "clang",
+    "ver": "23",
+    "ipo": "ON",
+    "args": "-DUSE_ALTERNATE_LINKER=lld",
+    "pad": "1040",
+    "tests": "false",
+    "cflags": "-fstack-protector-strong -fstack-clash-protection -fcf-protection -D_FORTIFY_SOURCE=2",
+    "ldflags": "-fuse-ld=lld -Wl,--thinlto-cache-dir=thinlto-cache -Wl,-z,now -Wl,--as-needed"
+  },
+  {
+    "name": "clang23-pgo-thin-hard-L3",
+    "cc": "clang",
+    "ver": "23",
+    "ipo": "ON",
+    "args": "-DUSE_ALTERNATE_LINKER=lld",
+    "pad": "2208",
+    "tests": "false",
+    "cflags": "-fstack-protector-strong -fstack-clash-protection -fcf-protection -D_FORTIFY_SOURCE=2",
+    "ldflags": "-fuse-ld=lld -Wl,--thinlto-cache-dir=thinlto-cache -Wl,-z,now -Wl,--as-needed"
+  }
 ]
