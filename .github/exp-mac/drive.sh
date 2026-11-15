@@ -39,8 +39,16 @@ busy() { top -l 2 -n 0 -s 1 | awk '/CPU usage/ {idle = $(NF - 1)} END {sub("%", 
 mark "start rounds=$rounds arms=$3 stride=$stride offset=${OFFSET:-0} $(sysctl -n hw.ncpu) cpus $(sysctl -n machdep.cpu.brand_string)"
 for r in $(seq 1 "$rounds"); do
   k=$(( ((r - 1) * stride + ${OFFSET:-0}) % n ))
+  # PAIRFLIP: the list is pairs; start on a pair and swap each pair's order every other round
+  flip=0
+  if [ -n "${PAIRFLIP:-}" ]; then
+    k=$(( (k / 2) * 2 ))
+    flip=$(( (r + ${OFFSET:-0}) % 2 ))
+  fi
   for i in $(seq 0 $((n - 1))); do
-    a=${list[$(( (k + i) % n ))]}
+    j=$(( (k + i) % n ))
+    [ "$flip" = 1 ] && j=$(( j ^ 1 ))
+    a=${list[$j]}
     tag=$prefix-$r-$a
     o=$O/$tag.txt
     for try in 1 2; do

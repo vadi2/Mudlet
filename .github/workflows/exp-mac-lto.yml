@@ -171,6 +171,7 @@ jobs:
         SOURCE: ${{ needs.setup.outputs.source }}
         BUILD_RUNS: ${{ needs.setup.outputs.build_run }}
         STRIDE: ${{ needs.setup.outputs.stride }}
+        PAIRFLIP: ${{ matrix.pairflip }}
         GH_TOKEN: ${{ github.token }}
         ZIPS: ${{runner.workspace}}/zips
         RELEASE_DMG: ${{runner.workspace}}/Mudlet-5.1.1-${{ matrix.arch }}.dmg

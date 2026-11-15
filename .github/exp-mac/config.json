@@ -5,44 +5,36 @@
       "os": "macos-15",
       "arch": "arm64",
       "job": 1,
-      "offset": 0
+      "offset": 0,
+      "pairflip": "1"
     },
     {
       "os": "macos-15",
       "arch": "arm64",
       "job": 2,
-      "offset": 1
+      "offset": 2,
+      "pairflip": "1"
     },
     {
       "os": "macos-15",
       "arch": "arm64",
       "job": 3,
-      "offset": 2
+      "offset": 4,
+      "pairflip": "1"
     },
     {
-      "os": "macos-15-intel",
-      "arch": "x86_64",
-      "job": 1,
-      "offset": 0
-    },
-    {
-      "os": "macos-15-intel",
-      "arch": "x86_64",
-      "job": 2,
-      "offset": 1
-    },
-    {
-      "os": "macos-15-intel",
-      "arch": "x86_64",
-      "job": 3,
-      "offset": 2
+      "os": "macos-15",
+      "arch": "arm64",
+      "job": 4,
+      "offset": 6,
+      "pairflip": "1"
     }
   ],
   "bench_source": "run",
   "build_run": "43576142451 43580173186",
-  "rounds": 10,
-  "arms": "ctl46,bp46,tl46,fl46,bpsvof,tlsvof,flsvof,bp0,tl0,fl0,bpb46,tlb46,flb46,bpbsvof,tlbsvof,flbsvof,bpb0,tlb0,flb0,bpc46,tlc46,flc46,bpcsvof,tlcsvof,flcsvof,bpc0,tlc0,flc0",
-  "prefix": "m",
+  "rounds": 16,
+  "arms": "bp46,tl46,bpsvof,tlsvof,bp0,tl0,bpb46,tlb46,bpbsvof,tlbsvof,bpb0,tlb0,bpc46,tlc46,bpcsvof,tlcsvof,bpc0,tlc0",
+  "prefix": "p",
   "ship": [],
-  "stride": 5
+  "stride": 4
 }
