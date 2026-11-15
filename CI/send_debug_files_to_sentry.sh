@@ -1,4 +1,5 @@
 #!/bin/bash
+exit 0 # exp only: no upload
 ###########################################################################
 #   Copyright (C) 2025 by Nicolas Keita - nicolaskeita2@gmail.com         #
 #                                                                         #
